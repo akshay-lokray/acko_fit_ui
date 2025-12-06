@@ -6,6 +6,15 @@
   overflow: hidden;
   background: transparent;
   min-height: 500px;
+  /* Add a subtle border to help see the container */
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.avatar-scene-container canvas {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  outline: none;
 }
 
 .avatar-placeholder {

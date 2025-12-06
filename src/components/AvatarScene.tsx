@@ -186,18 +186,26 @@ export default function AvatarScene({
         gl={{ 
           antialias: true, 
           alpha: true,
-          preserveDrawingBuffer: true
+          preserveDrawingBuffer: true,
+          powerPreference: "high-performance"
         }}
-        style={{ background: 'transparent' }}
+        style={{ 
+          background: 'transparent',
+          width: '100%',
+          height: '100%',
+          display: 'block'
+        }}
+        dpr={[1, 2]}
         onError={(err) => {
           console.error('Canvas error:', err);
           setError('Failed to render 3D scene');
         }}
       >
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[5, 5, 5]} intensity={1} castShadow />
-        <directionalLight position={[-5, 3, -5]} intensity={0.5} />
-        <pointLight position={[0, 5, 0]} intensity={0.3} />
+        <ambientLight intensity={0.8} />
+        <directionalLight position={[5, 5, 5]} intensity={1.2} castShadow />
+        <directionalLight position={[-5, 3, -5]} intensity={0.6} />
+        <pointLight position={[0, 5, 0]} intensity={0.4} />
+        <directionalLight position={[0, 10, 0]} intensity={0.5} />
         
         <Suspense fallback={
           <Html center>

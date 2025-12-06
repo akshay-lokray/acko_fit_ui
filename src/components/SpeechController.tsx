@@ -156,11 +156,14 @@ export default function SpeechController({
         'siri female', 'alex female', 'cortana'
       ];
       
-      // Common male voice names to exclude
+      // Common male voice names to exclude (comprehensive list)
       const maleVoiceKeywords = [
         'male', 'david', 'mark', 'richard', 'james', 'ravi', 'ajay',
         'kiran', 'arjun', 'tom', 'daniel', 'alex', 'google uk english male',
-        'microsoft david', 'siri male'
+        'microsoft david', 'siri male', 'thomas', 'john', 'paul', 'mike',
+        'michael', 'robert', 'william', 'charles', 'george', 'joseph',
+        'kevin', 'brian', 'edward', 'ronald', 'anthony', 'kenny',
+        'google us english male', 'microsoft mark', 'microsoft richard'
       ];
       
       // Priority 1: Indian English female voices
@@ -214,9 +217,21 @@ export default function SpeechController({
               if (preferredVoice) {
                 console.log('✅ Found common female voice:', preferredVoice.name);
               } else {
-                // Last resort: any English voice
-                preferredVoice = voices.find((voice) => voice.lang.includes('en')) || voices[0] || null;
-                console.warn('⚠️ Using fallback voice (may not be female):', preferredVoice?.name);
+                // Last resort: Find ANY English voice that's NOT male (will be verified later)
+                const nonMaleVoices = voices.filter(v => 
+                  v.lang.includes('en') && 
+                  !maleVoiceKeywords.some(keyword => v.name.toLowerCase().includes(keyword))
+                );
+                
+                if (nonMaleVoices.length > 0) {
+                  preferredVoice = nonMaleVoices[0];
+                  console.warn('⚠️ Using non-male voice as last resort:', preferredVoice.name);
+                  console.warn('   Note: This voice may not be explicitly female, but it is not male');
+                } else {
+                  console.error('❌ No suitable female voice found!');
+                  console.error('Available voices:', voices.map(v => `${v.name} (${v.lang})`));
+                  preferredVoice = null;
+                }
               }
             }
           }
@@ -266,24 +281,62 @@ export default function SpeechController({
         voices[0];
     }
 
+    // Final verification: if female is requested, double-check it's not a male voice
+    if (preferredVoice && voiceType === 'female') {
+      const voiceNameLower = preferredVoice.name.toLowerCase();
+      const maleKeywords = ['male', 'david', 'mark', 'richard', 'james', 'ravi', 'ajay', 'kiran', 'arjun', 'tom', 'daniel', 'michael', 'thomas', 'john', 'paul', 'mike'];
+      
+      if (maleKeywords.some(keyword => voiceNameLower.includes(keyword))) {
+        console.error('❌ ERROR: Selected voice appears to be MALE:', preferredVoice.name);
+        console.log('   Rejecting this voice and searching for a different one...');
+        
+        // Try to find a different voice
+        const alternativeVoice = voices.find((voice) => {
+          const name = voice.name.toLowerCase();
+          return voice.lang.includes('en') &&
+                 !maleKeywords.some(k => name.includes(k)) &&
+                 (name.includes('female') || 
+                  name.includes('zira') || 
+                  name.includes('samantha') || 
+                  name.includes('karen') ||
+                  name.includes('susan') ||
+                  name.includes('victoria') ||
+                  name.includes('linda'));
+        });
+        
+        if (alternativeVoice) {
+          preferredVoice = alternativeVoice;
+          console.log('✅ Found alternative female voice:', preferredVoice.name);
+        } else {
+          console.error('❌ Could not find a suitable female voice. Available voices:', voices.map(v => v.name));
+          preferredVoice = null;
+        }
+      }
+    }
+    
     if (preferredVoice) {
       utterance.voice = preferredVoice;
       utterance.lang = preferredVoice.lang; // Use the voice's language
       console.log(`✅ Using voice: ${preferredVoice.name} (${preferredVoice.lang}) for ${voiceType}`);
       console.log(`   Voice settings: rate=${utterance.rate}, pitch=${utterance.pitch}, volume=${utterance.volume}`);
-      console.log(`   Voice object:`, preferredVoice);
+      
+      // Final confirmation
+      if (voiceType === 'female') {
+        const isFemale = !['male', 'david', 'mark', 'richard', 'james', 'ravi', 'ajay', 'kiran', 'arjun', 'tom', 'daniel'].some(k => 
+          preferredVoice!.name.toLowerCase().includes(k)
+        );
+        if (!isFemale) {
+          console.error('❌ WARNING: Selected voice may not be female!');
+        } else {
+          console.log('✅ Confirmed: Voice appears to be female');
+        }
+      }
     } else {
       console.error('❌ No suitable voice found!');
       console.log('Available voices:', voices.map(v => `${v.name} (${v.lang})`));
-      // Try to set a reasonable default
-      const defaultVoice = voices.find(v => v.lang.includes('en')) || voices[0];
-      if (defaultVoice) {
-        utterance.voice = defaultVoice;
-        utterance.lang = defaultVoice.lang;
-        console.warn(`⚠️ Fallback to: ${defaultVoice.name} (${defaultVoice.lang})`);
-      } else {
-        console.error('❌ No voices available at all!');
-      }
+      // Don't set a default if we can't find the right gender - it's better to fail than use wrong voice
+      console.error('❌ Refusing to use wrong gender voice. Please check available voices.');
+      return; // Don't speak if we can't find the right voice
     }
 
     // Set up event handlers
