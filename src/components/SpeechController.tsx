@@ -107,14 +107,14 @@ export default function SpeechController({
 
     // Configure voice settings for more human-like Indian English
     // More natural settings for human-like speech
-    utterance.rate = 0.90; // Slightly slower for natural, clear speech (human-like pace)
-    utterance.pitch = voiceType === 'male' ? 0.90 : 1.05; // More natural pitch range (closer to human voices)
+    utterance.rate = 1.05; // Slightly slower for natural, clear speech (human-like pace)
+    utterance.pitch = voiceType === 'male' ? 0.9 : 1.5; // More natural pitch range (closer to human voices)
     utterance.volume = 1.0;
     utterance.lang = 'en-IN'; // Set language to Indian English
 
     // Get available voices (may need to wait for voices to load)
     let voices = synthRef.current.getVoices();
-    
+
     // If voices aren't loaded yet, wait a bit and try again
     if (voices.length === 0) {
       // Try multiple times as voices may load asynchronously
@@ -131,7 +131,7 @@ export default function SpeechController({
       setTimeout(tryLoadVoices, 100);
       return;
     }
-    
+
     selectAndSpeak(voices, utterance, voiceType);
   };
 
@@ -142,18 +142,18 @@ export default function SpeechController({
   ) => {
     // Log all available voices for debugging
     console.log('Available voices:', voices.map(v => `${v.name} (${v.lang})`));
-    
+
     if (voices.length === 0) {
       console.warn('No voices available');
       return;
     }
-    
+
     // Filter voices by gender/type, prioritizing Indian English and natural-sounding voices
     let preferredVoice: SpeechSynthesisVoice | null = null;
-    
+
     if (voiceType === 'female') {
       console.log('🔍 Searching for FEMALE voice...');
-      
+
       // Common female voice names across different browsers/platforms
       const femaleVoiceKeywords = [
         'female', 'zira', 'samantha', 'karen', 'susan', 'priya', 'neela',
@@ -161,7 +161,7 @@ export default function SpeechController({
         'google uk english female', 'microsoft zira', 'google us english female',
         'siri female', 'alex female', 'cortana'
       ];
-      
+
       // Common male voice names to exclude (comprehensive list)
       const maleVoiceKeywords = [
         'male', 'david', 'mark', 'richard', 'james', 'ravi', 'ajay',
@@ -171,23 +171,23 @@ export default function SpeechController({
         'kevin', 'brian', 'edward', 'ronald', 'anthony', 'kenny',
         'google us english male', 'microsoft mark', 'microsoft richard'
       ];
-      
+
       // Priority 1: Indian English female voices
       preferredVoice = voices.find(
         (voice) =>
-          (voice.lang === 'en-IN' || voice.lang.includes('en-IN')) &&
+          (voice.lang === 'en' || voice.lang.includes('en')) &&
           femaleVoiceKeywords.some(keyword => voice.name.toLowerCase().includes(keyword))
       ) || null;
-      
+
       if (preferredVoice) {
         console.log('✅ Found Indian English female voice:', preferredVoice.name);
       } else {
         // Priority 2: Any Indian English voice (exclude male explicitly)
-        preferredVoice = voices.find((voice) => 
+        preferredVoice = voices.find((voice) =>
           (voice.lang === 'en-IN' || voice.lang.includes('en-IN')) &&
           !maleVoiceKeywords.some(keyword => voice.name.toLowerCase().includes(keyword))
         ) || null;
-        
+
         if (preferredVoice) {
           console.log('✅ Found Indian English voice (non-male):', preferredVoice.name);
         } else {
@@ -198,37 +198,37 @@ export default function SpeechController({
               !maleVoiceKeywords.some(keyword => voice.name.toLowerCase().includes(keyword)) &&
               femaleVoiceKeywords.some(keyword => voice.name.toLowerCase().includes(keyword))
           ) || null;
-          
+
           if (preferredVoice) {
             console.log('✅ Found explicit female English voice:', preferredVoice.name);
           } else {
             // Priority 4: Any English voice that's NOT male (safer fallback)
-            preferredVoice = voices.find((voice) => 
-              voice.lang.includes('en') && 
+            preferredVoice = voices.find((voice) =>
+              voice.lang.includes('en') &&
               !maleVoiceKeywords.some(keyword => voice.name.toLowerCase().includes(keyword))
             ) || null;
-            
+
             if (preferredVoice) {
               console.log('✅ Found English voice (non-male):', preferredVoice.name);
             } else {
               // Priority 5: Try common female voices by name
-              preferredVoice = voices.find((voice) => 
-                voice.lang.includes('en') && 
+              preferredVoice = voices.find((voice) =>
+                voice.lang.includes('en') &&
                 (voice.name.toLowerCase().includes('zira') ||
-                 voice.name.toLowerCase().includes('samantha') ||
-                 voice.name.toLowerCase().includes('karen') ||
-                 voice.name.toLowerCase().includes('susan'))
+                  voice.name.toLowerCase().includes('samantha') ||
+                  voice.name.toLowerCase().includes('karen') ||
+                  voice.name.toLowerCase().includes('susan'))
               ) || null;
-              
+
               if (preferredVoice) {
                 console.log('✅ Found common female voice:', preferredVoice.name);
               } else {
                 // Last resort: Find ANY English voice that's NOT male (will be verified later)
-                const nonMaleVoices = voices.filter(v => 
-                  v.lang.includes('en') && 
+                const nonMaleVoices = voices.filter(v =>
+                  v.lang.includes('en') &&
                   !maleVoiceKeywords.some(keyword => v.name.toLowerCase().includes(keyword))
                 );
-                
+
                 if (nonMaleVoices.length > 0) {
                   preferredVoice = nonMaleVoices[0];
                   console.warn('⚠️ Using non-male voice as last resort:', preferredVoice.name);
@@ -248,17 +248,17 @@ export default function SpeechController({
       preferredVoice =
         voices.find(
           (voice) =>
-            (voice.lang === 'en-IN' || voice.lang.includes('en-IN')) &&
+            (voice.lang === 'en' || voice.lang.includes('en')) &&
             (voice.name.toLowerCase().includes('male') ||
-             voice.name.toLowerCase().includes('india') ||
-             voice.name.toLowerCase().includes('ravi') ||
-             voice.name.toLowerCase().includes('ajay') ||
-             voice.name.toLowerCase().includes('kiran') ||
-             voice.name.toLowerCase().includes('arjun'))
+              voice.name.toLowerCase().includes('india') ||
+              voice.name.toLowerCase().includes('ravi') ||
+              voice.name.toLowerCase().includes('ajay') ||
+              voice.name.toLowerCase().includes('kiran') ||
+              voice.name.toLowerCase().includes('arjun'))
         ) ||
         // Priority 2: Any Indian English voice (prefer lower-pitched ones for male)
-        voices.find((voice) => 
-          (voice.lang === 'en-IN' || voice.lang.includes('en-IN')) &&
+        voices.find((voice) =>
+          (voice.lang === 'en' || voice.lang.includes('en')) &&
           !voice.name.toLowerCase().includes('female')
         ) ||
         // Priority 3: Natural-sounding male English voices
@@ -266,18 +266,18 @@ export default function SpeechController({
           (voice) =>
             voice.lang.includes('en') &&
             (voice.name.toLowerCase().includes('male') ||
-             voice.name.toLowerCase().includes('david') ||
-             voice.name.toLowerCase().includes('mark') ||
-             voice.name.toLowerCase().includes('richard') ||
-             voice.name.toLowerCase().includes('james') ||
-             voice.name.toLowerCase().includes('ravi') ||
-             voice.name.toLowerCase().includes('google uk english male') ||
-             voice.name.toLowerCase().includes('microsoft david') ||
-             (voice.name.toLowerCase().includes('natural') && voice.name.toLowerCase().includes('male')))
+              voice.name.toLowerCase().includes('david') ||
+              voice.name.toLowerCase().includes('mark') ||
+              voice.name.toLowerCase().includes('richard') ||
+              voice.name.toLowerCase().includes('james') ||
+              voice.name.toLowerCase().includes('ravi') ||
+              voice.name.toLowerCase().includes('google uk english male') ||
+              voice.name.toLowerCase().includes('microsoft david') ||
+              (voice.name.toLowerCase().includes('natural') && voice.name.toLowerCase().includes('male')))
         ) ||
         // Priority 4: Any English voice that's not explicitly female
-        voices.find((voice) => 
-          voice.lang.includes('en') && 
+        voices.find((voice) =>
+          voice.lang.includes('en') &&
           !voice.name.toLowerCase().includes('female') &&
           !voice.name.toLowerCase().includes('zira') &&
           !voice.name.toLowerCase().includes('samantha')
@@ -291,25 +291,25 @@ export default function SpeechController({
     if (preferredVoice && voiceType === 'female') {
       const voiceNameLower = preferredVoice.name.toLowerCase();
       const maleKeywords = ['male', 'david', 'mark', 'richard', 'james', 'ravi', 'ajay', 'kiran', 'arjun', 'tom', 'daniel', 'michael', 'thomas', 'john', 'paul', 'mike'];
-      
+
       if (maleKeywords.some(keyword => voiceNameLower.includes(keyword))) {
         console.error('❌ ERROR: Selected voice appears to be MALE:', preferredVoice.name);
         console.log('   Rejecting this voice and searching for a different one...');
-        
+
         // Try to find a different voice
         const alternativeVoice = voices.find((voice) => {
           const name = voice.name.toLowerCase();
           return voice.lang.includes('en') &&
-                 !maleKeywords.some(k => name.includes(k)) &&
-                 (name.includes('female') || 
-                  name.includes('zira') || 
-                  name.includes('samantha') || 
-                  name.includes('karen') ||
-                  name.includes('susan') ||
-                  name.includes('victoria') ||
-                  name.includes('linda'));
+            !maleKeywords.some(k => name.includes(k)) &&
+            (name.includes('female') ||
+              name.includes('zira') ||
+              name.includes('samantha') ||
+              name.includes('karen') ||
+              name.includes('susan') ||
+              name.includes('victoria') ||
+              name.includes('linda'));
         });
-        
+
         if (alternativeVoice) {
           preferredVoice = alternativeVoice;
           console.log('✅ Found alternative female voice:', preferredVoice.name);
@@ -319,16 +319,16 @@ export default function SpeechController({
         }
       }
     }
-    
+
     if (preferredVoice) {
       utterance.voice = preferredVoice;
       utterance.lang = preferredVoice.lang; // Use the voice's language
       console.log(`✅ Using voice: ${preferredVoice.name} (${preferredVoice.lang}) for ${voiceType}`);
       console.log(`   Voice settings: rate=${utterance.rate}, pitch=${utterance.pitch}, volume=${utterance.volume}`);
-      
+
       // Final confirmation
       if (voiceType === 'female') {
-        const isFemale = !['male', 'david', 'mark', 'richard', 'james', 'ravi', 'ajay', 'kiran', 'arjun', 'tom', 'daniel'].some(k => 
+        const isFemale = !['male', 'david', 'mark', 'richard', 'james', 'ravi', 'ajay', 'kiran', 'arjun', 'tom', 'daniel'].some(k =>
           preferredVoice!.name.toLowerCase().includes(k)
         );
         if (!isFemale) {
@@ -384,7 +384,7 @@ export default function SpeechController({
       console.warn('⚠️ Voice not set, attempting to set it again...');
       utterance.voice = preferredVoice;
     }
-    
+
     // Speak the text
     if (synthRef.current) {
       if (utterance.voice) {
