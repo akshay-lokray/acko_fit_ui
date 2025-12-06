@@ -1,0 +1,177 @@
+import { useRef, useEffect, useState } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, Environment } from '@react-three/drei';
+import * as THREE from 'three';
+import { AvatarModel } from './AvatarModel';
+import SpeechController from './SpeechController';
+import './AvatarScene.css';
+
+interface AvatarSceneProps {
+  textToSpeak?: string;
+  onSpeakStart?: () => void;
+  onSpeakEnd?: () => void;
+}
+
+// Viseme mapping - maps phonemes to mouth shapes
+const VISEME_MAP: Record<string, number[]> = {
+  // Silence/Closed
+  'silence': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  // A, E, I sounds - open mouth
+  'A': [0.7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  'E': [0.5, 0.3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  'I': [0.3, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  // O, U sounds - rounded mouth
+  'O': [0.4, 0, 0, 0.6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  'U': [0.3, 0, 0, 0.7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  // M, P, B sounds - closed lips
+  'M': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  'P': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  'B': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  // F, V sounds - lower lip bite
+  'F': [0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  'V': [0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  // Th sounds - tongue out
+  'TH': [0.3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  // Default - slight open
+  'default': [0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+};
+
+// Simple phoneme detection from text
+function getPhonemeFromText(text: string, position: number): string {
+  if (position >= text.length) return 'silence';
+  
+  const char = text[position].toUpperCase();
+  const vowels = 'AEIOU';
+  const consonants = 'BCDFGHJKLMNPQRSTVWXYZ';
+  
+  if (vowels.includes(char)) {
+    if (char === 'A') return 'A';
+    if (char === 'E' || char === 'I') return 'E';
+    if (char === 'O' || char === 'U') return 'O';
+  }
+  
+  if (consonants.includes(char)) {
+    if ('MPB'.includes(char)) return 'M';
+    if ('FV'.includes(char)) return 'F';
+    if (char === 'T' && position + 1 < text.length && text[position + 1].toUpperCase() === 'H') return 'TH';
+  }
+  
+  return 'default';
+}
+
+function AvatarWithVisemes({ 
+  isSpeaking, 
+  text, 
+  audioTime 
+}: { 
+  isSpeaking: boolean; 
+  text: string; 
+  audioTime: number;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const headRef = useRef<THREE.SkinnedMesh>(null);
+
+  useEffect(() => {
+    if (groupRef.current) {
+      // Find the head mesh
+      groupRef.current.traverse((child) => {
+        if (child instanceof THREE.SkinnedMesh && child.name === 'Wolf3D_Head') {
+          headRef.current = child;
+        }
+      });
+    }
+  }, []);
+
+  useFrame(() => {
+    if (!headRef.current || !isSpeaking) {
+      if (headRef.current?.morphTargetInfluences) {
+        for (let i = 0; i < headRef.current.morphTargetInfluences.length; i++) {
+          headRef.current.morphTargetInfluences[i] *= 0.9; // Fade out
+        }
+      }
+      return;
+    }
+
+    // Calculate phoneme based on audio time
+    const charIndex = Math.floor(audioTime * 6.67);
+    const phoneme = getPhonemeFromText(text, charIndex);
+    const viseme = VISEME_MAP[phoneme] || VISEME_MAP['default'];
+
+    if (headRef.current?.morphTargetInfluences) {
+      for (let i = 0; i < Math.min(viseme.length, headRef.current.morphTargetInfluences.length); i++) {
+        const target = viseme[i];
+        const current = headRef.current.morphTargetInfluences[i];
+        headRef.current.morphTargetInfluences[i] = current * 0.7 + target * 0.3;
+      }
+    }
+  });
+
+  return (
+    <group ref={groupRef}>
+      <AvatarModel />
+    </group>
+  );
+}
+
+export default function AvatarScene({ 
+  textToSpeak, 
+  onSpeakStart, 
+  onSpeakEnd 
+}: AvatarSceneProps) {
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [audioTime, setAudioTime] = useState(0);
+
+  return (
+    <div className="avatar-scene-container">
+      <SpeechController
+        textToSpeak={textToSpeak}
+        onSpeakStart={() => {
+          setIsSpeaking(true);
+          onSpeakStart?.();
+        }}
+        onSpeakEnd={() => {
+          setIsSpeaking(false);
+          setAudioTime(0);
+          onSpeakEnd?.();
+        }}
+        onSpeakingChange={setIsSpeaking}
+        onAudioTimeUpdate={setAudioTime}
+      />
+      
+      <Canvas
+        camera={{ position: [0, 1.6, 3], fov: 50 }}
+        shadows
+        gl={{ antialias: true, alpha: true }}
+      >
+        <ambientLight intensity={0.6} />
+        <directionalLight position={[5, 5, 5]} intensity={1} castShadow />
+        <directionalLight position={[-5, 3, -5]} intensity={0.5} />
+        <pointLight position={[0, 5, 0]} intensity={0.3} />
+        
+        <AvatarWithVisemes 
+          isSpeaking={isSpeaking} 
+          text={textToSpeak || ''} 
+          audioTime={audioTime}
+        />
+        
+        <OrbitControls
+          enablePan={false}
+          minDistance={2}
+          maxDistance={5}
+          minPolarAngle={0}
+          maxPolarAngle={Math.PI / 2}
+        />
+        
+        <Environment preset="sunset" />
+      </Canvas>
+      
+      {isSpeaking && (
+        <div className="speaking-indicator">
+          <div className="speaking-pulse"></div>
+          <span>Speaking...</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
