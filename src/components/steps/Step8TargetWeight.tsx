@@ -153,27 +153,6 @@ export function Step8TargetWeight({
           Lb
         </Toggle>
       </div>
-
-      <div className="flex justify-between gap-4">
-        <Button
-          onClick={onBack}
-          variant="outline"
-          className="h-12 px-6"
-          size="lg"
-        >
-          <ArrowLeft className="mr-2 h-5 w-5" />
-          Back
-        </Button>
-        <Button
-          onClick={onNext}
-          disabled={!displayWeight}
-          className="h-12 px-6"
-          size="lg"
-        >
-          Next
-          <ArrowRight className="ml-2 h-5 w-5" />
-        </Button>
-      </div>
     </div>
   )
 }

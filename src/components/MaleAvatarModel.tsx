@@ -7,22 +7,43 @@ export function MaleAvatarModel(props: any) {
     const gltf = useGLTF('/male.glb') as any;
     const { nodes, materials } = gltf || {};
     const groupRef = useRef<THREE.Group>(null);
+    const lastFullScreenRef = useRef<boolean | undefined>(undefined);
+    const { isFullScreen = false } = props || {};
 
     console.log('Male avatar loaded:', { nodes: !!nodes, materials: !!materials });
 
     useEffect(() => {
+      // Reset positioning if isFullScreen changed
+      if (lastFullScreenRef.current !== undefined && lastFullScreenRef.current !== isFullScreen) {
+        if (groupRef.current) {
+          groupRef.current.position.set(0, 0, 0);
+          groupRef.current.scale.set(1, 1, 1);
+        }
+      }
+
       if (groupRef.current && nodes) {
         // Center and scale the model
         const box = new THREE.Box3().setFromObject(groupRef.current);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
-        const scale = 1.8 / maxDim; // Scale to fit in view
         
-        groupRef.current.position.sub(center);
-        groupRef.current.scale.multiplyScalar(scale);
+        if (isFullScreen) {
+          // Full screen: normal scale
+          const scale = 1.8 / maxDim;
+          groupRef.current.position.sub(center);
+          groupRef.current.scale.multiplyScalar(scale);
+        } else {
+          // Face-only (200x200): very large scale and high Y offset to show ONLY face
+          const scale = 8.5 / maxDim; // Very large scale for face-only focus
+          groupRef.current.position.sub(center);
+          groupRef.current.position.y += 1.2; // High offset to position face at camera targetY
+          groupRef.current.scale.multiplyScalar(scale);
+        }
       }
-    }, [nodes]);
+      
+      lastFullScreenRef.current = isFullScreen;
+    }, [nodes, isFullScreen]);
 
     if (!nodes || !materials) {
       return null;

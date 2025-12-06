@@ -3,6 +3,8 @@ import type { FormData } from "@/types/form";
 import { useLocation, useNavigate } from "react-router-dom";
 import AvatarScene from "./AvatarScene";
 import "./MultiStepForm.css";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Step1NameInput } from "./steps/Step1NameInput";
 import { Step2OptionsSelection } from "./steps/Step2OptionsSelection";
 import { Step3ActivityLevel } from "./steps/Step3ActivityLevel";
@@ -56,6 +58,34 @@ export function MultiStepForm() {
     setFormData({ ...formData, ...updates });
   };
 
+  // Validation logic for each step to enable/disable Next button
+  const canProceed = () => {
+    switch (step) {
+      case 1:
+        return formData.name.trim().length > 0;
+      case 2:
+        return formData.selectedOptions.length > 0;
+      case 3:
+        return formData.activityLevel.length > 0;
+      case 4:
+        return formData.age > 0 && formData.age <= 120;
+      case 5:
+        return formData.height > 0;
+      case 6:
+        return formData.currentWeight > 0;
+      case 7:
+        return formData.goalPace > 0;
+      case 8:
+        return formData.targetWeight > 0;
+      case 9:
+        return true; // Auto track is optional
+      case 10:
+        return formData.medicalConditions.length > 0;
+      default:
+        return false;
+    }
+  };
+
   // Determine voice type based on form data (you can customize this logic)
   const voiceType = formData.gender === "male"
     ? "male"
@@ -91,10 +121,10 @@ export function MultiStepForm() {
   };
 
   return (
-    <div className="min-h-screen bg-white p-4 font-sans">
+    <div className="min-h-screen bg-white p-4 font-sans pb-24">
       {/* Avatar Section - Fixed at bottom right */}
       <div className="avatar-container-form">
-        <AvatarScene textToSpeak={getStepText()} voiceType={voiceType} />
+        <AvatarScene textToSpeak={getStepText()} voiceType={voiceType} isFullScreen={false} />
       </div>
 
       <div className="max-w-7xl mx-auto">
@@ -230,6 +260,33 @@ export function MultiStepForm() {
               onBack={handleBack}
             />
           )}
+        </div>
+      </div>
+
+      {/* Fixed Bottom Navigation Buttons */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-20">
+        <div className="max-w-md mx-auto">
+          <div className="flex justify-between gap-4">
+            <Button
+              onClick={handleBack}
+              variant="outline"
+              className="h-12 px-6 flex-1"
+              size="lg"
+              disabled={step === 1}
+            >
+              <ArrowLeft className="mr-2 h-5 w-5" />
+              Back
+            </Button>
+            <Button
+              onClick={handleNext}
+              disabled={!canProceed()}
+              className="h-12 px-8 flex-1"
+              size="lg"
+            >
+              Next
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
