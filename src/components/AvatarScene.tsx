@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, Suspense } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Environment, Html } from '@react-three/drei';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Environment, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { MaleAvatarModel } from './MaleAvatarModel';
 import { FemaleAvatarModel } from './FemaleAvatarModel';
@@ -60,6 +60,38 @@ function getPhonemeFromText(text: string, position: number): string {
   }
   
   return 'default';
+}
+
+// Auto-zoom camera component - maximized zoom
+function AutoZoomCamera({ target = [0, 0.5, 0] }: { target?: [number, number, number] }) {
+  const { camera } = useThree();
+  const targetRef = useRef(new THREE.Vector3(...target));
+  const distanceRef = useRef(5);
+  const targetDistance = 3.2; // Maximized zoom (closer)
+  const minDistance = 3.0;
+  const maxDistance = 3.5;
+  
+  useFrame(() => {
+    // Smooth auto-zoom animation to max zoom
+    const lerpFactor = 0.05;
+    distanceRef.current += (targetDistance - distanceRef.current) * lerpFactor;
+    
+    // Clamp distance
+    distanceRef.current = Math.max(minDistance, Math.min(maxDistance, distanceRef.current));
+    
+    // Calculate camera position from bottom-right perspective
+    const angle = Math.PI / 4; // 45 degrees
+    const cameraX = Math.cos(angle) * distanceRef.current;
+    const cameraY = 0.3 + (distanceRef.current - 3) * 0.15; // Adjusted for better view
+    const cameraZ = Math.sin(angle) * distanceRef.current;
+    
+    // Smooth camera movement
+    const targetPos = new THREE.Vector3(cameraX, cameraY, cameraZ);
+    camera.position.lerp(targetPos, lerpFactor);
+    camera.lookAt(targetRef.current);
+  });
+  
+  return null;
 }
 
 function AvatarWithVisemes({ 
@@ -181,7 +213,7 @@ export default function AvatarScene({
       />
       
       <Canvas
-        camera={{ position: [1.2, 0.1, 4.5], fov: 50 }}
+        camera={{ position: [2.2, 0.3, 3.2], fov: 50 }}
         shadows
         gl={{ antialias: true, alpha: true }}
         onError={(err) => {
@@ -210,14 +242,7 @@ export default function AvatarScene({
           />
         </Suspense>
         
-        <OrbitControls
-          enablePan={false}
-          minDistance={3.5}
-          maxDistance={7}
-          minPolarAngle={0}
-          maxPolarAngle={Math.PI / 2}
-          target={[0, 0.1, 0]}
-        />
+        <AutoZoomCamera target={[0, 0.5, 0]} />
         
         <Environment preset="sunset" />
       </Canvas>
