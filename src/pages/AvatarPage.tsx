@@ -27,12 +27,13 @@ export default function AvatarPage() {
           <div className="form-section">
             <TextToSpeechInput onTextSubmit={handleTextSubmit} />
           </div>
-          
-          <div className="viewer-section">
-            <AvatarScene textToSpeak={textToSpeak} voiceType={voiceType} />
-          </div>
         </div>
       </main>
+
+      {/* Avatar Section - Fixed at bottom right */}
+      <div className="avatar-container-form">
+        <AvatarScene textToSpeak={textToSpeak} voiceType={voiceType} />
+      </div>
     </div>
   );
 }

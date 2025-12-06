@@ -3,29 +3,27 @@ import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
 export function FemaleAvatarModel(props: any) {
-  // Hooks must be called unconditionally at the top level
-  const gltf = useGLTF('/female.glb') as any;
-  const { nodes, materials } = gltf || {};
-  const groupRef = useRef<THREE.Group>(null);
-
-  console.log('Female avatar loaded:', { nodes: !!nodes, materials: !!materials });
-
-  useEffect(() => {
-    if (groupRef.current && nodes) {
-      // Center and scale the model
-      const box = new THREE.Box3().setFromObject(groupRef.current);
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const scale = 1.8 / maxDim; // Scale to fit in view
-      
-      groupRef.current.position.sub(center);
-      groupRef.current.scale.multiplyScalar(scale);
-    }
-  }, [nodes]);
-
-  // Error handling for rendering logic only
   try {
+    const gltf = useGLTF('/female.glb') as any;
+    const { nodes, materials } = gltf || {};
+    const groupRef = useRef<THREE.Group>(null);
+
+    console.log('Female avatar loaded:', { nodes: !!nodes, materials: !!materials });
+
+    useEffect(() => {
+      if (groupRef.current && nodes) {
+        // Center and scale the model
+        const box = new THREE.Box3().setFromObject(groupRef.current);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const scale = 1.8 / maxDim; // Scale to fit in view
+        
+        groupRef.current.position.sub(center);
+        groupRef.current.scale.multiplyScalar(scale);
+      }
+    }, [nodes]);
+
     if (!nodes || !materials) {
       return null;
     }
@@ -111,7 +109,7 @@ export function FemaleAvatarModel(props: any) {
       </group>
     );
   } catch (error) {
-    console.error('Error rendering female avatar:', error);
+    console.error('Error loading female avatar:', error);
     return null;
   }
 }

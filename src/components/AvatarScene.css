@@ -1,20 +1,12 @@
 .avatar-scene-container {
   width: 100%;
-  height: 500px;
+  height: 100%;
   position: relative;
   border-radius: 12px;
   overflow: hidden;
   background: transparent;
-  min-height: 500px;
-  /* Add a subtle border to help see the container */
-  border: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.avatar-scene-container canvas {
-  display: block !important;
-  width: 100% !important;
-  height: 100% !important;
-  outline: none;
+  box-shadow: none;
+  min-height: 300px;
 }
 
 .avatar-placeholder {

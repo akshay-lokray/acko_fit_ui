@@ -89,17 +89,13 @@ export function MultiStepForm() {
 
   return (
     <div className="min-h-screen bg-background p-4">
-      <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          {/* Avatar Section - Visible on all steps */}
-          <div className="lg:sticky lg:top-4 order-2 lg:order-1">
-            <div className="avatar-container-form">
-              <AvatarScene textToSpeak={getStepText()} voiceType={voiceType} />
-            </div>
-          </div>
+      {/* Avatar Section - Fixed at bottom right */}
+      <div className="avatar-container-form">
+        <AvatarScene textToSpeak={getStepText()} voiceType={voiceType} />
+      </div>
 
-          {/* Form Section */}
-          <div className="w-full max-w-md mx-auto lg:mx-0 order-1 lg:order-2">
+      <div className="max-w-7xl mx-auto">
+        <div className="w-full max-w-md mx-auto">
             {/* Progress dots */}
             <div className="flex justify-center gap-2 mb-8">
               {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
@@ -231,7 +227,6 @@ export function MultiStepForm() {
                 onBack={handleBack}
               />
             )}
-          </div>
         </div>
       </div>
     </div>
