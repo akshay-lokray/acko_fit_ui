@@ -22,6 +22,7 @@ export default function SpeechController({
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const startTimeRef = useRef<number>(0);
   const animationFrameRef = useRef<number | undefined>(undefined);
+  const voiceTimeoutRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     synthRef.current = window.speechSynthesis;
@@ -68,7 +69,7 @@ export default function SpeechController({
             speakText(textToSpeak, voiceType);
           } else {
             // Try again after a short delay
-            setTimeout(waitForVoices, 100);
+            voiceTimeoutRef.current = window.setTimeout(waitForVoices, 100);
           }
         };
         waitForVoices();
@@ -83,6 +84,11 @@ export default function SpeechController({
       }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+      }
+      // Clear pending voice loading timeout
+      if (voiceTimeoutRef.current !== undefined) {
+        clearTimeout(voiceTimeoutRef.current);
+        voiceTimeoutRef.current = undefined;
       }
     };
   }, [textToSpeak, voiceType]);
