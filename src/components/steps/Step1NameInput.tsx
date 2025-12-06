@@ -1,15 +1,16 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, ArrowLeft } from "lucide-react"
 
 interface Step1NameInputProps {
   name: string
   onNameChange: (name: string) => void
   onNext: () => void
+  onBack: () => void
 }
 
-export function Step1NameInput({ name, onNameChange, onNext }: Step1NameInputProps) {
+export function Step1NameInput({ name, onNameChange, onNext, onBack }: Step1NameInputProps) {
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
@@ -40,7 +41,17 @@ export function Step1NameInput({ name, onNameChange, onNext }: Step1NameInputPro
         </div>
       </Card>
 
-      <div className="flex justify-end">
+      <div className="flex justify-between gap-4">
+        <Button
+          onClick={onBack}
+          variant="outline"
+          className="h-12 px-6"
+          size="lg"
+        >
+          <ArrowLeft className="mr-2 h-5 w-5" />
+          Back
+        </Button>
+
         <Button
           onClick={onNext}
           disabled={!name.trim()}

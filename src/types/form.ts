@@ -1,4 +1,5 @@
 export interface FormData {
+  gender: 'male' | 'female' | ''
   name: string
   selectedOptions: string[]
   activityLevel: string
