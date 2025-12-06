@@ -1,13 +1,16 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Environment } from '@react-three/drei';
+import { OrbitControls, Environment, Html } from '@react-three/drei';
 import * as THREE from 'three';
-import { AvatarModel } from './AvatarModel';
+import { MaleAvatarModel } from './MaleAvatarModel';
+import { FemaleAvatarModel } from './FemaleAvatarModel';
 import SpeechController from './SpeechController';
+import type { VoiceType } from '../types/voice';
 import './AvatarScene.css';
 
 interface AvatarSceneProps {
   textToSpeak?: string;
+  voiceType?: VoiceType;
   onSpeakStart?: () => void;
   onSpeakEnd?: () => void;
 }
@@ -62,11 +65,13 @@ function getPhonemeFromText(text: string, position: number): string {
 function AvatarWithVisemes({ 
   isSpeaking, 
   text, 
-  audioTime 
+  audioTime,
+  voiceType
 }: { 
   isSpeaking: boolean; 
   text: string; 
   audioTime: number;
+  voiceType: VoiceType;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const headRef = useRef<THREE.SkinnedMesh>(null);
@@ -80,7 +85,7 @@ function AvatarWithVisemes({
         }
       });
     }
-  }, []);
+  }, [voiceType]); // Re-find head when voice type changes
 
   useFrame(() => {
     if (!headRef.current || !isSpeaking) {
@@ -108,23 +113,60 @@ function AvatarWithVisemes({
 
   return (
     <group ref={groupRef}>
-      <AvatarModel />
+      {voiceType === 'male' ? (
+        <MaleAvatarModel />
+      ) : (
+        <FemaleAvatarModel />
+      )}
     </group>
   );
 }
 
 export default function AvatarScene({ 
   textToSpeak, 
+  voiceType = 'female',
   onSpeakStart, 
   onSpeakEnd 
 }: AvatarSceneProps) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [audioTime, setAudioTime] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Reset error when voice type changes
+    setError(null);
+  }, [voiceType]);
+
+  if (error) {
+    return (
+      <div className="avatar-scene-container">
+        <div className="avatar-placeholder">
+          <div className="avatar-placeholder-icon">⚠️</div>
+          <p>Error loading avatar</p>
+          <p style={{ fontSize: '0.9rem', opacity: 0.8 }}>{error}</p>
+          <button 
+            onClick={() => setError(null)}
+            style={{
+              padding: '0.5rem 1rem',
+              background: 'rgba(255, 255, 255, 0.2)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              borderRadius: '8px',
+              color: 'white',
+              cursor: 'pointer'
+            }}
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="avatar-scene-container">
       <SpeechController
         textToSpeak={textToSpeak}
+        voiceType={voiceType}
         onSpeakStart={() => {
           setIsSpeaking(true);
           onSpeakStart?.();
@@ -142,17 +184,31 @@ export default function AvatarScene({
         camera={{ position: [0, 1.6, 3], fov: 50 }}
         shadows
         gl={{ antialias: true, alpha: true }}
+        onError={(err) => {
+          console.error('Canvas error:', err);
+          setError('Failed to render 3D scene');
+        }}
       >
         <ambientLight intensity={0.6} />
         <directionalLight position={[5, 5, 5]} intensity={1} castShadow />
         <directionalLight position={[-5, 3, -5]} intensity={0.5} />
         <pointLight position={[0, 5, 0]} intensity={0.3} />
         
-        <AvatarWithVisemes 
-          isSpeaking={isSpeaking} 
-          text={textToSpeak || ''} 
-          audioTime={audioTime}
-        />
+        <Suspense fallback={
+          <Html center>
+            <div style={{ color: 'white', textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
+              <p>Loading {voiceType} avatar...</p>
+            </div>
+          </Html>
+        }>
+          <AvatarWithVisemes 
+            isSpeaking={isSpeaking} 
+            text={textToSpeak || ''} 
+            audioTime={audioTime}
+            voiceType={voiceType}
+          />
+        </Suspense>
         
         <OrbitControls
           enablePan={false}

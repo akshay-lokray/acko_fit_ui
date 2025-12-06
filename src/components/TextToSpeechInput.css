@@ -6,6 +6,55 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
+.voice-selection {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.voice-selection label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.voice-options {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.voice-btn {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 2px solid #e0e0e0;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.voice-btn:hover {
+  border-color: #007bff;
+  color: #007bff;
+}
+
+.voice-btn.active {
+  border-color: #007bff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+}
+
 .text-to-speech-input h3 {
   margin: 0 0 0.5rem 0;
   color: #333;

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import type { VoiceType } from '../types/voice';
 
 interface SpeechControllerProps {
   textToSpeak?: string;
+  voiceType?: VoiceType;
   onSpeakStart: () => void;
   onSpeakEnd: () => void;
   onSpeakingChange: (isSpeaking: boolean) => void;
@@ -10,6 +12,7 @@ interface SpeechControllerProps {
 
 export default function SpeechController({
   textToSpeak,
+  voiceType = 'female',
   onSpeakStart,
   onSpeakEnd,
   onSpeakingChange,
@@ -35,7 +38,7 @@ export default function SpeechController({
 
   useEffect(() => {
     if (textToSpeak && textToSpeak.trim() && synthRef.current) {
-      speakText(textToSpeak);
+      speakText(textToSpeak, voiceType);
     }
 
     return () => {
@@ -46,9 +49,9 @@ export default function SpeechController({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [textToSpeak]);
+  }, [textToSpeak, voiceType]);
 
-  const speakText = (text: string) => {
+  const speakText = (text: string, voiceType: VoiceType) => {
     if (!synthRef.current) return;
 
     // Cancel any ongoing speech
@@ -62,22 +65,53 @@ export default function SpeechController({
 
     // Configure voice settings
     utterance.rate = 1.0;
-    utterance.pitch = 1.0;
+    utterance.pitch = voiceType === 'male' ? 0.9 : 1.1; // Slightly lower for male, higher for female
     utterance.volume = 1.0;
 
-    // Try to use a natural-sounding voice
+    // Get available voices
     const voices = synthRef.current.getVoices();
-    const preferredVoice =
-      voices.find(
-        (voice) =>
-          voice.lang.includes('en') &&
-          (voice.name.includes('Natural') || voice.name.includes('Enhanced'))
-      ) ||
-      voices.find((voice) => voice.lang.includes('en-US')) ||
-      voices[0];
+    
+    // Filter voices by gender/type
+    let preferredVoice: SpeechSynthesisVoice | null = null;
+    
+    if (voiceType === 'female') {
+      // Try to find female voices (usually have "Female" in name or higher pitch)
+      preferredVoice =
+        voices.find(
+          (voice) =>
+            voice.lang.includes('en') &&
+            (voice.name.toLowerCase().includes('female') ||
+             voice.name.toLowerCase().includes('zira') ||
+             voice.name.toLowerCase().includes('samantha') ||
+             voice.name.toLowerCase().includes('karen') ||
+             voice.name.toLowerCase().includes('susan'))
+        ) ||
+        voices.find(
+          (voice) =>
+            voice.lang.includes('en') &&
+            (voice.name.includes('Natural') || voice.name.includes('Enhanced'))
+        ) ||
+        voices.find((voice) => voice.lang.includes('en-US')) ||
+        voices[0];
+    } else {
+      // Try to find male voices (usually have "Male" in name or lower pitch)
+      preferredVoice =
+        voices.find(
+          (voice) =>
+            voice.lang.includes('en') &&
+            (voice.name.toLowerCase().includes('male') ||
+             voice.name.toLowerCase().includes('david') ||
+             voice.name.toLowerCase().includes('mark') ||
+             voice.name.toLowerCase().includes('richard') ||
+             voice.name.toLowerCase().includes('james'))
+        ) ||
+        voices.find((voice) => voice.lang.includes('en-US')) ||
+        voices[0];
+    }
 
     if (preferredVoice) {
       utterance.voice = preferredVoice;
+      console.log(`Using voice: ${preferredVoice.name} (${voiceType})`);
     }
 
     utterance.onstart = () => {

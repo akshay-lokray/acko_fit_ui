@@ -1,9 +1,9 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
 export function AvatarModel(props: any) {
-  const { nodes, materials } = useGLTF('/6933f526100ae875d5e63b42.glb');
+  const { nodes, materials } = useGLTF('/6933f526100ae875d5e63b42.glb') as any;
   const groupRef = useRef<THREE.Group>(null);
 
   useEffect(() => {

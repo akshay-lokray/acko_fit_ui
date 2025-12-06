@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import AvatarScene from './components/AvatarScene';
 import TextToSpeechInput from './components/TextToSpeechInput';
+import type { VoiceType } from './types/voice';
 import './App.css';
 
 function App() {
   const [textToSpeak, setTextToSpeak] = useState<string>('');
+  const [voiceType, setVoiceType] = useState<VoiceType>('female');
 
-  const handleTextSubmit = (text: string) => {
+  const handleTextSubmit = (text: string, voice: VoiceType) => {
     setTextToSpeak(text);
+    setVoiceType(voice);
   };
 
   return (
@@ -24,7 +27,7 @@ function App() {
           </div>
           
           <div className="viewer-section">
-            <AvatarScene textToSpeak={textToSpeak} />
+            <AvatarScene textToSpeak={textToSpeak} voiceType={voiceType} />
           </div>
         </div>
       </main>
