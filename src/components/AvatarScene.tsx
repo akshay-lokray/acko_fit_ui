@@ -183,7 +183,12 @@ export default function AvatarScene({
       <Canvas
         camera={{ position: [0, 1.6, 3], fov: 50 }}
         shadows
-        gl={{ antialias: true, alpha: true }}
+        gl={{ 
+          antialias: true, 
+          alpha: true,
+          preserveDrawingBuffer: true
+        }}
+        style={{ background: 'transparent' }}
         onError={(err) => {
           console.error('Canvas error:', err);
           setError('Failed to render 3D scene');
@@ -196,7 +201,7 @@ export default function AvatarScene({
         
         <Suspense fallback={
           <Html center>
-            <div style={{ color: 'white', textAlign: 'center' }}>
+            <div style={{ color: '#333', textAlign: 'center' }}>
               <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
               <p>Loading {voiceType} avatar...</p>
             </div>
@@ -217,8 +222,6 @@ export default function AvatarScene({
           minPolarAngle={0}
           maxPolarAngle={Math.PI / 2}
         />
-        
-        <Environment preset="sunset" />
       </Canvas>
       
       {isSpeaking && (
