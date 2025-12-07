@@ -20,6 +20,7 @@ import { RankingsPage } from './pages/RankingsPage';
 import { LogLunchPage } from './pages/LogLunchPage';
 import { LogStepsPage } from './pages/LogStepsPage';
 import { LogWaterPage } from './pages/LogWaterPage';
+import { HabitDetailPage } from './pages/HabitDetailPage';
 
 function App() {
   const [showIntro, setShowIntro] = useState(true);
@@ -65,6 +66,7 @@ function App() {
         <Route path="/log-meal" element={<LogLunchPage />} />
         <Route path="/log-steps" element={<LogStepsPage />} />
         <Route path="/log-water" element={<LogWaterPage />} />
+        <Route path="/habit-detail" element={<HabitDetailPage />} />
         <Route path="/avatar" element={<AvatarPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

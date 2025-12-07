@@ -204,7 +204,11 @@ export function HabitTrackerPage() {
                 </div>
 
                 {habits.map((habit) => (
-                    <div key={habit.id} className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 flex items-center justify-between group">
+                    <div
+                        key={habit.id}
+                        className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 flex items-center justify-between group cursor-pointer hover:shadow-md"
+                        onClick={() => navigate("/habit-detail", { state: { habit: habit.name } })}
+                    >
                         <div className="flex items-center gap-4">
                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm ${habitMeta[habit.name]?.color || habit.color}`}>
                                 {getIconComponent((habitMeta[habit.name]?.icon as string) || habit.icon)}
