@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { FormData } from "@/types/form";
 import { useLocation, useNavigate } from "react-router-dom";
 import AvatarScene from "./AvatarScene";
@@ -95,7 +95,7 @@ export function MultiStepForm() {
   const getStepText = () => {
     switch (step) {
       case 1:
-        return `Hi! I'm your fitness coach. Let's start by getting to know you, ${formData.name || "friend"
+        return `Let's start by getting to know you, ${formData.name || "friend"
           }!`;
       case 2:
         return "Great! Now let's see what you're looking for in your fitness journey.";

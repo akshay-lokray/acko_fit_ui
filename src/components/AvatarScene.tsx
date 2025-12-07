@@ -428,12 +428,6 @@ export default function AvatarScene({
         <Environment preset="sunset" />
       </Canvas>
       
-      {isSpeaking && (
-        <div className="speaking-indicator">
-          <div className="speaking-pulse"></div>
-          <span>Speaking...</span>
-        </div>
-      )}
     </div>
   );
 }
