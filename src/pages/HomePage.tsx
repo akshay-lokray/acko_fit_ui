@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   MessageSquare,
@@ -63,11 +63,11 @@ const MOCK_LEADERBOARD: LeaderboardUser[] = [
 export function HomePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { formData: profile } = useUserProfileStore();
+  const { formData: profile, updateFormData } = useUserProfileStore();
+  const fetchedUserRef = useRef<string | null>(null);
   // Safe access to formData with defaults
-  const formData = location.state?.formData || {};
-  const gender = formData.gender || "female";
-  const name = formData.name || "Traveller";
+  const gender = profile.gender || "female";
+  const name = profile.name || "Traveller";
   const coachName = gender === "male" ? "Atlas" : "Aria";
 
   // State
@@ -88,9 +88,30 @@ export function HomePage() {
   const levelingXp = 1000;
   const level = 1;
 
+  // Fetch user profile on mount
+  useEffect(() => {
+    const userId = profile.mobile || profile.mobile || "";
+    if (!userId) return;
+    if (fetchedUserRef.current === userId) return;
+    fetchedUserRef.current = userId;
+
+    const fetchUser = async () => {
+      try {
+        const res = await fetch(`/api/users/${encodeURIComponent(userId)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        updateFormData(data);
+      } catch (e) {
+        console.error("Failed to fetch user profile", e);
+      }
+    };
+
+    fetchUser();
+  }, [profile.mobile, profile.mobile, updateFormData]);
+
   // Fetch daily habit stats on mount
   useEffect(() => {
-    const userId = profile.mobile || formData.mobile || "";
+    const userId = profile.mobile || profile.mobile || "";
     if (!userId) return;
 
     const fetchHabits = async () => {
@@ -112,7 +133,7 @@ export function HomePage() {
     };
 
     fetchHabits();
-  }, [profile.mobile, formData.mobile]);
+  }, [profile.mobile, profile.mobile]);
 
   // Determining "Persona" styles
   const isMale = gender === "male";
@@ -312,13 +333,13 @@ export function HomePage() {
                       }`}
                       onClick={() => {
                         if (quest.title === "Track Your Meal") {
-                          navigate("/log-meal", { state: { formData } })
+                          navigate("/log-meal", { state: { profile } })
                         }
                         if (quest.title === "Crush 5k Steps") {
-                          navigate("/log-steps", { state: { formData } })
+                          navigate("/log-steps", { state: { profile } })
                         }
                         if (quest.title.startsWith("Hydrate Now")) {
-                          navigate("/log-water", { state: { formData } })
+                          navigate("/log-water", { state: { profile } })
                         }
                       }}
                     >
@@ -337,7 +358,7 @@ export function HomePage() {
                           )}
                         </div>
                         <div className="flex flex-col">
-                          <span className={`text-sm font-medium ${quest.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{quest.title}</span>
+                        <span className={`text-sm font-medium ${quest.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{quest.title}</span>
                           {quest.title === "Track Your Meal" && habitStats.calorie != null && (
                             <span className="text-xs text-emerald-600">{habitStats.calorie} kcal today</span>
                           )}
