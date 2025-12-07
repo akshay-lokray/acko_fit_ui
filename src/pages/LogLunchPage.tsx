@@ -4,24 +4,99 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Upload, Camera, ArrowLeft, Info, Salad } from "lucide-react"
+import { useUserProfileStore } from "@/store/userProfileStore"
 
 export function LogLunchPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { formData: profile } = useUserProfileStore()
   const formData = (location.state as { formData?: any })?.formData || {}
   const [calories, setCalories] = useState("")
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [mealType, setMealType] = useState<"Breakfast" | "Lunch" | "Dinner" | "Snack">("Lunch")
+  const [notes, setNotes] = useState("")
   const [error, setError] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
+  const [successCalories, setSuccessCalories] = useState<number | null>(null)
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    const userId = profile.mobile || formData.mobile || "unknown-user"
+    const quickNote = notes.trim()
+    const meta = { mealType: mealType.toLowerCase(), quickNote }
+
     if (!photoFile && !calories.trim()) {
       setError("Add a photo or enter calories to log your meal.")
       return
     }
-    setError("")
-    // TODO: send to backend when endpoint is ready
-    navigate("/home", { state: { formData } })
+
+    try {
+      if (photoFile) {
+        const form = new FormData()
+        form.append("userId", userId)
+        form.append("image", photoFile, photoFile.name)
+        form.append("meta", new Blob([JSON.stringify(meta)], { type: "application/json" }))
+
+        const res = await fetch("/api/habits/calories/analyze-image", {
+          method: "POST",
+          body: form,
+        })
+
+        if (!res.ok) {
+          const msg = await res.text()
+          throw new Error(msg || `Image upload failed: ${res.status}`)
+        }
+
+        // Try to read calorie estimate from response (best-effort)
+        let calorieValue: number | null = null
+        try {
+          const data = await res.json()
+          const parsed = Number(data?.value ?? data?.calories ?? data?.calorie)
+          calorieValue = Number.isFinite(parsed) ? parsed : null
+        } catch (_) {
+          // ignore parse errors; fall back to null
+        }
+        setSuccessCalories(calorieValue)
+        setSuccessMessage(
+          calorieValue != null
+            ? `Calories tracked: ${calorieValue} kcal`
+            : "Calories tracked successfully!"
+        )
+      } else {
+        const payload = {
+          userId,
+          habit: "calorie",
+          value: Number(calories),
+          meta,
+        }
+
+        const res = await fetch("/api/habits", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+
+        if (!res.ok) {
+          const msg = await res.text()
+          throw new Error(msg || `Manual calorie log failed: ${res.status}`)
+        }
+
+        const calorieValue = Number(calories)
+        setSuccessCalories(Number.isFinite(calorieValue) ? calorieValue : null)
+        setSuccessMessage(
+          Number.isFinite(calorieValue)
+            ? `Calories tracked: ${calorieValue} kcal`
+            : "Calories tracked successfully!"
+        )
+      }
+
+      setError("")
+      setTimeout(() => {
+        navigate("/home", { state: { formData } })
+      }, 3000)
+    } catch (err) {
+      console.error(err)
+      setError("Unable to save right now. Please try again.")
+    }
   }
 
   const handleFileChange = (file: File | null) => {
@@ -31,7 +106,7 @@ export function LogLunchPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-4 pb-24 font-sans">
+    <div className="min-h-screen bg-white p-4 pb-24 font-sans relative">
       <div className="max-w-md mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
@@ -95,6 +170,17 @@ export function LogLunchPage() {
             />
           </div>
 
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-gray-800">Add a quick note</p>
+            <textarea
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              rows={3}
+              placeholder="e.g., paneer bowl with veggies, olive oil drizzle"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+
           {error && <p className="text-sm text-red-500">{error}</p>}
 
           <Button className="w-full h-11" onClick={handleSubmit}>
@@ -127,6 +213,16 @@ export function LogLunchPage() {
         </Card>
 
       </div>
+      {successMessage && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm z-40">
+          <div className="bg-white shadow-xl rounded-xl px-6 py-4 text-center border border-emerald-100">
+            <p className="text-sm font-semibold text-emerald-700">{successMessage}</p>
+            {successCalories != null && (
+              <p className="text-xs text-gray-600 mt-1">Approx. {successCalories} kcal</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
