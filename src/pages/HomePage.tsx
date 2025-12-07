@@ -51,7 +51,7 @@ interface LeaderboardUser {
 
 // --- Mock Data ---
 const DAILY_QUESTS: Quest[] = [
-  { id: "1", title: "Log Lunch", xp: 50, completed: false, type: "daily" },
+  { id: "1", title: "Log Meal", xp: 50, completed: false, type: "daily" },
   { id: "2", title: "Walk 5,000 Steps", xp: 100, completed: false, type: "daily" },
   { id: "3", title: "Drink 2L Water", xp: 50, completed: true, type: "daily" },
 ];
@@ -207,7 +207,7 @@ export function HomePage() {
             <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-8 md:w-80">
               <div className="bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-lg animate-fade-in-up">
                 <p className={`text-xs font-bold uppercase mb-1 ${themeColor}`}>Current Mission</p>
-                <p className="text-sm text-gray-800 font-medium">Log your lunch to maintain your 3-day streak!</p>
+                <p className="text-sm text-gray-800 font-medium">Log your meal to maintain your 3-day streak!</p>
               </div>
             </div>
           )}
@@ -271,7 +271,15 @@ export function HomePage() {
                 <div className="mb-4 space-y-2">
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Daily Objectives</p>
                   {DAILY_QUESTS.map(quest => (
-                    <div key={quest.id} className="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm">
+                    <div
+                      key={quest.id}
+                      className={`bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm ${quest.title === "Log Lunch" ? "cursor-pointer hover:border-emerald-300 hover:shadow-md" : ""}`}
+                      onClick={() => {
+                        if (quest.title === "Log Meal") {
+                          navigate("/log-meal", { state: { formData } })
+                        }
+                      }}
+                    >
                       <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center ${quest.completed ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
                           {quest.completed ? <CheckCircle2 className="w-5 h-5" /> : <div className="w-3 h-3 rounded-full bg-gray-300" />}

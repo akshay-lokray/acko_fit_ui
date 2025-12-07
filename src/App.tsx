@@ -17,6 +17,7 @@ import { UserLockerPage } from './pages/UserLockerPage';
 import { DevicesPage } from './pages/DevicesPage';
 import { RewardsPage } from './pages/RewardsPage';
 import { RankingsPage } from './pages/RankingsPage';
+import { LogLunchPage } from './pages/LogLunchPage';
 
 function App() {
   const [showIntro, setShowIntro] = useState(true);
@@ -59,6 +60,7 @@ function App() {
         <Route path="/devices" element={<DevicesPage />} />
         <Route path="/rewards" element={<RewardsPage />} />
         <Route path="/rankings" element={<RankingsPage />} />
+        <Route path="/log-meal" element={<LogLunchPage />} />
         <Route path="/avatar" element={<AvatarPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

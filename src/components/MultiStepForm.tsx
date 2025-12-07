@@ -1,7 +1,6 @@
-import { useState, useRef, useEffect } from "react";
-import type { FormData } from "@/types/form";
+import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useFormStore } from "@/store/formStore";
+import { useUserProfileStore } from "@/store/userProfileStore";
 import AvatarScene from "./AvatarScene";
 import "./MultiStepForm.css";
 import { Button } from "@/components/ui/button";
@@ -23,7 +22,7 @@ export function MultiStepForm() {
   const location = useLocation();
   const navigate = useNavigate();
   const initialGender = location.state?.gender || "female"; // Default fallback
-  const { step, formData, nextStep, prevStep, updateFormData } = useFormStore();
+  const { step, formData, nextStep, prevStep, updateFormData } = useUserProfileStore();
 
   const submitUserData = async () => {
     const payload = {
