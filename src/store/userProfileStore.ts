@@ -19,7 +19,7 @@ const initialFormData = (): FormData => ({
   medicalConditions: ["None"],
 })
 
-interface FormStore {
+interface UserProfileStore {
   step: number
   formData: FormData
   setStep: (step: number) => void
@@ -29,7 +29,7 @@ interface FormStore {
   resetForm: () => void
 }
 
-export const useFormStore = create<FormStore>()(
+export const useUserProfileStore = create<UserProfileStore>()(
   devtools(
     (set) => ({
       step: 1,
@@ -40,8 +40,7 @@ export const useFormStore = create<FormStore>()(
       updateFormData: (updates) =>
         set((state) => {
           const nextFormData = { ...state.formData, ...updates }
-          // Log changes for debugging/user visibility
-          console.log("[formStore] updateFormData", { updates, nextFormData })
+          console.log("[userProfileStore] updateFormData", { updates, nextFormData })
           return { formData: nextFormData }
         }),
       resetForm: () =>
@@ -50,7 +49,7 @@ export const useFormStore = create<FormStore>()(
           formData: initialFormData(),
         }),
     }),
-    { name: "formStore" }
+    { name: "userProfileStore" }
   )
 )
 
