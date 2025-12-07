@@ -24,6 +24,29 @@ export function MultiStepForm() {
   const initialGender = location.state?.gender || "female"; // Default fallback
   const { step, formData, nextStep, prevStep, updateFormData } = useFormStore();
 
+  const submitUserData = async () => {
+    const payload = {
+      userId: formData.mobile, // use mobile as userId
+      ...formData,
+    };
+
+    try {
+      const response = await fetch("/api/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        console.error("Failed to submit user data", await response.text());
+      }
+    } catch (error) {
+      console.error("Failed to submit user data", error);
+    }
+  };
+
   // Ensure gender from navigation state is captured once when arriving
   useEffect(() => {
     if (initialGender && formData.gender !== initialGender) {
@@ -31,10 +54,11 @@ export function MultiStepForm() {
     }
   }, [initialGender, formData.gender, updateFormData]);
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step < TOTAL_STEPS) {
       nextStep();
     } else {
+      await submitUserData();
       // Navigate to premium page with form data
       navigate("/premium", { state: { formData } });
     }
