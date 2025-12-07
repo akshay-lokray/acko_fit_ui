@@ -14,6 +14,9 @@ import { WorkoutPlansPage } from './pages/WorkoutPlansPage';
 import { PhotoTrackingPage } from './pages/PhotoTrackingPage';
 import { HabitTrackerPage } from './pages/HabitTrackerPage';
 import { UserLockerPage } from './pages/UserLockerPage';
+import { DevicesPage } from './pages/DevicesPage';
+import { RewardsPage } from './pages/RewardsPage';
+import { RankingsPage } from './pages/RankingsPage';
 
 function App() {
   const [showIntro, setShowIntro] = useState(true);
@@ -53,6 +56,9 @@ function App() {
         <Route path="/tracker" element={<PhotoTrackingPage />} />
         <Route path="/habits" element={<HabitTrackerPage />} />
         <Route path="/profile" element={<UserLockerPage />} />
+        <Route path="/devices" element={<DevicesPage />} />
+        <Route path="/rewards" element={<RewardsPage />} />
+        <Route path="/rankings" element={<RankingsPage />} />
         <Route path="/avatar" element={<AvatarPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -12,7 +12,11 @@ import {
   Utensils,
   Dumbbell,
   Camera,
-  LayoutGrid
+  LayoutGrid,
+  MapPin,
+  Trophy,
+  Crown,
+  Medal
 } from "lucide-react";
 import AvatarScene from "@/components/AvatarScene";
 import type { VoiceType } from "@/types/voice";
@@ -36,11 +40,27 @@ interface Quest {
   type: "daily" | "weekly";
 }
 
+interface LeaderboardUser {
+  rank: number;
+  name: string;
+  xp: number;
+  avatarColor: string;
+  isUser?: boolean;
+  location?: string;
+}
+
 // --- Mock Data ---
 const DAILY_QUESTS: Quest[] = [
   { id: "1", title: "Log Lunch", xp: 50, completed: false, type: "daily" },
   { id: "2", title: "Walk 5,000 Steps", xp: 100, completed: false, type: "daily" },
   { id: "3", title: "Drink 2L Water", xp: 50, completed: true, type: "daily" },
+];
+
+const MOCK_LEADERBOARD: LeaderboardUser[] = [
+  { rank: 1, name: "Aarav P.", xp: 15400, avatarColor: "bg-orange-500", location: "Mumbai" },
+  { rank: 2, name: "Sneha K.", xp: 14200, avatarColor: "bg-blue-500", location: "Delhi" },
+  { rank: 3, name: "Rohan M.", xp: 13850, avatarColor: "bg-green-500", location: "Bangalore" },
+  { rank: 144, name: "You", xp: 350, avatarColor: "bg-purple-600", isUser: true, location: "Pune" }, // User's rank
 ];
 
 export function HomePage() {
@@ -53,8 +73,8 @@ export function HomePage() {
   const coachName = gender === "male" ? "Atlas" : "Aria";
 
   // State
-  // Changed "map" to "explore"
-  const [activeTab, setActiveTab] = useState<"chat" | "explore" | "community">("chat");
+  // Changed "community" to "leaderboard"
+  const [activeTab, setActiveTab] = useState<"chat" | "explore" | "leaderboard">("chat");
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -64,6 +84,8 @@ export function HomePage() {
   ]);
   const [inputValue, setInputValue] = useState("");
   const [xp, setXp] = useState(350);
+  const [userLocation, setUserLocation] = useState("India"); // Default location
+
   const levelingXp = 1000;
   const level = 1;
 
@@ -146,11 +168,17 @@ export function HomePage() {
             </div>
           </div>
           <div className="flex items-center gap-4 text-sm font-medium text-gray-600">
-            <div className="flex items-center gap-1">
+            <div
+              className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => navigate("/rewards")}
+            >
               <Zap className="w-4 h-4 text-yellow-500 fill-yellow-500" />
               <span>{xp} XP</span>
             </div>
-            <div className="flex items-center gap-1">
+            <div
+              className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => navigate("/rankings")}
+            >
               <Shield className="w-4 h-4 text-blue-500" />
               <span>Warrior</span>
             </div>
@@ -199,7 +227,7 @@ export function HomePage() {
           )}
         </div>
 
-        {/* 2. Interface Tabs (Chat / Explore / Community) */}
+        {/* 2. Interface Tabs (Chat / Explore / Leaderboard) */}
         <div className="flex-1 bg-white rounded-t-[2rem] shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] relative z-20 overflow-hidden flex flex-col">
 
           {/* Tab Navigation */}
@@ -217,10 +245,10 @@ export function HomePage() {
               <Compass className="w-4 h-4" /> Explore
             </button>
             <button
-              onClick={() => setActiveTab("community")}
-              className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${activeTab === 'community' ? `${themeColor} border-b-2 ${isMale ? 'border-emerald-500' : 'border-purple-500'}` : 'text-gray-400'}`}
+              onClick={() => setActiveTab("leaderboard")}
+              className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${activeTab === 'leaderboard' ? `${themeColor} border-b-2 ${isMale ? 'border-emerald-500' : 'border-purple-500'}` : 'text-gray-400'}`}
             >
-              <Users className="w-4 h-4" /> Squad
+              <Trophy className="w-4 h-4" /> Ranking
             </button>
           </div>
 
@@ -330,12 +358,13 @@ export function HomePage() {
                   </Card>
 
                   <Card
-                    className="p-4 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white opacity-50"
+                    className="p-4 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white md:col-span-2"
+                    onClick={() => navigate("/devices")}
                   >
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
-                      <LayoutGrid className="w-6 h-6" />
+                    <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
+                      <Zap className="w-6 h-6" />
                     </div>
-                    <span className="font-semibold text-gray-400">Coming Soon</span>
+                    <span className="font-semibold text-gray-700">Wearable Sync</span>
                   </Card>
                 </div>
 
@@ -348,40 +377,94 @@ export function HomePage() {
               </div>
             )}
 
-            {activeTab === "community" && (
+            {/* Leaderboard Tab (Replaces Squad) */}
+            {activeTab === "leaderboard" && (
               <div className="h-full space-y-6 max-w-2xl mx-auto">
-                <Card className="p-6 border-l-4 border-l-orange-500">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-orange-500 uppercase">Current Team Challenge</p>
-                      <h3 className="text-lg font-bold text-gray-900 mt-1">Movement Masters</h3>
-                      <p className="text-sm text-gray-600 mt-2">Log 100k collective steps with your squad.</p>
+                {/* Location Header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">Leaderboard</h2>
+                    <div className="flex items-center gap-1 text-sm text-gray-500 mt-1">
+                      <MapPin className="w-4 h-4 text-emerald-500" />
+                      <span>Ranking in <span className="font-bold text-gray-900">{userLocation}</span></span>
                     </div>
-                    <Award className="w-8 h-8 text-orange-500" />
                   </div>
-                  <div className="mt-4 space-y-2">
-                    <div className="flex justify-between text-xs font-medium text-gray-500">
-                      <span>Team Progress</span>
-                      <span>42,050 / 100,000 steps</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => setUserLocation(prev => prev === "India" ? "Global" : "India")}
+                  >
+                    {userLocation === "India" ? "Show Global" : "Show Local"}
+                  </Button>
+                </div>
+
+                {/* Top 3 Podium */}
+                <div className="grid grid-cols-3 gap-2 items-end pt-4 mb-8">
+                  {/* Silver */}
+                  <div className="flex flex-col items-center">
+                    <div className="w-14 h-14 bg-gray-200 rounded-full border-4 border-gray-300 flex items-center justify-center mb-2 relative">
+                      <span className="text-xl">🥈</span>
+                      <div className="absolute -bottom-2 bg-gray-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">#2</div>
                     </div>
-                    <Progress value={42} className="h-2" />
+                    <p className="font-bold text-xs text-center truncate w-full">{MOCK_LEADERBOARD[1].name}</p>
+                    <p className="text-[10px] text-gray-400">{MOCK_LEADERBOARD[1].xp} XP</p>
+                  </div>
+
+                  {/* Gold */}
+                  <div className="flex flex-col items-center -mt-4">
+                    <Crown className="w-6 h-6 text-yellow-500 mb-1 animate-bounce" />
+                    <div className="w-20 h-20 bg-yellow-100 rounded-full border-4 border-yellow-400 flex items-center justify-center mb-2 relative shadow-lg">
+                      <span className="text-3xl">🥇</span>
+                      <div className="absolute -bottom-2 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">#1</div>
+                    </div>
+                    <p className="font-bold text-sm text-center truncate w-full">{MOCK_LEADERBOARD[0].name}</p>
+                    <p className="text-xs text-gray-400">{MOCK_LEADERBOARD[0].xp} XP</p>
+                  </div>
+
+                  {/* Bronze */}
+                  <div className="flex flex-col items-center">
+                    <div className="w-14 h-14 bg-orange-100 rounded-full border-4 border-orange-300 flex items-center justify-center mb-2 relative">
+                      <span className="text-xl">🥉</span>
+                      <div className="absolute -bottom-2 bg-orange-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">#3</div>
+                    </div>
+                    <p className="font-bold text-xs text-center truncate w-full">{MOCK_LEADERBOARD[2].name}</p>
+                    <p className="text-[10px] text-gray-400">{MOCK_LEADERBOARD[2].xp} XP</p>
+                  </div>
+                </div>
+
+                {/* User Rank Card */}
+                <Card className="bg-gradient-to-r from-gray-900 to-gray-800 p-4 rounded-xl flex items-center justify-between text-white shadow-lg transform scale-105 border-2 border-emerald-500/50">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center font-bold text-sm border-2 border-white/20">
+                      You
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm">Your Rank</p>
+                      <p className="text-xs text-gray-400">Top 15% in {userLocation}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-emerald-400">#144</p>
+                    <p className="text-xs text-gray-400">{xp} XP</p>
                   </div>
                 </Card>
 
-                <div>
-                  <h4 className="font-bold text-gray-900 mb-4">Squad Leaderboard</h4>
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm font-bold text-gray-400">#{i}</span>
-                          <div className="w-8 h-8 bg-gray-200 rounded-full" />
-                          <span className="font-medium text-gray-700">User_{9000 + i}</span>
+                {/* REST OF LIST */}
+                <div className="space-y-4 pt-2">
+                  <p className="text-xs font-bold text-gray-400 uppercase">Runners Up</p>
+                  {[4, 5, 6].map((rank) => (
+                    <div key={rank} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-gray-400 text-sm w-6">#{rank}</span>
+                        <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-xs font-bold text-gray-500">
+                          U{rank}
                         </div>
-                        <span className="text-sm font-bold text-gray-900">{1500 - (i * 100)} XP</span>
+                        <span className="font-medium text-sm text-gray-700">User_{9200 + rank}</span>
                       </div>
-                    ))}
-                  </div>
+                      <span className="text-xs font-bold text-gray-500">{13000 - (rank * 500)} XP</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
