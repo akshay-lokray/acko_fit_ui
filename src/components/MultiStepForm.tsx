@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
+import type { FormData } from "@/types/form";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useFormStore } from "@/store/formStore";
 import AvatarScene from "./AvatarScene";
