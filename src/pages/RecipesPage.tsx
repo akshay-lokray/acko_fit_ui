@@ -1,442 +1,1068 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-    ArrowLeft,
-    Flame,
-    Clock,
-    ChevronRight,
-    Minus,
-    Plus,
-    Check,
-    ShoppingCart,
-    ExternalLink,
-    PlayCircle,
-    Utensils,
-    ChefHat,
-    Bell
+  ArrowLeft,
+  Search,
+  Bookmark,
+  BookmarkCheck,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
-// --- Types ---
-interface Ingredient {
-    id: string;
-    name: string;
-    quantity: string;
-    price: number;
-}
+// Types
+type RecipeSuggestion = string;
 
 interface Recipe {
-    id: string;
-    title: string;
-    calories: number;
-    time: string;
-    image: string; // Emoji for now, or url
-    rating: number;
-    servings: number;
-    tags: string[];
-    videoUrl?: string;
-    ingredients: Ingredient[];
+  id: string;
+  title: string;
+  calories: number;
+  image: string;
+  category: string;
 }
 
-// --- Mock Data ---
-const RECIPES: Recipe[] = [
-    {
-        id: "1",
-        title: "High-Protein Lentil Salad",
-        calories: 320,
-        time: "15 min",
-        image: "🥗",
-        rating: 4.8,
-        servings: 2,
-        tags: ["High Protein", "Vegetarian"],
-        videoUrl: "https://example.com/video",
-        ingredients: [
-            { id: "i1", name: "Red Lentils", quantity: "2 cups", price: 80 },
-            { id: "i2", name: "Cherry Tomatoes", quantity: "200g", price: 60 },
-            { id: "i3", name: "Cucumber", quantity: "1 pc", price: 20 },
-            { id: "i4", name: "Red Onion", quantity: "1 medium", price: 15 },
-            { id: "i5", name: "Feta Cheese", quantity: "50g", price: 120 },
-            { id: "i6", name: "Olive Oil", quantity: "2 tbsp", price: 40 },
-        ]
-    },
-    {
-        id: "2",
-        title: "Grilled Salmon & Asparagus",
-        calories: 520,
-        time: "25 min",
-        image: "🐟",
-        rating: 4.9,
-        servings: 1,
-        tags: ["Keto", "Omega-3"],
-        ingredients: [
-            { id: "s1", name: "Salmon Fillet", quantity: "200g", price: 450 },
-            { id: "s2", name: "Asparagus", quantity: "1 bunch", price: 120 },
-            { id: "s3", name: "Lemon", quantity: "1 pc", price: 10 },
-            { id: "s4", name: "Butter", quantity: "20g", price: 30 },
-            { id: "s5", name: "Garlic", quantity: "2 cloves", price: 5 },
-        ]
-    },
-    {
-        id: "3",
-        title: "Berry Blast Smoothie",
-        calories: 200,
-        time: "5 min",
-        image: "🥤",
-        rating: 4.7,
-        servings: 1,
-        tags: ["Breakfast", "Low Carb"],
-        ingredients: [
-            { id: "b1", name: "Mixed Berries", quantity: "1 cup", price: 200 },
-            { id: "b2", name: "Greek Yogurt", quantity: "1/2 cup", price: 80 },
-            { id: "b3", name: "Almond Milk", quantity: "200ml", price: 40 },
-            { id: "b4", name: "Chia Seeds", quantity: "1 tbsp", price: 20 },
-        ]
+interface RecipeSection {
+  title: string;
+  recipes: Recipe[];
+}
+
+interface RecipeDetail {
+  title: string;
+  description: string;
+  image?: string;
+  serves?: number;
+  category?: string;
+  calories?: number;
+  carbs?: number;
+  fat?: number;
+  protein?: number;
+  ingredients?: string[];
+  directions?: string[];
+  nutrition?: {
+    calories?: number;
+    totalFat?: number;
+    saturatedFat?: number;
+    polyunsaturatedFat?: number;
+    monounsaturatedFat?: number;
+    transFat?: number;
+    cholesterol?: number;
+    sodium?: number;
+    totalCarbohydrates?: number;
+    dietaryFiber?: number;
+    sugars?: number;
+    addedSugars?: number;
+    sugarAlcohols?: number;
+    protein?: number;
+    vitaminD?: number;
+    calcium?: number;
+    iron?: number;
+    potassium?: number;
+    vitaminA?: number;
+    vitaminC?: number;
+  };
+}
+
+// API Functions
+const fetchSuggestions = async (
+  query: string,
+  signal?: AbortSignal
+): Promise<RecipeSuggestion[]> => {
+  try {
+    const response = await fetch(
+      `/api/ai/recipes/suggestions?query=${encodeURIComponent(query)}`,
+      { signal }
+    );
+    if (!response.ok) throw new Error("Failed to fetch suggestions");
+    const data = await response.json();
+    // API returns an array of strings (recipe names)
+    if (Array.isArray(data)) {
+      return data.filter((item): item is string => typeof item === "string");
     }
+    return [];
+  } catch (error) {
+    // Ignore abort errors
+    if (error instanceof Error && error.name === "AbortError") {
+      return [];
+    }
+    console.error("Error fetching suggestions:", error);
+    return [];
+  }
+};
+
+const fetchRecipeDetails = async (
+  dishName: string
+): Promise<RecipeDetail | null> => {
+  try {
+    const response = await fetch(
+      `/api/ai/recipes/search?dishName=${encodeURIComponent(dishName)}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    if (!response.ok) throw new Error("Failed to fetch recipe details");
+    const data = await response.json();
+
+    // Parse the API response (which is likely a description string)
+    return parseRecipeDescription(data, dishName);
+  } catch (error) {
+    console.error("Error fetching recipe details:", error);
+    return null;
+  }
+};
+
+// Parse recipe description from API response
+const parseRecipeDescription = (
+  data: unknown,
+  dishName: string
+): RecipeDetail => {
+  // If data is already structured, use it
+  if (typeof data === "object" && data !== null && !Array.isArray(data)) {
+    const obj = data as Record<string, unknown>;
+    const nutrition = (obj.nutrition as Record<string, unknown>) || {};
+
+    // Parse recipe/directions string into array
+    const recipeText = (obj.recipe as string) || "";
+    const directions = recipeText
+      ? recipeText
+          .split(/\d+\./)
+          .map((step) => step.trim())
+          .filter((step) => step.length > 0)
+      : [];
+
+    return {
+      title:
+        (obj.dishName as string) ||
+        (obj.title as string) ||
+        (obj.name as string) ||
+        dishName,
+      description:
+        (obj.healthAssessment as string) ||
+        (obj.description as string) ||
+        (obj.text as string) ||
+        "",
+      image: (obj.imageUrl as string) || (obj.image as string) || "",
+      serves: (obj.serves as number) || (obj.servings as number) || 4,
+      category:
+        (obj.cuisine as string) ||
+        (obj.category as string) ||
+        (obj.tag as string) ||
+        "",
+      calories: (nutrition.calories as number) || (obj.calories as number),
+      carbs:
+        (nutrition.carbs as number) ||
+        (nutrition.carbohydrates as number) ||
+        (obj.carbs as number) ||
+        (obj.carbohydrates as number),
+      fat: (nutrition.fat as number) || (obj.fat as number),
+      protein: (nutrition.protein as number) || (obj.protein as number),
+      ingredients: Array.isArray(obj.ingredients)
+        ? (obj.ingredients as string[])
+        : typeof obj.ingredients === "string"
+        ? obj.ingredients.split("\n").filter((s: string) => s.trim())
+        : undefined,
+      directions:
+        directions.length > 0
+          ? directions
+          : Array.isArray(obj.directions)
+          ? (obj.directions as string[])
+          : Array.isArray(obj.instructions)
+          ? (obj.instructions as string[])
+          : typeof obj.directions === "string"
+          ? obj.directions.split("\n").filter((s: string) => s.trim())
+          : typeof obj.instructions === "string"
+          ? obj.instructions.split("\n").filter((s: string) => s.trim())
+          : [],
+      nutrition: {
+        calories: nutrition.calories as number,
+        totalFat: nutrition.fat as number,
+        protein: nutrition.protein as number,
+        totalCarbohydrates: nutrition.carbs as number,
+        dietaryFiber: nutrition.fiber as number,
+        sugars: nutrition.sugar as number,
+        sodium: nutrition.sodium as number,
+        ...(nutrition as RecipeDetail["nutrition"]),
+      },
+    };
+  }
+
+  // If data is a string (description), try to parse it
+  const description = typeof data === "string" ? data : JSON.stringify(data);
+
+  // Extract ingredients (lines starting with numbers, dashes, or bullet points)
+  const ingredientMatches = description.match(
+    /(?:^|\n)[\s]*[-•\d]+[\s]+(.+?)(?=\n|$)/gm
+  );
+  const ingredients = ingredientMatches
+    ? ingredientMatches.map((m) => m.replace(/^[\s]*[-•\d]+[\s]+/, "").trim())
+    : [];
+
+  // Extract directions/steps (numbered steps)
+  const directionMatches = description.match(
+    /(?:^|\n)[\s]*\d+[.)][\s]+(.+?)(?=\n|$)/gm
+  );
+  const directions = directionMatches
+    ? directionMatches.map((m) => m.replace(/^[\s]*\d+[.)][\s]+/, "").trim())
+    : [];
+
+  return {
+    title: dishName,
+    description,
+    serves: 4,
+    ingredients: ingredients.length > 0 ? ingredients : undefined,
+    directions: directions.length > 0 ? directions : undefined,
+  };
+};
+
+// Mock data for sections (will be replaced with API data later)
+const MOCK_SECTIONS: RecipeSection[] = [
+  {
+    title: "Immune Support",
+    recipes: [
+      {
+        id: "1",
+        title: "Salmon Pate With Cauliflower Dippers",
+        calories: 155,
+        image:
+          "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400",
+        category: "Immune Support",
+      },
+      {
+        id: "2",
+        title: "Mushrooms, Brussels Sprouts and Farro",
+        calories: 375,
+        image:
+          "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400",
+        category: "Immune Support",
+      },
+    ],
+  },
+  {
+    title: "Pantry Staples",
+    recipes: [
+      {
+        id: "3",
+        title: "Buffalo Chicken Wrap",
+        calories: 321,
+        image:
+          "https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=400",
+        category: "Pantry Staples",
+      },
+      {
+        id: "4",
+        title: "Instant Pot Chickpea Tikka Masala",
+        calories: 336,
+        image:
+          "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=400",
+        category: "Pantry Staples",
+      },
+    ],
+  },
+  {
+    title: "Pre-Workout",
+    recipes: [
+      {
+        id: "5",
+        title: "Rice Cakes with Fruit",
+        calories: 155,
+        image:
+          "https://images.unsplash.com/photo-1603048297172-c92544798d5a?w=400",
+        category: "Pre-Workout",
+      },
+      {
+        id: "6",
+        title: "Peak Protein Bites",
+        calories: 131,
+        image:
+          "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=400",
+        category: "Pre-Workout",
+      },
+    ],
+  },
+  {
+    title: "Post-Workout",
+    recipes: [
+      {
+        id: "7",
+        title: "Chicken and Avocado Burrito",
+        calories: 368,
+        image:
+          "https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=400",
+        category: "Post-Workout",
+      },
+      {
+        id: "8",
+        title: "Quinoa and Spinach Scramble",
+        calories: 259,
+        image:
+          "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400",
+        category: "Post-Workout",
+      },
+    ],
+  },
+  {
+    title: "High Protein",
+    recipes: [
+      {
+        id: "9",
+        title: "Grilled Salmon",
+        calories: 320,
+        image:
+          "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=400",
+        category: "High Protein",
+      },
+      {
+        id: "10",
+        title: "Protein Power Bowl",
+        calories: 450,
+        image:
+          "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400",
+        category: "High Protein",
+      },
+    ],
+  },
 ];
 
-const PROVIDERS = [
-    { id: "bb", name: "BigBasket", color: "bg-green-100 text-green-700 border-green-200" },
-    { id: "blinkit", name: "Blinkit", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-    { id: "zepto", name: "Zepto", color: "bg-purple-100 text-purple-700 border-purple-200" },
-    { id: "instamart", name: "Instamart", color: "bg-orange-100 text-orange-700 border-orange-200" },
-];
+// Recipe Detail View Component
+function RecipeDetailView({
+  recipe,
+  onBack,
+  onBookmark,
+  isBookmarked,
+}: {
+  recipe: RecipeDetail;
+  onBack: () => void;
+  onBookmark: () => void;
+  isBookmarked: boolean;
+}) {
+  const [showNutrition, setShowNutrition] = useState(false);
+  const nutrition = recipe.nutrition || {};
+  const calories = recipe.calories || nutrition.calories || 0;
+  const carbs = recipe.carbs || nutrition.totalCarbohydrates || 0;
+  const fat = recipe.fat || nutrition.totalFat || 0;
+  const protein = recipe.protein || nutrition.protein || 0;
+
+  // Calculate percentages for circular graph
+  const totalMacros = carbs + fat + protein;
+  const carbsPercent = totalMacros > 0 ? (carbs / totalMacros) * 100 : 0;
+  const fatPercent = totalMacros > 0 ? (fat / totalMacros) * 100 : 0;
+  const proteinPercent = totalMacros > 0 ? (protein / totalMacros) * 100 : 0;
+
+  // Calculate circumference for SVG circle
+  const radius = 50;
+  const circumference = 2 * Math.PI * radius;
+  const carbsOffset = circumference - (carbsPercent / 100) * circumference;
+  const fatOffset =
+    circumference -
+    (fatPercent / 100) * circumference -
+    (carbsPercent / 100) * circumference;
+  const proteinOffset =
+    circumference -
+    (proteinPercent / 100) * circumference -
+    (carbsPercent / 100) * circumference -
+    (fatPercent / 100) * circumference;
+
+  return (
+    <div className="min-h-screen bg-black text-white">
+      {/* Header */}
+      <div className="sticky top-0 z-20 bg-black/95 backdrop-blur-sm border-b border-gray-800">
+        <div className="flex items-center gap-4 px-4 py-3">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-6 h-6 text-white" />
+          </button>
+          <h1 className="text-xl font-bold text-white flex-1 text-center">
+            Recipe Details
+          </h1>
+          <button
+            onClick={onBookmark}
+            className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            {isBookmarked ? (
+              <BookmarkCheck className="w-6 h-6 text-green-500 fill-green-500" />
+            ) : (
+              <Bookmark className="w-6 h-6 text-white" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="pb-24">
+        {/* Recipe Image */}
+        {recipe.image && (
+          <div className="w-full aspect-[4/3] overflow-hidden bg-gray-900">
+            <img
+              src={recipe.image}
+              alt={recipe.title}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          </div>
+        )}
+
+        <div className="px-4 py-6">
+          {/* Title and Meta */}
+          <h2 className="text-2xl font-bold text-white mb-2">{recipe.title}</h2>
+          {recipe.serves && (
+            <p className="text-gray-400 mb-3">Serves {recipe.serves}</p>
+          )}
+          {recipe.category && (
+            <span className="inline-block px-3 py-1 bg-gray-800 text-gray-300 rounded-full text-sm mb-6">
+              {recipe.category}
+            </span>
+          )}
+
+          {/* Nutrition Per Serving */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-white mb-4">
+              Nutrition Per Serving
+            </h3>
+            <div className="flex items-center gap-6">
+              {/* Circular Graph */}
+              <div className="relative w-32 h-32 flex-shrink-0">
+                <svg className="w-32 h-32 transform -rotate-90">
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r={radius}
+                    fill="none"
+                    stroke="#1f2937"
+                    strokeWidth="12"
+                  />
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r={radius}
+                    fill="none"
+                    stroke="#3b82f6"
+                    strokeWidth="12"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={carbsOffset}
+                    strokeLinecap="round"
+                  />
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r={radius}
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="12"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={fatOffset}
+                    strokeLinecap="round"
+                  />
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r={radius}
+                    fill="none"
+                    stroke="#f59e0b"
+                    strokeWidth="12"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={proteinOffset}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-white">
+                      {calories}
+                    </div>
+                    <div className="text-xs text-gray-400">Cal</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Macros */}
+              <div className="flex-1 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <span className="text-gray-300">Carbs</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-white font-semibold">
+                      {Math.round(carbsPercent)}%
+                    </span>
+                    <span className="text-gray-400 text-sm ml-1">
+                      ({carbs}g)
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span className="text-gray-300">Fat</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-white font-semibold">
+                      {Math.round(fatPercent)}%
+                    </span>
+                    <span className="text-gray-400 text-sm ml-1">({fat}g)</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                    <span className="text-gray-300">Protein</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-white font-semibold">
+                      {Math.round(proteinPercent)}%
+                    </span>
+                    <span className="text-gray-400 text-sm ml-1">
+                      ({protein}g)
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Collapsible Nutrition Section */}
+          <div className="mb-6">
+            <button
+              onClick={() => setShowNutrition(!showNutrition)}
+              className="w-full flex items-center justify-between text-blue-400 mb-2"
+            >
+              <span>{showNutrition ? "HIDE NUTRITION" : "SHOW NUTRITION"}</span>
+              {showNutrition ? (
+                <ChevronUp className="w-5 h-5" />
+              ) : (
+                <ChevronDown className="w-5 h-5" />
+              )}
+            </button>
+
+            {showNutrition && (
+              <div className="space-y-2 text-sm">
+                {nutrition.calories !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Calories</span>
+                    <span className="text-white">{nutrition.calories}</span>
+                  </div>
+                )}
+                {nutrition.totalFat !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Total Fat (g)</span>
+                    <span className="text-white">{nutrition.totalFat}</span>
+                  </div>
+                )}
+                {nutrition.saturatedFat !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Saturated Fat (g)</span>
+                    <span className="text-white">{nutrition.saturatedFat}</span>
+                  </div>
+                )}
+                {nutrition.polyunsaturatedFat !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">
+                      Polyunsaturated Fat (g)
+                    </span>
+                    <span className="text-white">
+                      {nutrition.polyunsaturatedFat}
+                    </span>
+                  </div>
+                )}
+                {nutrition.monounsaturatedFat !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">
+                      Monounsaturated Fat (g)
+                    </span>
+                    <span className="text-white">
+                      {nutrition.monounsaturatedFat}
+                    </span>
+                  </div>
+                )}
+                {nutrition.transFat !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Trans Fat (g)</span>
+                    <span className="text-white">{nutrition.transFat}</span>
+                  </div>
+                )}
+                {nutrition.cholesterol !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Cholesterol (mg)</span>
+                    <span className="text-white">{nutrition.cholesterol}</span>
+                  </div>
+                )}
+                {nutrition.sodium !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Sodium (mg)</span>
+                    <span className="text-white">{nutrition.sodium}</span>
+                  </div>
+                )}
+                {nutrition.totalCarbohydrates !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">
+                      Total Carbohydrates (g)
+                    </span>
+                    <span className="text-white">
+                      {nutrition.totalCarbohydrates}
+                    </span>
+                  </div>
+                )}
+                {nutrition.dietaryFiber !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Dietary Fiber (g)</span>
+                    <span className="text-white">{nutrition.dietaryFiber}</span>
+                  </div>
+                )}
+                {nutrition.sugars !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Sugars (g)</span>
+                    <span className="text-white">{nutrition.sugars}</span>
+                  </div>
+                )}
+                {nutrition.addedSugars !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Added Sugars (g)</span>
+                    <span className="text-white">
+                      {nutrition.addedSugars !== null &&
+                      nutrition.addedSugars !== undefined
+                        ? nutrition.addedSugars
+                        : "-"}
+                    </span>
+                  </div>
+                )}
+                {nutrition.sugarAlcohols !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Sugar Alcohols (g)</span>
+                    <span className="text-white">
+                      {nutrition.sugarAlcohols !== null &&
+                      nutrition.sugarAlcohols !== undefined
+                        ? nutrition.sugarAlcohols
+                        : "-"}
+                    </span>
+                  </div>
+                )}
+                {nutrition.protein !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Protein (g)</span>
+                    <span className="text-white">{nutrition.protein}</span>
+                  </div>
+                )}
+                {nutrition.vitaminD !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Vitamin D (%)</span>
+                    <span className="text-white">
+                      {nutrition.vitaminD !== null &&
+                      nutrition.vitaminD !== undefined
+                        ? nutrition.vitaminD
+                        : "-"}
+                    </span>
+                  </div>
+                )}
+                {nutrition.calcium !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Calcium (%)</span>
+                    <span className="text-white">{nutrition.calcium}</span>
+                  </div>
+                )}
+                {nutrition.iron !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Iron (%)</span>
+                    <span className="text-white">{nutrition.iron}</span>
+                  </div>
+                )}
+                {nutrition.potassium !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Potassium (mg)</span>
+                    <span className="text-white">{nutrition.potassium}</span>
+                  </div>
+                )}
+                {nutrition.vitaminA !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Vitamin A (%)</span>
+                    <span className="text-white">{nutrition.vitaminA}</span>
+                  </div>
+                )}
+                {nutrition.vitaminC !== undefined && (
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-400">Vitamin C (%)</span>
+                    <span className="text-white">{nutrition.vitaminC}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Ingredients */}
+          {recipe.ingredients && recipe.ingredients.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Ingredients
+              </h3>
+              <ul className="space-y-2">
+                {recipe.ingredients.map((ingredient, index) => (
+                  <li
+                    key={index}
+                    className="text-gray-300 text-sm border-b border-gray-800 pb-2"
+                  >
+                    {ingredient}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Directions */}
+          {recipe.directions && recipe.directions.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Directions
+              </h3>
+              <ol className="space-y-3">
+                {recipe.directions.map((direction, index) => (
+                  <li key={index} className="text-gray-300 text-sm">
+                    <span className="font-semibold text-white mr-2">
+                      {index + 1}.
+                    </span>
+                    {direction}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {/* Description (fallback if no structured data) */}
+          {(!recipe.ingredients || recipe.ingredients.length === 0) &&
+            (!recipe.directions || recipe.directions.length === 0) &&
+            recipe.description && (
+              <div className="mb-6">
+                <p className="text-gray-300 text-sm whitespace-pre-wrap">
+                  {recipe.description}
+                </p>
+              </div>
+            )}
+        </div>
+      </div>
+
+      {/* Add to Diary Button */}
+      <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 p-4 z-10">
+        <Button
+          className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg"
+          onClick={() => {
+            // TODO: Implement add to diary functionality
+            console.log("Add to diary:", recipe.title);
+          }}
+        >
+          ADD TO DIARY
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export function RecipesPage() {
-    const navigate = useNavigate();
-    // Added "choice" state
-    const [view, setView] = useState<"list" | "choice" | "detail" | "cart" | "success">("list");
-    const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
-    const [servings, setServings] = useState(2);
-    const [selectedIngredients, setSelectedIngredients] = useState<Set<string>>(new Set());
-    const [selectedProvider, setSelectedProvider] = useState(PROVIDERS[0]);
-    const [notified, setNotified] = useState(false);
+  const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<RecipeSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [sections] = useState<RecipeSection[]>(MOCK_SECTIONS);
+  const [bookmarkedRecipes, setBookmarkedRecipes] = useState<Set<string>>(
+    new Set()
+  );
+  const [recipeDetail, setRecipeDetail] = useState<RecipeDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+  const searchTimeoutRef = useRef<number | null>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const suggestionClickedRef = useRef<boolean>(false);
 
-    const handleSelectRecipe = (recipe: Recipe) => {
-        setSelectedRecipe(recipe);
-        setServings(recipe.servings);
-        setSelectedIngredients(new Set(recipe.ingredients.map(i => i.id)));
-        setNotified(false); // Reset notification state
-        setView("choice");
-    };
+  // Handle search with debouncing and race condition prevention
+  useEffect(() => {
+    // Reset suggestion clicked flag when query changes
+    suggestionClickedRef.current = false;
 
-    const toggleIngredient = (id: string) => {
-        const next = new Set(selectedIngredients);
-        if (next.has(id)) {
-            next.delete(id);
-        } else {
-            next.add(id);
-        }
-        setSelectedIngredients(next);
-    };
-
-    const getTotalPrice = () => {
-        if (!selectedRecipe) return 0;
-        return selectedRecipe.ingredients
-            .filter(i => selectedIngredients.has(i.id))
-            .reduce((acc, curr) => acc + curr.price, 0);
-    };
-
-    // --- Renderers ---
-
-    const renderList = () => (
-        <div className="min-h-screen bg-gray-50/50 p-6 font-sans">
-            <div className="flex items-center gap-4 mb-8">
-                <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-                    <ArrowLeft className="w-6 h-6" />
-                </Button>
-                <h1 className="text-2xl font-bold text-gray-900">Health Recipes</h1>
-            </div>
-
-            <div className="grid gap-6">
-                {RECIPES.map((recipe) => (
-                    <Card
-                        key={recipe.id}
-                        className="p-4 flex gap-4 items-center hover:shadow-lg transition-all cursor-pointer bg-white border-gray-100"
-                        onClick={() => handleSelectRecipe(recipe)}
-                    >
-                        <div className="w-24 h-24 bg-orange-50 rounded-2xl flex items-center justify-center text-5xl shadow-sm">
-                            {recipe.image}
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="font-bold text-lg text-gray-900">{recipe.title}</h3>
-                            <div className="flex items-center gap-4 text-sm text-gray-500 mt-2">
-                                <span className="flex items-center gap-1"><Flame className="w-4 h-4 text-orange-500" /> {recipe.calories} kcal</span>
-                                <span className="flex items-center gap-1"><Clock className="w-4 h-4 text-blue-500" /> {recipe.time}</span>
-                            </div>
-                            <div className="flex gap-2 mt-3">
-                                {recipe.tags.map(tag => (
-                                    <span key={tag} className="px-2.5 py-1 bg-gray-100 text-xs font-semibold rounded-lg text-gray-600 border border-gray-200">{tag}</span>
-                                ))}
-                            </div>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-gray-300" />
-                    </Card>
-                ))}
-            </div>
-        </div>
-    );
-
-    const renderChoice = () => {
-        if (!selectedRecipe) return null;
-        return (
-            <div className="min-h-screen bg-white font-sans flex flex-col items-center p-6">
-                <div className="w-full flex items-center mb-8">
-                    <Button variant="ghost" size="icon" className="-ml-2" onClick={() => setView("list")}>
-                        <ArrowLeft className="w-6 h-6 text-gray-900" />
-                    </Button>
-                </div>
-
-                <div className="w-32 h-32 bg-orange-50 rounded-full flex items-center justify-center text-7xl mb-6 shadow-sm">
-                    {selectedRecipe.image}
-                </div>
-                <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">{selectedRecipe.title}</h1>
-                <p className="text-gray-500 text-center mb-10 max-w-xs mx-auto">
-                    Choose how you want to experience this meal today.
-                </p>
-
-                <div className="w-full max-w-md space-y-4">
-                    {/* Option 1: Acko EATS */}
-                    <Card className="p-6 border-2 border-gray-100 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs font-bold px-3 py-1 rounded-bl-xl z-10">
-                            COMING SOON
-                        </div>
-                        <div className="flex gap-4 items-start opacity-70">
-                            <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 shrink-0">
-                                <Utensils className="w-6 h-6" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="font-bold text-lg text-gray-900">Order from Acko EATS</h3>
-                                <p className="text-sm text-gray-500 mt-1">
-                                    Chef-prepared, healthy & hot. Delivered in 30 mins to your door.
-                                </p>
-                                <Button
-                                    variant="outline"
-                                    className={`mt-4 w-full gap-2 transition-all ${notified ? 'bg-green-50 text-green-600 border-green-200' : ''}`}
-                                    onClick={() => setNotified(true)}
-                                    disabled={notified}
-                                >
-                                    {notified ? (
-                                        <>
-                                            <Check className="w-4 h-4" /> We'll notify you
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Bell className="w-4 h-4" /> Notify me when available
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
-                        </div>
-                    </Card>
-
-                    {/* Option 2: Cook Yourself */}
-                    <Card
-                        className="p-6 border-2 border-emerald-100 bg-emerald-50/30 cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all group"
-                        onClick={() => setView("detail")}
-                    >
-                        <div className="flex gap-4 items-start">
-                            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 shrink-0">
-                                <ChefHat className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-lg text-gray-900 group-hover:text-emerald-700 transition-colors">Cook on your own</h3>
-                                <p className="text-sm text-gray-600 mt-1">
-                                    Get step-by-step instructions and order fresh ingredients instantly.
-                                </p>
-                                <div className="mt-4 flex items-center gap-2 text-emerald-600 font-bold text-sm">
-                                    Start Cooking <ChevronRight className="w-4 h-4" />
-                                </div>
-                            </div>
-                        </div>
-                    </Card>
-                </div>
-            </div>
-        );
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
     }
 
-    const renderDetail = () => {
-        if (!selectedRecipe) return null;
-        return (
-            <div className="min-h-screen bg-white flex flex-col font-sans">
-                {/* Header Image Area */}
-                <div className="h-64 bg-gray-100 relative w-full flex items-center justify-center overflow-hidden">
-                    <div className="absolute inset-0 bg-orange-50 flex items-center justify-center text-9xl">
-                        {selectedRecipe.image}
-                    </div>
-                    {/* Back goes to Choice screen now */}
-                    <Button variant="secondary" size="icon" className="absolute top-4 left-4 rounded-full bg-white/50 backdrop-blur-md hover:bg-white" onClick={() => setView("choice")}>
-                        <ArrowLeft className="w-6 h-6 text-gray-900" />
-                    </Button>
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="w-16 h-16 bg-white/30 backdrop-blur rounded-full flex items-center justify-center">
-                            <PlayCircle className="w-10 h-10 text-white fill-white/50" />
-                        </div>
-                    </div>
-                </div>
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
 
-                <div className="flex-1 p-6 relative -top-6 bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.05)] flex flex-col">
-                    <div className="mb-6">
-                        <h1 className="text-2xl font-bold text-gray-900 mb-1">{selectedRecipe.title}</h1>
-                        <div className="flex items-center gap-2 text-sm">
-                            <span className="text-yellow-500 font-bold">★ {selectedRecipe.rating}</span>
-                            <span className="text-gray-400">•</span>
-                            <span className="text-gray-500">{selectedRecipe.tags.join(", ")}</span>
-                        </div>
-                    </div>
+    if (searchQuery.trim().length > 3) {
+      // Create new AbortController for this request
+      abortControllerRef.current = new AbortController();
+      const currentController = abortControllerRef.current;
 
-                    <div className="flex items-center justify-between mb-8 bg-gray-50 p-4 rounded-2xl">
-                        <span className="font-semibold text-gray-900">Servings: {servings}</span>
-                        <div className="flex items-center gap-3">
-                            <button className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm" onClick={() => setServings(Math.max(1, servings - 1))}>
-                                <Minus className="w-4 h-4 text-gray-600" />
-                            </button>
-                            <button className="w-8 h-8 rounded-full bg-emerald-500 border border-emerald-500 flex items-center justify-center shadow-sm shadow-emerald-200" onClick={() => setServings(servings + 1)}>
-                                <Plus className="w-4 h-4 text-white" />
-                            </button>
-                        </div>
-                    </div>
+      searchTimeoutRef.current = window.setTimeout(async () => {
+        // Only fetch if suggestion wasn't clicked
+        if (!suggestionClickedRef.current) {
+          try {
+            const results = await fetchSuggestions(
+              searchQuery,
+              currentController.signal
+            );
+            // Only update if this is still the current request and suggestion wasn't clicked
+            if (
+              !currentController.signal.aborted &&
+              !suggestionClickedRef.current
+            ) {
+              setSuggestions(results);
+              setShowSuggestions(true);
+            }
+          } catch (error) {
+            // Ignore abort errors
+            if (
+              !(error instanceof Error && error.name === "AbortError") &&
+              !suggestionClickedRef.current
+            ) {
+              console.error("Error fetching suggestions:", error);
+            }
+          }
+        }
+      }, 300);
+    } else {
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => {
+        if (!suggestionClickedRef.current) {
+          setSuggestions([]);
+          setShowSuggestions(false);
+        }
+      }, 0);
+    }
 
-                    <div className="flex-1">
-                        <h3 className="font-bold text-gray-900 mb-4">Ingredients</h3>
-                        <div className="space-y-3">
-                            {selectedRecipe.ingredients.map(ing => {
-                                const isSelected = selectedIngredients.has(ing.id);
-                                return (
-                                    <div
-                                        key={ing.id}
-                                        className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${isSelected ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-100 hover:border-gray-200'}`}
-                                        onClick={() => toggleIngredient(ing.id)}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${isSelected ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-gray-300'}`}>
-                                                {isSelected && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
-                                            </div>
-                                            <span className={`font-medium ${isSelected ? 'text-gray-900' : 'text-gray-500'}`}>{ing.quantity} {ing.name}</span>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [searchQuery]);
 
-                    <div className="mt-8">
-                        <Button
-                            className="w-full h-14 text-lg bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-200"
-                            onClick={() => setView("cart")}
-                            disabled={selectedIngredients.size === 0}
-                        >
-                            Get Ingredients - Send to Cart
-                        </Button>
-                    </div>
-                </div>
-            </div>
-        );
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
     };
 
-    const renderCart = () => {
-        if (!selectedRecipe) return null;
-        const cartItems = selectedRecipe.ingredients.filter(i => selectedIngredients.has(i.id));
-
-        return (
-            <div className="min-h-screen bg-gray-50/50 flex flex-col font-sans">
-                <div className="bg-white p-6 shadow-sm z-10">
-                    <div className="flex items-center gap-4 mb-6">
-                        <Button variant="ghost" size="icon" className="-ml-2" onClick={() => setView("detail")}>
-                            <ArrowLeft className="w-6 h-6 text-gray-900" />
-                        </Button>
-                        <h1 className="text-xl font-bold text-gray-900">Review Your Cart</h1>
-                    </div>
-
-                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                        {PROVIDERS.map(p => (
-                            <button
-                                key={p.id}
-                                onClick={() => setSelectedProvider(p)}
-                                className={`flex-shrink-0 px-4 py-2 rounded-full border text-sm font-bold transition-all flex items-center gap-2 ${selectedProvider.id === p.id ? p.color + ' ring-2 ring-offset-2 ring-transparent' : 'bg-white border-gray-200 text-gray-500'}`}
-                            >
-                                {p.name}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-6">
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div className="p-4 border-b border-gray-50 bg-gray-50/50">
-                            <h3 className="font-semibold text-gray-700">Ingredients ({cartItems.length})</h3>
-                        </div>
-                        <div className="divide-y divide-gray-50">
-                            {cartItems.map(item => (
-                                <div key={item.id} className="p-4 flex items-center justify-between">
-                                    <div>
-                                        <p className="font-medium text-gray-900">{item.name}</p>
-                                        <p className="text-xs text-gray-400">{item.quantity}</p>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                        <span className="font-bold text-gray-600 text-sm">₹{item.price}</span>
-                                        <Switch checked={true} onCheckedChange={(checked) => !checked && toggleIngredient(item.id)} />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
-                            <span className="font-bold text-gray-600">Total</span>
-                            <span className="font-bold text-xl text-emerald-600">₹{getTotalPrice()}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="p-6 bg-white border-t border-gray-100">
-                    <Button
-                        className="w-full h-14 text-lg bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg"
-                        onClick={() => setView("success")}
-                    >
-                        Send {cartItems.length} Items to {selectedProvider.name} Cart
-                    </Button>
-                </div>
-            </div>
-        );
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
     };
+  }, []);
 
-    const renderSuccess = () => (
-        <div className="min-h-screen bg-black/50 backdrop-blur-sm flex items-center justify-center p-6 font-sans">
-            <div className="bg-white w-full max-w-sm rounded-3xl p-8 flex flex-col items-center text-center animate-fade-in-up shadow-2xl">
-                <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
-                    <Check className="w-10 h-10 text-emerald-600" strokeWidth={3} />
-                </div>
+  const handleRecipeClick = async (recipe: Recipe) => {
+    setLoading(true);
+    const details = await fetchRecipeDetails(recipe.title);
+    setLoading(false);
+    if (details) {
+      setRecipeDetail(details);
+    }
+  };
 
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Success! Cart Ready at {selectedProvider.name}</h2>
-                <p className="text-gray-500 mb-8 leading-relaxed">
-                    Your {selectedIngredients.size} items have been added to your {selectedProvider.name} account.
-                </p>
+  const handleSuggestionClick = async (suggestion: string) => {
+    // Mark that suggestion was clicked to prevent re-rendering
+    suggestionClickedRef.current = true;
 
-                <Button
-                    className="w-full h-14 text-lg bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg mb-4"
-                    onClick={() => console.log("Open Deeplink")}
-                >
-                    Open {selectedProvider.name} App
-                </Button>
+    // Cancel any pending suggestion requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
 
-                <Button variant="ghost" className="text-gray-400" onClick={() => {
-                    setView("list");
-                    setSelectedRecipe(null);
-                }}>
-                    Back to Recipes
-                </Button>
-            </div>
-        </div>
-    );
+    setSearchQuery(suggestion);
+    setShowSuggestions(false);
+    setSuggestions([]); // Clear suggestions immediately
+    setLoading(true);
+    const details = await fetchRecipeDetails(suggestion);
+    setLoading(false);
+    if (details) {
+      setRecipeDetail(details);
+    }
+  };
 
+  const handleSearch = async () => {
+    if (searchQuery.trim().length > 0) {
+      // Mark that we're doing a direct search
+      suggestionClickedRef.current = true;
+
+      // Cancel any pending suggestion requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      setShowSuggestions(false);
+      setSuggestions([]);
+      setLoading(true);
+      const details = await fetchRecipeDetails(searchQuery.trim());
+      setLoading(false);
+      if (details) {
+        setRecipeDetail(details);
+      }
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSearch();
+    }
+  };
+
+  const toggleBookmark = (recipeId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setBookmarkedRecipes((prev) => {
+      const next = new Set(prev);
+      if (next.has(recipeId)) {
+        next.delete(recipeId);
+      } else {
+        next.add(recipeId);
+      }
+      return next;
+    });
+  };
+
+  // Show recipe detail view if available
+  if (recipeDetail) {
     return (
-        <>
-            {view === "list" && renderList()}
-            {view === "choice" && renderChoice()}
-            {view === "detail" && renderDetail()}
-            {view === "cart" && renderCart()}
-            {view === "success" && renderSuccess()}
-        </>
+      <RecipeDetailView
+        recipe={recipeDetail}
+        onBack={() => setRecipeDetail(null)}
+        onBookmark={() => toggleBookmark(recipeDetail.title)}
+        isBookmarked={bookmarkedRecipes.has(recipeDetail.title)}
+      />
     );
+  }
+
+  return (
+    <div className="min-h-screen bg-black text-white">
+      {/* Loading Overlay */}
+      {loading && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="text-white">Loading recipe...</div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="sticky top-0 z-20 bg-black/95 backdrop-blur-sm border-b border-gray-800">
+        <div className="flex items-center gap-4 px-4 py-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-6 h-6 text-white" />
+          </button>
+          <h1 className="text-xl font-bold text-white flex-1">Recipes</h1>
+          <button className="p-2 hover:bg-gray-800 rounded-lg transition-colors">
+            <Bookmark className="w-6 h-6 text-white" />
+          </button>
+        </div>
+
+        {/* Search Bar */}
+        <div className="px-4 pb-4 relative" ref={suggestionsRef}>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Search for recipes..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => {
+                if (suggestions.length > 0) setShowSuggestions(true);
+              }}
+              className="pl-10 bg-gray-900 border-gray-700 text-white placeholder:text-gray-500 focus:border-gray-600"
+            />
+          </div>
+
+          {/* Suggestions Dropdown */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="absolute top-full left-4 right-4 mt-2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-30 max-h-60 overflow-y-auto">
+              {suggestions.map((suggestion, index) => (
+                <button
+                  key={`${suggestion}-${index}`}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-800 transition-colors border-b border-gray-800 last:border-b-0"
+                >
+                  <span className="text-white">{suggestion}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Content Sections */}
+      <div className="pb-20">
+        {sections.map((section, sectionIndex) => (
+          <div key={sectionIndex} className="mb-8">
+            {/* Section Header */}
+            <div className="flex items-center justify-between px-4 mb-4">
+              <h2 className="text-lg font-bold text-white">{section.title}</h2>
+              <button className="text-sm text-gray-400 hover:text-white transition-colors">
+                View More &gt;
+              </button>
+            </div>
+
+            {/* Horizontal Scrollable Recipe Cards */}
+            <div className="flex gap-4 overflow-x-auto px-4 scrollbar-hide pb-2">
+              {section.recipes.map((recipe) => {
+                const isBookmarked = bookmarkedRecipes.has(recipe.id);
+                return (
+                  <Card
+                    key={recipe.id}
+                    onClick={() => handleRecipeClick(recipe)}
+                    className="min-w-[160px] bg-gray-900 border-gray-800 rounded-lg overflow-hidden cursor-pointer hover:border-gray-700 transition-all group"
+                  >
+                    {/* Recipe Image */}
+                    <div className="relative aspect-square w-full overflow-hidden bg-gray-800">
+                      <img
+                        src={recipe.image}
+                        alt={recipe.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          // Fallback to placeholder if image fails to load
+                          e.currentTarget.src =
+                            "https://via.placeholder.com/400x400/1f2937/9ca3af?text=Recipe";
+                        }}
+                      />
+                      {/* Bookmark Button */}
+                      <button
+                        onClick={(e) => toggleBookmark(recipe.id, e)}
+                        className="absolute bottom-2 right-2 p-1.5 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black/70 transition-colors"
+                      >
+                        {isBookmarked ? (
+                          <BookmarkCheck className="w-4 h-4 text-green-500 fill-green-500" />
+                        ) : (
+                          <Bookmark className="w-4 h-4 text-white" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Recipe Info */}
+                    <div className="p-3">
+                      <h3 className="text-sm font-semibold text-white line-clamp-2 mb-1">
+                        {recipe.title}
+                      </h3>
+                      <p className="text-xs text-gray-400">
+                        {recipe.calories} Cal
+                      </p>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
