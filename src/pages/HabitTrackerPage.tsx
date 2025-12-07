@@ -1,10 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     ArrowLeft,
     Plus,
-    Check,
-    Flame,
     MoreVertical,
     BookOpen,
     Droplets,
@@ -14,16 +12,11 @@ import {
     Sun,
     Briefcase,
     Coffee,
-    Utensils,
-    ChevronRight,
-    Bell,
-    Calendar,
-    X
+    Utensils
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
+import { useUserProfileStore } from "@/store/userProfileStore";
 
 // --- Types ---
 interface Habit {
@@ -31,9 +24,7 @@ interface Habit {
     name: string;
     icon: string; // ID of the icon
     color: string;
-    streak: number;
     completed: boolean;
-    goal?: string;
     frequency: "Daily" | "Weekly" | "Custom";
 }
 
@@ -62,84 +53,124 @@ const COLORS = [
 
 export function HabitTrackerPage() {
     const navigate = useNavigate();
-    const [view, setView] = useState<"dashboard" | "create-1" | "create-2">("dashboard");
+    const { formData: profile } = useUserProfileStore();
+    const [view, setView] = useState<"dashboard" | "create">("dashboard");
 
     // Form State
     const [newHabitName, setNewHabitName] = useState("");
     const [selectedIcon, setSelectedIcon] = useState("book");
     const [selectedColor, setSelectedColor] = useState("bg-emerald-500");
-    const [frequency, setFrequency] = useState<"Daily" | "Weekly" | "Custom">("Daily");
-    const [hasGoal, setHasGoal] = useState(false);
-    const [goalAmount, setGoalAmount] = useState("");
-    const [hasReminder, setHasReminder] = useState(false);
-    const [reminderTime, setReminderTime] = useState("07:00");
+    const frequency: "Daily" = "Daily";
 
     // Habits State
-    const [habits, setHabits] = useState<Habit[]>([
-        {
-            id: "1",
-            name: "Read for 30 mins",
-            icon: "book",
-            color: "bg-emerald-500",
-            streak: 5,
-            completed: true,
-            frequency: "Daily",
-            goal: "30 mins"
-        },
-        {
-            id: "2",
-            name: "Drink 2L Water",
-            icon: "water",
-            color: "bg-blue-500",
-            streak: 2,
-            completed: false,
-            frequency: "Daily",
-            goal: "2L"
-        },
-        {
-            id: "3",
-            name: "Run 5K",
-            icon: "run",
-            color: "bg-orange-500",
-            streak: 10,
-            completed: false,
-            frequency: "Weekly",
-            goal: "5 km"
+    const [habits, setHabits] = useState<Habit[]>([]);
+    const [habitValues, setHabitValues] = useState<Record<string, number>>({});
+    const [habitMeta, setHabitMeta] = useState<Record<string, Record<string, any>>>({});
+
+
+    const handleSaveHabit = async () => {
+        const userId = profile.mobile || "";
+        if (!userId) {
+            alert("User ID not found. Please complete profile setup.");
+            return;
         }
-    ]);
 
-    const toggleHabit = (id: string) => {
-        setHabits(habits.map(h =>
-            h.id === id ? { ...h, completed: !h.completed, streak: !h.completed ? h.streak + 1 : h.streak - 1 } : h
-        ));
-    };
-
-    const handleSaveHabit = () => {
         const newHabit: Habit = {
             id: Date.now().toString(),
             name: newHabitName || "New Habit",
             icon: selectedIcon,
             color: selectedColor,
-            streak: 0,
             completed: false,
             frequency: frequency,
-            goal: hasGoal ? goalAmount : undefined
         };
-        setHabits([...habits, newHabit]);
-        resetForm();
-        setView("dashboard");
+
+        const payload = {
+            userId,
+            habit: newHabit.name,
+            value: 0,
+            meta: {
+                color: selectedColor,
+                icon: selectedIcon,
+                quickNote: newHabit.name,
+            },
+        };
+
+        try {
+            await fetch("/api/habits", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            setHabits([...habits, newHabit]);
+            resetForm();
+            setView("dashboard");
+        } catch (e) {
+            console.error("Failed to create habit", e);
+            alert("Unable to create habit right now.");
+        }
     };
 
     const resetForm = () => {
         setNewHabitName("");
         setSelectedIcon("book");
         setSelectedColor("bg-emerald-500");
-        setFrequency("Daily");
-        setHasGoal(false);
-        setGoalAmount("");
-        setHasReminder(false);
-        setReminderTime("07:00");
     };
+
+    const assignColor = (index: number) => COLORS[index % COLORS.length];
+    const assignIcon = (index: number) => ICONS[index % ICONS.length].id;
+
+    const formatHabitName = (name: string) =>
+        name ? name.charAt(0).toUpperCase() + name.slice(1) : name;
+
+    // Load habits and today values
+    useEffect(() => {
+        const userId = profile.mobile || "";
+        if (!userId) return;
+
+        const load = async () => {
+            try {
+                // 1) get habit names
+                const namesRes = await fetch(`/api/habits/names?userId=${encodeURIComponent(userId)}`);
+                const names: string[] = namesRes.ok ? await namesRes.json() : [];
+                const habitNames = names.length ? names : ["calorie", "water", "steps"];
+
+                // build client habit list with deterministic color/icon
+                const builtHabits: Habit[] = habitNames.map((name, idx) => ({
+                    id: `${name}-${idx}`,
+                    name,
+                    icon: assignIcon(idx),
+                    color: assignColor(idx),
+                    completed: false,
+                    frequency: "Daily"
+                }));
+                setHabits(builtHabits);
+
+                // 2) get daily values
+                const dailyRes = await fetch(
+                    `/api/habits/daily/batch?userId=${encodeURIComponent(userId)}&habits=${encodeURIComponent(habitNames.join(","))}`
+                );
+                if (dailyRes.ok) {
+                    const dailyData: Record<string, any> = await dailyRes.json();
+                    const values: Record<string, number> = {};
+                    const metas: Record<string, Record<string, any>> = {};
+                    habitNames.forEach((h) => {
+                        const entry = dailyData[h];
+                        if (entry) {
+                            const totalVal = entry.totals ? Object.values(entry.totals)[0] : undefined;
+                            values[h] = Number(totalVal ?? 0) || 0;
+                            if (entry.meta) metas[h] = entry.meta;
+                        }
+                    });
+                    setHabitValues(values);
+                    setHabitMeta(metas);
+                }
+            } catch (e) {
+                console.error("Failed to load habits", e);
+            }
+        };
+
+        load();
+    }, [profile.mobile]);
 
     const getIconComponent = (id: string) => {
         const item = ICONS.find(i => i.id === id);
@@ -172,64 +203,29 @@ export function HabitTrackerPage() {
                     <span>{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                 </div>
 
-                {habits.map(habit => (
+                {habits.map((habit) => (
                     <div key={habit.id} className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 flex items-center justify-between group">
                         <div className="flex items-center gap-4">
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm ${habit.color}`}>
-                                {getIconComponent(habit.icon)}
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm ${habitMeta[habit.name]?.color || habit.color}`}>
+                                {getIconComponent((habitMeta[habit.name]?.icon as string) || habit.icon)}
                             </div>
                             <div>
-                                <h3 className="font-bold text-gray-900 text-sm md:text-base">{habit.name}</h3>
-                                <div className="flex items-center gap-1 mt-1">
-                                    <Flame className="w-3 h-3 text-orange-500 fill-orange-500" />
-                                    <span className="text-xs font-semibold text-gray-500">{habit.streak}-Day Streak</span>
+                                <h3 className="font-bold text-gray-900 text-sm md:text-base">{formatHabitName(habit.name)}</h3>
+                                <div className="text-xs text-gray-500 font-semibold">
+                                    {habitValues[habit.name] ?? 0} logged today
                                 </div>
                             </div>
                         </div>
 
-                        <button
-                            onClick={() => toggleHabit(habit.id)}
-                            className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-300
-                            ${habit.completed
-                                    ? "bg-green-500 border-green-500 shadow-[0_4px_12px_rgba(34,197,94,0.3)]"
-                                    : "border-gray-200 text-transparent hover:border-gray-300"}`}
-                        >
-                            <Check className="w-5 h-5 text-white" strokeWidth={3} />
-                        </button>
                     </div>
                 ))}
 
-                {/* Streak Detail / Analytics Card */}
-                <div className="mt-8 bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="font-bold text-gray-900">Streak Detail</h3>
-                        <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center">
-                            <Plus className="w-4 h-4 text-green-600" />
-                        </div>
-                    </div>
-
-                    <div className="flex items-end justify-between h-24 px-2 mb-4">
-                        {[40, 65, 45, 80, 55, 90, 70].map((h, i) => (
-                            <div key={i} className="w-8 bg-emerald-50 rounded-t-lg relative group">
-                                <div
-                                    className="absolute bottom-0 w-full bg-emerald-400 rounded-t-lg transition-all"
-                                    style={{ height: `${h}%` }}
-                                />
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-500">Completion Rate: <span className="text-gray-900 font-bold">85%</span></span>
-                        <span className="text-gray-500">Best Streak: <span className="text-gray-900 font-bold">10 Days</span></span>
-                    </div>
-                </div>
             </div>
 
             {/* Floating Action Button */}
             <div className="absolute bottom-8 right-6">
                 <Button
-                    onClick={() => setView("create-1")}
+                    onClick={() => setView("create")}
                     className="w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-600 shadow-[0_8px_20px_rgba(16,185,129,0.3)] flex items-center justify-center"
                 >
                     <Plus className="w-8 h-8 text-white" strokeWidth={2.5} />
@@ -238,7 +234,7 @@ export function HabitTrackerPage() {
         </div>
     );
 
-    const renderCreateStep1 = () => (
+    const renderCreate = () => (
         <div className="flex flex-col h-full p-2">
             <div className="flex items-center justify-center relative mb-8">
                 <Button variant="ghost" size="icon" className="absolute left-0" onClick={() => setView("dashboard")}>
@@ -283,83 +279,8 @@ export function HabitTrackerPage() {
             <div className="mt-auto pb-6">
                 <Button
                     className="w-full h-14 text-lg bg-emerald-500 hover:bg-emerald-600 rounded-xl"
-                    onClick={() => setView("create-2")}
-                    disabled={!newHabitName.trim()}
-                >
-                    Next: Schedule
-                </Button>
-            </div>
-        </div>
-    );
-
-    const renderCreateStep2 = () => (
-        <div className="flex flex-col h-full p-2">
-            <div className="flex items-center justify-center relative mb-8">
-                <Button variant="ghost" size="icon" className="absolute left-0" onClick={() => setView("create-1")}>
-                    <ArrowLeft className="w-6 h-6 text-gray-900" />
-                </Button>
-                <h2 className="text-lg font-bold">Create New Habit</h2>
-            </div>
-
-            <div className="space-y-6 animate-fade-in-up">
-                {/* Frequency */}
-                <div className="bg-white rounded-2xl p-2 shadow-sm border border-gray-100 flex">
-                    {["Daily", "Weekly", "Custom"].map(f => (
-                        <button
-                            key={f}
-                            onClick={() => setFrequency(f as any)}
-                            className={`flex-1 py-3 text-sm font-semibold rounded-xl transition-all ${frequency === f ? 'bg-white shadow-md text-emerald-600 border border-emerald-100' : 'text-gray-400'}`}
-                        >
-                            {f}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Goal Setting */}
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <p className="font-semibold text-gray-900">Goal:</p>
-                            <p className="text-xs text-gray-400">{hasGoal ? goalAmount || "Set quantity" : "No specific goal"}</p>
-                        </div>
-                        <Switch checked={hasGoal} onCheckedChange={setHasGoal} />
-                    </div>
-                    {hasGoal && (
-                        <Input
-                            placeholder="e.g. 30 minutes, 2 Litres"
-                            value={goalAmount}
-                            onChange={(e) => setGoalAmount(e.target.value)}
-                            className="bg-gray-50 border-gray-200"
-                        />
-                    )}
-                </div>
-
-                {/* Reminder Setting */}
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <p className="font-semibold text-gray-900">Set Reminder</p>
-                            <p className="text-xs text-gray-400">{hasReminder ? reminderTime : "No reminder"}</p>
-                        </div>
-                        <Switch checked={hasReminder} onCheckedChange={setHasReminder} />
-                    </div>
-                    {hasReminder && (
-                        <div className="grid grid-cols-1">
-                            <input
-                                type="time"
-                                value={reminderTime}
-                                onChange={(e) => setReminderTime(e.target.value)}
-                                className="w-full p-3 bg-gray-50 rounded-xl border-gray-200 text-center font-bold text-gray-800"
-                            />
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            <div className="mt-auto pb-6">
-                <Button
-                    className="w-full h-14 text-lg bg-emerald-500 hover:bg-emerald-600 rounded-xl shadow-lg shadow-emerald-200"
                     onClick={handleSaveHabit}
+                    disabled={!newHabitName.trim()}
                 >
                     Save Habit
                 </Button>
@@ -370,8 +291,7 @@ export function HabitTrackerPage() {
     return (
         <div className="min-h-screen bg-gray-50/50 p-6 font-sans flex flex-col relative overflow-hidden">
             {view === "dashboard" && renderDashboard()}
-            {view === "create-1" && renderCreateStep1()}
-            {view === "create-2" && renderCreateStep2()}
+            {view === "create" && renderCreate()}
         </div>
     );
 }

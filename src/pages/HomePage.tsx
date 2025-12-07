@@ -136,11 +136,21 @@ export function HomePage() {
         );
         if (!res.ok) return;
         const data = await res.json();
-        const todayKey = Object.keys(data.calorie ?? {})[0] || Object.keys(data.water ?? {})[0] || Object.keys(data.steps ?? {})[0];
+        const calorie = data?.calorie ?? {};
+        const water = data?.water ?? {};
+        const steps = data?.steps ?? {};
+
+        const parseTotals = (totals: any) => {
+          if (!totals || typeof totals !== "object") return undefined;
+          const firstKey = Object.keys(totals)[0];
+          const val = totals[firstKey];
+          return Number(val ?? 0) || 0;
+        };
+
         setHabitStats({
-          calorie: data.calorie?.[todayKey],
-          water: data.water?.[todayKey],
-          steps: data.steps?.[todayKey],
+          calorie: parseTotals(calorie.totals),
+          water: parseTotals(water.totals),
+          steps: parseTotals(steps.totals),
         });
       } catch (e) {
         console.error("Failed to fetch habit stats", e);

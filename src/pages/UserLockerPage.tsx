@@ -354,16 +354,17 @@ export function UserLockerPage() {
                                     Object.entries(dailyProgress).map(([habit, dates], idx) => {
                                         const todayVal = Object.values(dates)[0];
                                         const color = COLOR_CLASSES[idx % COLOR_CLASSES.length];
+                                        const displayName = habit ? habit.charAt(0).toUpperCase() + habit.slice(1) : habit;
                                         return (
                                             <div key={`${habit}-${idx}`} className="relative pl-8">
                                                 <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-white shadow-sm z-10 bg-emerald-500" />
                                                 <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm flex items-start gap-3">
                                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${color} font-bold text-sm`}>
-                                                        {habit.slice(0, 1).toUpperCase()}
+                                                        {displayName.slice(0, 1).toUpperCase()}
                                                     </div>
                                                     <div className="flex-1">
                                                         <div className="flex justify-between items-start">
-                                                            <h4 className="font-bold text-gray-900 text-sm capitalize">{habit}</h4>
+                                                            <h4 className="font-bold text-gray-900 text-sm capitalize">{displayName}</h4>
                                                             <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-full">Today</span>
                                                         </div>
                                                         <p className="text-xs text-gray-500 mt-1 font-medium">
