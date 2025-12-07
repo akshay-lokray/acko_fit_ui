@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import type { VoiceType } from '../types/voice';
+import { useEffect, useRef } from "react";
+import type { VoiceType } from "../types/voice";
 
 interface SpeechControllerProps {
   textToSpeak?: string;
@@ -12,7 +12,7 @@ interface SpeechControllerProps {
 
 export default function SpeechController({
   textToSpeak,
-  voiceType = 'female',
+  voiceType = "female",
   onSpeakStart,
   onSpeakEnd,
   onSpeakingChange,
@@ -21,7 +21,7 @@ export default function SpeechController({
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const startTimeRef = useRef<number>(0);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     synthRef.current = window.speechSynthesis;
@@ -65,47 +65,47 @@ export default function SpeechController({
 
     // Configure voice settings
     utterance.rate = 1.0;
-    utterance.pitch = voiceType === 'male' ? 0.9 : 1.1; // Slightly lower for male, higher for female
+    utterance.pitch = voiceType === "male" ? 0.9 : 1.1; // Slightly lower for male, higher for female
     utterance.volume = 1.0;
 
     // Get available voices
     const voices = synthRef.current.getVoices();
-    
+
     // Filter voices by gender/type
     let preferredVoice: SpeechSynthesisVoice | null = null;
 
-    if (voiceType === 'female') {
+    if (voiceType === "female") {
       // Try to find female voices (usually have "Female" in name or higher pitch)
       preferredVoice =
         voices.find(
           (voice) =>
-            voice.lang.includes('en') &&
-            (voice.name.toLowerCase().includes('female') ||
-             voice.name.toLowerCase().includes('zira') ||
-             voice.name.toLowerCase().includes('samantha') ||
-             voice.name.toLowerCase().includes('karen') ||
-             voice.name.toLowerCase().includes('susan'))
+            voice.lang.includes("en") &&
+            (voice.name.toLowerCase().includes("female") ||
+              voice.name.toLowerCase().includes("zira") ||
+              voice.name.toLowerCase().includes("samantha") ||
+              voice.name.toLowerCase().includes("karen") ||
+              voice.name.toLowerCase().includes("susan"))
         ) ||
         voices.find(
           (voice) =>
-            voice.lang.includes('en') &&
-            (voice.name.includes('Natural') || voice.name.includes('Enhanced'))
+            voice.lang.includes("en") &&
+            (voice.name.includes("Natural") || voice.name.includes("Enhanced"))
         ) ||
-        voices.find((voice) => voice.lang.includes('en-US')) ||
+        voices.find((voice) => voice.lang.includes("en-US")) ||
         voices[0];
     } else {
       // Try to find male voices (usually have "Male" in name or lower pitch)
       preferredVoice =
         voices.find(
           (voice) =>
-            voice.lang.includes('en') &&
-            (voice.name.toLowerCase().includes('male') ||
-             voice.name.toLowerCase().includes('david') ||
-             voice.name.toLowerCase().includes('mark') ||
-             voice.name.toLowerCase().includes('richard') ||
-             voice.name.toLowerCase().includes('james'))
+            voice.lang.includes("en") &&
+            (voice.name.toLowerCase().includes("male") ||
+              voice.name.toLowerCase().includes("david") ||
+              voice.name.toLowerCase().includes("mark") ||
+              voice.name.toLowerCase().includes("richard") ||
+              voice.name.toLowerCase().includes("james"))
         ) ||
-        voices.find((voice) => voice.lang.includes('en-US')) ||
+        voices.find((voice) => voice.lang.includes("en-US")) ||
         voices[0];
     }
 
@@ -139,8 +139,8 @@ export default function SpeechController({
 
     utterance.onerror = (error) => {
       // Ignore 'canceled' errors as they're intentional when speech is interrupted
-      if (error.error !== 'canceled') {
-        console.error('Speech synthesis error:', error);
+      if (error.error !== "canceled") {
+        console.error("Speech synthesis error:", error);
       }
       onSpeakEnd();
       onSpeakingChange(false);
@@ -175,4 +175,3 @@ export default function SpeechController({
 
   return null; // This is a controller component, no UI
 }
-
