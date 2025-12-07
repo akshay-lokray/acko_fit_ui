@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   MessageSquare,
@@ -141,6 +142,75 @@ export function HomePage() {
   const buttonBg = isMale ? "bg-emerald-600 hover:bg-emerald-700" : "bg-purple-700 hover:bg-purple-800";
 
   const [isListening, setIsListening] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+  const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:5000/ws";
+
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+
+    const connect = () => {
+      ws = new WebSocket(WS_URL);
+      
+      wsRef.current = ws;
+      ws.onopen = () => {
+        console.log("WebSocket connected:", WS_URL);
+        try {
+          ws?.send(JSON.stringify({ type: "connect" }));
+        } catch (e) {
+          console.warn("WebSocket connect event send failed", e);
+        }
+      };
+      ws.onerror = (e) => {
+        console.error("WebSocket error", { event: e, url: WS_URL, readyState: ws?.readyState });
+      };
+      ws.onmessage = (event) => {
+        const raw = event.data;
+        let text = "";
+        try {
+          const parsed = JSON.parse(raw);
+          text = parsed.text ?? String(raw);
+        } catch {
+          text = String(raw);
+        }
+        const coachMsg: Message = {
+          id: Date.now().toString(),
+          sender: "coach",
+          text,
+        };
+        setMessages((prev) => [...prev, coachMsg]);
+        setIsListening(false);
+      };
+      ws.onclose = (evt) => {
+        console.log("WebSocket closed", {
+          code: evt.code,
+          reason: evt.reason,
+          wasClean: evt.wasClean,
+          readyState: ws?.readyState,
+        });
+        wsRef.current = null;
+        if (!reconnectTimer) reconnectTimer = window.setTimeout(connect, 2000);
+      };
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      if (ws) {
+        ws.onclose = null;
+        if (ws.readyState === WebSocket.OPEN) {
+          try {
+            ws.send(JSON.stringify({ type: "disconnect" }));
+          } catch (e) {
+            console.warn("WebSocket disconnect event send failed", e);
+          }
+        }
+        ws.close();
+      }
+      wsRef.current = null;
+    };
+  }, [WS_URL]);
 
   // Helper: Chat Response Logic (Mock Narrative AI)
   const handleSendMessage = (textOverride?: string) => {
@@ -155,38 +225,53 @@ export function HomePage() {
     };
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
-
-    // Simulated Coach Response
-    setTimeout(() => {
+    const sendFallbackCoachResponse = () => {
       let responseText = "";
       if (isMale) {
-        // "Drill Sergeant" Persona
         responseText = "Copy that. Stay focused on the objective. We don't stop when we're tired, we stop when we're done.";
       } else {
-        // "Scientist/Guide" Persona
         responseText = "Interesting data point. My analysis suggests keeping your hydration up will optimize your recovery today.";
       }
-
       const coachMsg: Message = {
         id: (Date.now() + 1).toString(),
         sender: "coach",
         text: responseText,
       };
       setMessages((prev) => [...prev, coachMsg]);
-    }, 1000);
+    };
+
+    const socket = wsRef.current;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      const payload = { type: "chat", text: textToSend, user_id: "user" };
+      try {
+        socket.send(JSON.stringify(payload));
+      } catch {
+        sendFallbackCoachResponse();
+      }
+    } else {
+      sendFallbackCoachResponse();
+    }
   };
 
   const handleVoiceInput = () => {
     if (isListening) return;
     setIsListening(true);
-
-    // Simulate Listening duration
-    setTimeout(() => {
-      setIsListening(false);
-      // Mock "Speech to Text" result
-      const spokenText = "Hey Coach, can you help me with a diet plan for today?";
-      handleSendMessage(spokenText);
-    }, 3000);
+    const socket = wsRef.current;
+    const payload = { type: "voice_start" };
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(payload));
+    } else {
+      setTimeout(() => {
+        setIsListening(false);
+        const spokenText = "Hey Coach, can you help me with a diet plan for today?";
+        const coachMsg: Message = {
+          id: (Date.now() + 1).toString(),
+          sender: "coach",
+          text: spokenText,
+        };
+        setMessages((prev) => [...prev, coachMsg]);
+      }, 3000);
+    }
   };
 
   return (

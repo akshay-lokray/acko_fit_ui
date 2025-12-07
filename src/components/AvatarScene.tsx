@@ -72,14 +72,14 @@ function AutoZoomCamera({ target = [0, 2.6, 0], isFullScreen = false }: { target
   const shouldAnimateRef = useRef(false);
   
   // For inner pages (200x200): start from full-body view, animate to face-only
-  // For full screen (coach-intro): zoomed out to cover full screen
-  const fullBodyDistance = 5.0; // Full body view (like coach-intro)
-  const fullBodyY = 1.2; // Full body camera Y
+  // For full screen (coach-intro): stay closer so avatar fills below CTA
+  const fullBodyDistance = 2.2; // Closer full body for intro
+  const fullBodyY = 1.4; // Camera height for intro
   
-  const startDistance = isFullScreen ? 1.8 : fullBodyDistance; // Start from full body for inner pages
-  const targetDistance = isFullScreen ? 5.0 : 1.8; // Coach-intro: zoom out, Inner: face-only view (closer)
-  const startY = isFullScreen ? 1.2 : fullBodyY; // Start from full body Y for inner pages
-  const targetY = isFullScreen ? 1.2 : 8.1; // Target Y for inner pages (face level - higher)
+  const startDistance = isFullScreen ? 2.2 : fullBodyDistance; // Intro stays close
+  const targetDistance = isFullScreen ? 2.2 : 1.8; // Intro stays close; inner pages zoom to face
+  const startY = isFullScreen ? 1.4 : fullBodyY;
+  const targetY = isFullScreen ? 1.4 : 8.1; // Inner pages face level
   
   const distanceRef = useRef(startDistance);
   const cameraYRef = useRef(startY);
@@ -375,7 +375,10 @@ export default function AvatarScene({
       />
       
       <Canvas
-        camera={{ position: isFullScreen ? [0, 1.2, 1.8] : [0, 2.8, 0.9], fov: 50 }}
+        camera={{ 
+          position: isFullScreen ? [0, 1.6, 2.2] : [0, 2.8, 0.9], 
+          fov: isFullScreen ? 35 : 50 
+        }}
         shadows
         gl={{ antialias: true, alpha: true }}
         onError={(err) => {
@@ -396,14 +399,16 @@ export default function AvatarScene({
             </div>
           </Html>
         }>
-          <AvatarWithVisemes 
-            key={avatarKey} // Force remount on transition
-            isSpeaking={isSpeaking} 
-            text={textToSpeak || ''} 
-            audioTime={audioTime}
-            voiceType={voiceType}
-            isFullScreen={isFullScreen}
-          />
+          <group position={isFullScreen ? [0, 0.6, 0] : [0, 0, 0]}>
+            <AvatarWithVisemes 
+              key={avatarKey} // Force remount on transition
+              isSpeaking={isSpeaking} 
+              text={textToSpeak || ''} 
+              audioTime={audioTime}
+              voiceType={voiceType}
+              isFullScreen={isFullScreen}
+            />
+          </group>
         </Suspense>
         
         <AutoZoomCamera 
