@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { FormData } from "@/types/form";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useFormStore } from "@/store/formStore";
 import AvatarScene from "./AvatarScene";
 import "./MultiStepForm.css";
 import { Button } from "@/components/ui/button";
@@ -22,26 +23,18 @@ export function MultiStepForm() {
   const location = useLocation();
   const navigate = useNavigate();
   const initialGender = location.state?.gender || "female"; // Default fallback
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<FormData>({
-    gender: initialGender,
-    name: "",
-    selectedOptions: [],
-    activityLevel: "",
-    age: 20,
-    height: 170,
-    heightUnit: "cm",
-    currentWeight: 80,
-    weightUnit: "kg",
-    goalPace: 0.25,
-    targetWeight: 60,
-    autoTrackEnabled: false,
-    medicalConditions: ["None"],
-  });
+  const { step, formData, nextStep, prevStep, updateFormData } = useFormStore();
+
+  // Ensure gender from navigation state is captured once when arriving
+  useEffect(() => {
+    if (initialGender && formData.gender !== initialGender) {
+      updateFormData({ gender: initialGender });
+    }
+  }, [initialGender, formData.gender, updateFormData]);
 
   const handleNext = () => {
     if (step < TOTAL_STEPS) {
-      setStep(step + 1);
+      nextStep();
     } else {
       // Navigate to premium page with form data
       navigate("/premium", { state: { formData } });
@@ -50,19 +43,16 @@ export function MultiStepForm() {
 
   const handleBack = () => {
     if (step > 1) {
-      setStep(step - 1);
+      prevStep();
     }
-  };
-
-  const updateFormData = (updates: Partial<FormData>) => {
-    setFormData({ ...formData, ...updates });
   };
 
   // Validation logic for each step to enable/disable Next button
   const canProceed = () => {
+    const isMobileValid = /^\d{10}$/.test(formData.mobile || "");
     switch (step) {
       case 1:
-        return formData.name.trim().length > 0;
+        return formData.name.trim().length > 0 && isMobileValid;
       case 2:
         return formData.selectedOptions.length > 0;
       case 3:
@@ -86,17 +76,16 @@ export function MultiStepForm() {
     }
   };
 
-  // Determine voice type based on form data (you can customize this logic)
-  const voiceType = formData.gender === "male"
-    ? "male"
-    : "female";
+  // Determine voice type based on gender selection
+  const voiceType = formData.gender === "male" ? "male" : "female";
 
   // Generate contextual text based on current step
   const getStepText = () => {
     switch (step) {
       case 1:
-        return `Let's start by getting to know you, ${formData.name || "friend"
-          }!`;
+        return `Hi! I'm your fitness coach. Let's start by getting to know you, ${
+          formData.name || "friend"
+        }! Please share your name and mobile number so I can stay in touch.`;
       case 2:
         return "Great! Now let's see what you're looking for in your fitness journey.";
       case 3:
@@ -144,9 +133,9 @@ export function MultiStepForm() {
           {step === 1 && (
             <Step1NameInput
               name={formData.name}
+              mobile={formData.mobile}
               onNameChange={(name) => updateFormData({ name })}
-              onNext={handleNext}
-              onBack={handleBack}
+              onMobileChange={(mobile) => updateFormData({ mobile })}
             />
           )}
 
