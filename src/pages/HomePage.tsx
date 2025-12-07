@@ -1,9 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   MessageSquare,
-  Users,
-  Award,
   Zap,
   Shield,
   Send,
@@ -12,11 +10,9 @@ import {
   Utensils,
   Dumbbell,
   Camera,
-  LayoutGrid,
   MapPin,
   Trophy,
-  Crown,
-  Medal
+  Crown
 } from "lucide-react";
 import AvatarScene from "@/components/AvatarScene";
 import type { VoiceType } from "@/types/voice";
@@ -24,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useUserProfileStore } from "@/store/userProfileStore";
 
 // --- Types ---
 interface Message {
@@ -51,9 +48,9 @@ interface LeaderboardUser {
 
 // --- Mock Data ---
 const DAILY_QUESTS: Quest[] = [
-  { id: "1", title: "Log Meal", xp: 50, completed: false, type: "daily" },
-  { id: "2", title: "Walk 5,000 Steps", xp: 100, completed: false, type: "daily" },
-  { id: "3", title: "Drink 2L Water", xp: 50, completed: true, type: "daily" },
+  { id: "1", title: "Track Your Meal", xp: 50, completed: false, type: "daily" },
+  { id: "2", title: "Crush 5k Steps", xp: 100, completed: false, type: "daily" },
+  { id: "3", title: "Hydrate Now · Goal 3000 ml", xp: 50, completed: false, type: "daily" },
 ];
 
 const MOCK_LEADERBOARD: LeaderboardUser[] = [
@@ -66,6 +63,7 @@ const MOCK_LEADERBOARD: LeaderboardUser[] = [
 export function HomePage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { formData: profile } = useUserProfileStore();
   // Safe access to formData with defaults
   const formData = location.state?.formData || {};
   const gender = formData.gender || "female";
@@ -83,18 +81,43 @@ export function HomePage() {
     },
   ]);
   const [inputValue, setInputValue] = useState("");
-  const [xp, setXp] = useState(350);
+  const [xp] = useState(350);
   const [userLocation, setUserLocation] = useState("India"); // Default location
+  const [habitStats, setHabitStats] = useState<{ calorie?: number; water?: number; steps?: number }>({});
 
   const levelingXp = 1000;
   const level = 1;
 
+  // Fetch daily habit stats on mount
+  useEffect(() => {
+    const userId = profile.mobile || formData.mobile || "";
+    if (!userId) return;
+
+    const fetchHabits = async () => {
+      try {
+        const res = await fetch(
+          `/api/habits/daily/batch?userId=${encodeURIComponent(userId)}&habits=water,calorie,steps`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const todayKey = Object.keys(data.calorie ?? {})[0] || Object.keys(data.water ?? {})[0] || Object.keys(data.steps ?? {})[0];
+        setHabitStats({
+          calorie: data.calorie?.[todayKey],
+          water: data.water?.[todayKey],
+          steps: data.steps?.[todayKey],
+        });
+      } catch (e) {
+        console.error("Failed to fetch habit stats", e);
+      }
+    };
+
+    fetchHabits();
+  }, [profile.mobile, formData.mobile]);
+
   // Determining "Persona" styles
   const isMale = gender === "male";
   const themeColor = isMale ? "text-emerald-600" : "text-purple-700";
-  const bgTheme = isMale ? "bg-emerald-50" : "bg-purple-50";
   const buttonBg = isMale ? "bg-emerald-600 hover:bg-emerald-700" : "bg-purple-700 hover:bg-purple-800";
-  const accentColor = isMale ? "emerald" : "purple";
 
   const [isListening, setIsListening] = useState(false);
 
@@ -270,25 +293,80 @@ export function HomePage() {
                 {/* Task List (Mini) */}
                 <div className="mb-4 space-y-2">
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Daily Objectives</p>
-                  {DAILY_QUESTS.map(quest => (
+                  {DAILY_QUESTS.map(quest => {
+                    const goalHit =
+                      (quest.title === "Crush 5k Steps" && habitStats.steps != null && habitStats.steps >= 5000) ||
+                      (quest.title.startsWith("Hydrate Now") && habitStats.water != null && habitStats.water >= 3000);
+
+                    return (
                     <div
                       key={quest.id}
-                      className={`bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm ${quest.title === "Log Lunch" ? "cursor-pointer hover:border-emerald-300 hover:shadow-md" : ""}`}
+                      className={`bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm ${
+                        quest.title === "Track Your Meal" || quest.title === "Crush 5k Steps" || quest.title.startsWith("Hydrate Now")
+                          ? "cursor-pointer hover:border-emerald-300 hover:shadow-md"
+                          : ""
+                      } ${
+                        goalHit
+                          ? "border-emerald-400 bg-emerald-50"
+                          : ""
+                      }`}
                       onClick={() => {
-                        if (quest.title === "Log Meal") {
+                        if (quest.title === "Track Your Meal") {
                           navigate("/log-meal", { state: { formData } })
+                        }
+                        if (quest.title === "Crush 5k Steps") {
+                          navigate("/log-steps", { state: { formData } })
+                        }
+                        if (quest.title.startsWith("Hydrate Now")) {
+                          navigate("/log-water", { state: { formData } })
                         }
                       }}
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${quest.completed ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                          {quest.completed ? <CheckCircle2 className="w-5 h-5" /> : <div className="w-3 h-3 rounded-full bg-gray-300" />}
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            quest.completed || goalHit ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'
+                          }`}
+                        >
+                          {quest.completed ? (
+                            <CheckCircle2 className="w-5 h-5" />
+                          ) : goalHit ? (
+                            <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                          ) : (
+                            <div className="w-3 h-3 rounded-full bg-gray-300" />
+                          )}
                         </div>
-                        <span className={`text-sm font-medium ${quest.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{quest.title}</span>
+                        <div className="flex flex-col">
+                          <span className={`text-sm font-medium ${quest.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{quest.title}</span>
+                          {quest.title === "Track Your Meal" && habitStats.calorie != null && (
+                            <span className="text-xs text-emerald-600">{habitStats.calorie} kcal today</span>
+                          )}
+                          {quest.title === "Crush 5k Steps" && habitStats.steps != null && (
+                            <span className="text-xs text-emerald-600">
+                              {habitStats.steps} steps today
+                              {habitStats.steps >= 5000 ? " · Goal hit!" : ""}
+                            </span>
+                          )}
+                          {quest.title.startsWith("Hydrate Now") && habitStats.water != null && (
+                            <span className="text-xs text-emerald-600">
+                              {habitStats.water} ml today
+                              {habitStats.water >= 3000 ? " · Goal hit!" : ""}
+                              {" · Goal: 3000 ml"}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-xs font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded-md">+{quest.xp} XP</span>
+                      {quest.title !== "Track Your Meal" && (
+                        <span
+                          className={`text-xs font-bold px-2 py-1 rounded-md ${
+                            goalHit ? "text-emerald-700 bg-emerald-100" : "text-yellow-600 bg-yellow-50"
+                          }`}
+                        >
+                          +{quest.xp} XP
+                        </span>
+                      )}
                     </div>
-                  ))}
+                  )})}
                 </div>
 
                 {/* Input Area */}
