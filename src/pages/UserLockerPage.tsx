@@ -1,26 +1,20 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useUserProfileStore } from "@/store/userProfileStore";
 import { useNavigate } from "react-router-dom";
 import {
     ArrowLeft,
     Shield,
     Zap,
-    Trophy,
     Shirt,
     Crown,
     Dumbbell,
     Lock,
-    Clock,
-    Droplets,
-    Utensils,
-    ShoppingBag,
-    Camera,
     ScanLine,
     CheckCircle2,
     Palette
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import UserAvatar3D from "@/components/UserAvatar3D";
 
 // Mock Gear Inteface
@@ -42,22 +36,28 @@ const GEAR_ITEMS: GearItem[] = [
     { id: "5", name: "Golden Halo", type: "head", rarity: "epic", locked: true, levelReq: 10, icon: Crown },
 ];
 
-// Mock Activity Logs
-const ACTIVITY_LOGS = [
-    { id: 1, type: "food", title: "Lunch Logged", detail: "Dal Tadka & Rice (580 kcal)", time: "2:30 PM", icon: Utensils, color: "bg-orange-100 text-orange-600" },
-    { id: 2, type: "water", title: "Hydration Goal", detail: "5 Glasses (1.2L)", time: "1:00 PM", icon: Droplets, color: "bg-blue-100 text-blue-600" },
-    { id: 3, type: "order", title: "Ingredients Ordered", detail: "BigBasket: Lentils, Tomatoes...", time: "11:45 AM", icon: ShoppingBag, color: "bg-green-100 text-green-600" },
-    { id: 4, type: "workout", title: "Morning HIIT", detail: "30 mins • 320 kcal burned", time: "8:00 AM", icon: Dumbbell, color: "bg-purple-100 text-purple-600" },
+const COLOR_CLASSES = [
+    "bg-orange-100 text-orange-600",
+    "bg-blue-100 text-blue-600",
+    "bg-green-100 text-green-600",
+    "bg-purple-100 text-purple-600",
+    "bg-amber-100 text-amber-600",
+    "bg-rose-100 text-rose-600",
+    "bg-indigo-100 text-indigo-600",
 ];
+
+type HabitDaily = Record<string, Record<string, number>>;
 
 export function UserLockerPage() {
     const navigate = useNavigate();
+    const { formData: profile } = useUserProfileStore();
 
     // --- State ---
     const [hasAvatar, setHasAvatar] = useState(false); // Simulate if user already created avatar
     const [scanStep, setScanStep] = useState<"idle" | "camera" | "scanning" | "complete">("idle");
     const [selectedTab, setSelectedTab] = useState<"gear" | "stats" | "logs">("logs");
     const [bodyShape, setBodyShape] = useState(0.5); // 0-1 Normal to Muscular
+    const [dailyProgress, setDailyProgress] = useState<HabitDaily>({});
 
     // Mock user stats impacting shape
     const stats = [
@@ -81,6 +81,35 @@ export function UserLockerPage() {
         setHasAvatar(true);
         setScanStep("idle"); // Reset for future logic if needed, but 'hasAvatar' gates main view
     };
+
+    // Fetch habits and daily progress on load
+    useEffect(() => {
+        const userId = profile.mobile || "";
+        if (!userId) return;
+
+        const loadHabits = async () => {
+            try {
+                const habitsRes = await fetch(`/api/habits/names?userId=${encodeURIComponent(userId)}`);
+                if (!habitsRes.ok) return;
+                const habitsData: string[] = await habitsRes.json();
+                const habitKeys = habitsData.filter(Boolean);
+                if (habitKeys.length === 0) return;
+
+                const dailyRes = await fetch(
+                    `/api/habits/daily/batch?userId=${encodeURIComponent(userId)}&habits=${encodeURIComponent(
+                        habitKeys.join(",")
+                    )}`
+                );
+                if (!dailyRes.ok) return;
+                const dailyData = await dailyRes.json();
+                setDailyProgress(dailyData as HabitDaily);
+            } catch (e) {
+                console.error("Failed to load habits", e);
+            }
+        };
+
+        loadHabits();
+    }, [profile.mobile]);
 
     // --- Render: Avatar Creation Flow ---
     if (!hasAvatar) {
@@ -218,7 +247,7 @@ export function UserLockerPage() {
                 <div className="absolute top-4 right-4 flex flex-col gap-2">
                     <div className="p-3 bg-white/80 backdrop-blur rounded-2xl shadow-sm text-center">
                         <p className="text-xs font-bold text-gray-400 uppercase">Streak</p>
-                        <p className="text-xl font-bold text-orange-500">🔥 12</p>
+                        <p className="text-xl font-bold text-orange-500">🔥 {profile.streak ?? 0}</p>
                     </div>
                 </div>
             </div>
@@ -318,27 +347,33 @@ export function UserLockerPage() {
 
                     {/* Logs */}
                     {selectedTab === "logs" && (
-                        <div className="space-y-0">
+                        <div className="space-y-4">
                             <h3 className="font-bold text-gray-900 mb-4 px-1">Today's Timeline</h3>
                             <div className="relative border-l-2 border-gray-100 ml-4 space-y-8 pb-4">
-                                {ACTIVITY_LOGS.map((log) => (
-                                    <div key={log.id} className="relative pl-8">
-                                        <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-white shadow-sm z-10 ${log.type === 'workout' ? 'bg-purple-500' : log.type === 'order' ? 'bg-green-500' : 'bg-blue-500'}`} />
-
-                                        <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm flex items-start gap-3">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${log.color}`}>
-                                                <log.icon className="w-5 h-5" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="flex justify-between items-start">
-                                                    <h4 className="font-bold text-gray-900 text-sm">{log.title}</h4>
-                                                    <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-full">{log.time}</span>
+                                {Object.keys(dailyProgress).length > 0 &&
+                                    Object.entries(dailyProgress).map(([habit, dates], idx) => {
+                                        const todayVal = Object.values(dates)[0];
+                                        const color = COLOR_CLASSES[idx % COLOR_CLASSES.length];
+                                        return (
+                                            <div key={`${habit}-${idx}`} className="relative pl-8">
+                                                <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-white shadow-sm z-10 bg-emerald-500" />
+                                                <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm flex items-start gap-3">
+                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${color} font-bold text-sm`}>
+                                                        {habit.slice(0, 1).toUpperCase()}
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="flex justify-between items-start">
+                                                            <h4 className="font-bold text-gray-900 text-sm capitalize">{habit}</h4>
+                                                            <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-full">Today</span>
+                                                        </div>
+                                                        <p className="text-xs text-gray-500 mt-1 font-medium">
+                                                            {todayVal ?? 0} logged today
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <p className="text-xs text-gray-500 mt-1 font-medium">{log.detail}</p>
                                             </div>
-                                        </div>
-                                    </div>
-                                ))}
+                                        );
+                                    })}
                             </div>
                         </div>
                     )}

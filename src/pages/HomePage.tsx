@@ -66,9 +66,11 @@ export function HomePage() {
   const navigate = useNavigate();
   const { formData: profile, updateFormData } = useUserProfileStore();
   const fetchedUserRef = useRef<string | null>(null);
+  const goalStateRef = useRef<{ userId: string | null; hits: Set<string> }>({ userId: null, hits: new Set() });
+  const routeFormData = location.state?.formData || {};
   // Safe access to formData with defaults
-  const gender = profile.gender || "female";
-  const name = profile.name || "Traveller";
+  const gender = profile.gender || routeFormData.gender || "female";
+  const name = profile.name || routeFormData.name || "Traveller";
   const coachName = gender === "male" ? "Atlas" : "Aria";
 
   // State
@@ -82,37 +84,49 @@ export function HomePage() {
     },
   ]);
   const [inputValue, setInputValue] = useState("");
-  const [xp] = useState(350);
+  const xp = profile.xp ?? routeFormData.xp ?? 350;
   const [userLocation, setUserLocation] = useState("India"); // Default location
   const [habitStats, setHabitStats] = useState<{ calorie?: number; water?: number; steps?: number }>({});
 
   const levelingXp = 1000;
   const level = 1;
 
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const res = await fetch(`/api/users/${encodeURIComponent(userId)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      updateFormData(data);
+    } catch (e) {
+      console.error("Failed to fetch user profile", e);
+    }
+  };
+
+  const awardXp = async (userId: string, delta: number) => {
+    try {
+      const res = await fetch(`/api/users/${encodeURIComponent(userId)}/xp?delta=${delta}`, {
+        method: "POST",
+      });
+      if (!res.ok) return;
+      await fetchUserProfile(userId); // refresh xp
+    } catch (e) {
+      console.error("Failed to award XP", e);
+    }
+  };
+
   // Fetch user profile on mount
   useEffect(() => {
-    const userId = profile.mobile || profile.mobile || "";
+    const userId = profile.mobile || routeFormData.mobile || "";
     if (!userId) return;
     if (fetchedUserRef.current === userId) return;
     fetchedUserRef.current = userId;
 
-    const fetchUser = async () => {
-      try {
-        const res = await fetch(`/api/users/${encodeURIComponent(userId)}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        updateFormData(data);
-      } catch (e) {
-        console.error("Failed to fetch user profile", e);
-      }
-    };
-
-    fetchUser();
-  }, [profile.mobile, profile.mobile, updateFormData]);
+    fetchUserProfile(userId);
+  }, [profile.mobile, routeFormData.mobile]);
 
   // Fetch daily habit stats on mount
   useEffect(() => {
-    const userId = profile.mobile || profile.mobile || "";
+    const userId = profile.mobile || routeFormData.mobile || "";
     if (!userId) return;
 
     const fetchHabits = async () => {
@@ -134,7 +148,44 @@ export function HomePage() {
     };
 
     fetchHabits();
-  }, [profile.mobile, profile.mobile]);
+  }, [profile.mobile, routeFormData.mobile]);
+
+  // Award XP when goals are reached (once per goal per user)
+  useEffect(() => {
+    const userId = profile.mobile || routeFormData.mobile || "";
+    if (!userId) return;
+
+    // Reset goal state when user changes
+    if (goalStateRef.current.userId !== userId) {
+      goalStateRef.current = { userId, hits: new Set() };
+    }
+
+    const goals = [
+      { key: "steps", hit: habitStats.steps != null && habitStats.steps >= 5000, xp: 100 },
+      { key: "water", hit: habitStats.water != null && habitStats.water >= 3000, xp: 50 },
+    ];
+
+    let delta = 0;
+    goals.forEach(({ key, hit, xp }) => {
+      const marker = `${userId}:${key}`;
+      const alreadyHit = goalStateRef.current.hits.has(marker);
+
+      // If goal is already achieved before this render, only award when transitioning from not-hit -> hit
+      if (hit && !alreadyHit) {
+        goalStateRef.current.hits.add(marker);
+        delta += xp;
+      }
+
+      // If not hit, ensure we don't accidentally award next time without a transition
+      if (!hit && alreadyHit) {
+        goalStateRef.current.hits.delete(marker);
+      }
+    });
+
+    if (delta > 0) {
+      awardXp(userId, delta);
+    }
+  }, [habitStats, profile.mobile, routeFormData.mobile]);
 
   // Determining "Persona" styles
   const isMale = gender === "male";
@@ -336,7 +387,9 @@ export function HomePage() {
             <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-8 md:w-80">
               <div className="bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-lg animate-fade-in-up">
                 <p className={`text-xs font-bold uppercase mb-1 ${themeColor}`}>Current Mission</p>
-                <p className="text-sm text-gray-800 font-medium">Log your meal to maintain your 3-day streak!</p>
+                <p className="text-sm text-gray-800 font-medium">
+                  Log your meal to keep your progress rolling!
+                </p>
               </div>
             </div>
           )}

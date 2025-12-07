@@ -13,5 +13,7 @@ export interface FormData {
   targetWeight: number;
   autoTrackEnabled: boolean;
   medicalConditions: string[];
+  xp?: number;
+  streak?: number;
 }
 

@@ -17,6 +17,8 @@ const initialFormData = (): FormData => ({
   targetWeight: 60,
   autoTrackEnabled: false,
   medicalConditions: ["None"],
+  xp: 0,
+  streak: 0,
 })
 
 interface UserProfileStore {
