@@ -60,7 +60,7 @@ export function HabitTrackerPage() {
     const [newHabitName, setNewHabitName] = useState("");
     const [selectedIcon, setSelectedIcon] = useState("book");
     const [selectedColor, setSelectedColor] = useState("bg-emerald-500");
-    const frequency: "Daily" = "Daily";
+    const frequency = "Daily" as const;
 
     // Habits State
     const [habits, setHabits] = useState<Habit[]>([]);
