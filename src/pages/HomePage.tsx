@@ -20,6 +20,8 @@ import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useUserProfileStore } from "@/store/userProfileStore";
+import AvatarScene from "@/components/AvatarScene";
+import "@/pages/HomePage.css";
 
 // Type definitions for Speech Recognition API
 interface SpeechRecognition extends EventTarget {
@@ -133,7 +135,7 @@ export function HomePage() {
   // Safe access to formData with defaults
   const gender = profile.gender || routeFormData.gender || "female";
   const name = profile.name || routeFormData.name || "Traveller";
-  const coachName = gender === "male" ? "Atlas" : "Aria";
+  const coachName = gender === "male" ? "Dhoni" : "Disha";
 
   // State
   // Changed "community" to "leaderboard"
@@ -180,7 +182,7 @@ export function HomePage() {
       const res = await fetch(
         `/api/users/${encodeURIComponent(userId)}/xp?delta=${delta}`,
         {
-          method: "POST",
+        method: "POST",
         }
       );
       if (!res.ok) return;
@@ -643,8 +645,8 @@ export function HomePage() {
     });
 
     socket.on("message", (data) => {
-      let text = "";
-      try {
+        let text = "";
+        try {
         if (typeof data === "string") {
           const parsed = JSON.parse(data);
           text = parsed.text ?? String(data);
@@ -653,16 +655,16 @@ export function HomePage() {
         } else {
           text = String(data);
         }
-      } catch {
+        } catch {
         text = String(data);
-      }
-      const coachMsg: Message = {
-        id: Date.now().toString(),
-        sender: "coach",
-        text,
-      };
-      setMessages((prev) => [...prev, coachMsg]);
-      setIsListening(false);
+        }
+        const coachMsg: Message = {
+          id: Date.now().toString(),
+          sender: "coach",
+          text,
+        };
+        setMessages((prev) => [...prev, coachMsg]);
+        setIsListening(false);
     });
 
     // Listen for 'response' event from server
@@ -812,7 +814,7 @@ export function HomePage() {
 
     // Send the transcribed text if available
     if (recognitionResultRef.current.trim() && socket && socket.connected) {
-      const avatar = isMale ? "atlas" : "aria";
+      const avatar = isMale ? "Dhoni" : "Disha";
       const payload = {
         event: "process_audio",
         data: {
@@ -1095,7 +1097,7 @@ export function HomePage() {
     }, 100); // Small delay to ensure previous recognition is fully stopped
   }, [isListening, stopListeningAndSend, playStartSound]);
 
-  // Wake word listener - listens for "okay atlas" or "ok aria"
+  // Wake word listener - listens for "okay Dhoni" or "ok Disha"
   useEffect(() => {
     const SpeechRecognition =
       (
@@ -1133,8 +1135,8 @@ export function HomePage() {
 
         // Define wake words based on coach gender
         const wakeWords = isMale
-          ? ["okay atlas", "ok atlas", "hey atlas", "atlas"]
-          : ["okay aria", "ok aria", "hey aria", "aria"];
+          ? ["okay Dhoni", "ok Dhoni", "hey Dhoni", "Dhoni"]
+          : ["okay Disha", "ok Disha", "hey Disha", "Disha"];
 
         wakeWordRecognition.onresult = (event: SpeechRecognitionEvent) => {
           // Don't process if already listening
@@ -1271,7 +1273,7 @@ export function HomePage() {
 
     const socket = socketRef.current;
     if (socket && socket.connected) {
-      const avatar = isMale ? "atlas" : "aria";
+      const avatar = isMale ? "Dhoni" : "Disha";
       const payload = {
         event: "process_audio",
         data: {
@@ -1349,29 +1351,37 @@ export function HomePage() {
               isMale ? "bg-emerald-100" : "bg-purple-100"
             } rounded-full blur-[120px]`}
           />
-        </div>
+              </div>
 
         {/* Listening Overlay - shown when listening */}
-        {isListening && (
+          {isListening && (
           <div className="relative z-10 flex flex-col items-center justify-center py-8">
             <div
               className={`w-24 h-24 rounded-full flex items-center justify-center ${
                 isMale ? "bg-emerald-500" : "bg-purple-500"
               } animate-pulse shadow-[0_0_40px_rgba(0,0,0,0.2)]`}
             >
-              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
+                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
                 <div
                   className={`w-16 h-16 rounded-full flex items-center justify-center animate-ping ${
                     isMale ? "bg-emerald-100" : "bg-purple-100"
                   }`}
                 >
-                  <Zap className={`w-8 h-8 ${themeColor}`} />
+                    <Zap className={`w-8 h-8 ${themeColor}`} />
+                  </div>
                 </div>
               </div>
-            </div>
             <p className="mt-6 text-gray-700 font-bold text-lg">Listening...</p>
-          </div>
-        )}
+            </div>
+          )}
+
+        <div className="home-avatar-banner">
+          <AvatarScene
+            textToSpeak={messages[messages.length - 1].sender === "coach" ? messages[messages.length - 1].text : ""}
+            voiceType={gender as VoiceType}
+            isFullScreen={false}
+          />
+        </div>
 
         {/* 2. Interface Tabs (Chat / Explore / Leaderboard) */}
         <div className="flex-1 bg-white rounded-t-[2rem] shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] relative z-20 overflow-hidden flex flex-col">
@@ -1418,8 +1428,8 @@ export function HomePage() {
           {/* Tab Content */}
           <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50/50">
             {activeTab === "chat" && (
-              <div className="h-full flex flex-col max-w-2xl mx-auto">
-                <div className="flex-1 space-y-4 mb-4">
+              <div className="h-full flex flex-col max-w-2xl mx-auto justify-between">
+                <div className="flex-1 space-y-4 mb-4 overflow-auto">
                   {messages.map((msg) => (
                     <div
                       key={msg.id}
@@ -1455,16 +1465,16 @@ export function HomePage() {
                         habitStats.water >= 2000);
 
                     return (
-                      <div
-                        key={quest.id}
-                        className={`bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm ${
+                    <div
+                      key={quest.id}
+                      className={`bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm ${
                           quest.title === "Log Meal" ||
                           quest.title === "Walk 5,000 Steps" ||
                           quest.title === "Drink 2L Water"
-                            ? "cursor-pointer hover:border-emerald-300 hover:shadow-md"
-                            : ""
+                          ? "cursor-pointer hover:border-emerald-300 hover:shadow-md"
+                          : ""
                         } ${goalHit ? "border-emerald-400 bg-emerald-50" : ""}`}
-                        onClick={() => {
+                      onClick={() => {
                           if (quest.title === "Log Meal") {
                             navigate("/log-meal", {
                               state: { formData: profile },
@@ -1473,22 +1483,22 @@ export function HomePage() {
                         }}
                       >
                         <div className="flex items-center gap-3 flex-1">
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
                               quest.completed || goalHit
                                 ? "bg-emerald-100 text-emerald-600"
                                 : "bg-gray-100 text-gray-400"
-                            }`}
-                          >
-                            {quest.completed ? (
-                              <CheckCircle2 className="w-5 h-5" />
-                            ) : goalHit ? (
-                              <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                            ) : (
-                              <div className="w-3 h-3 rounded-full bg-gray-300" />
-                            )}
-                          </div>
-                          <div className="flex flex-col">
+                          }`}
+                        >
+                          {quest.completed ? (
+                            <CheckCircle2 className="w-5 h-5" />
+                          ) : goalHit ? (
+                            <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                          ) : (
+                            <div className="w-3 h-3 rounded-full bg-gray-300" />
+                          )}
+                        </div>
+                        <div className="flex flex-col">
                             <span
                               className={`text-sm font-medium ${
                                 quest.completed
@@ -1506,24 +1516,24 @@ export function HomePage() {
                               )}
                             {quest.title === "Walk 5,000 Steps" &&
                               habitStats.steps != null && (
-                                <span className="text-xs text-emerald-600">
-                                  {habitStats.steps} steps today
+                            <span className="text-xs text-emerald-600">
+                              {habitStats.steps} steps today
                                   {habitStats.steps >= 5000
                                     ? " · Goal hit!"
                                     : ""}
-                                </span>
-                              )}
+                            </span>
+                          )}
                             {quest.title === "Drink 2L Water" &&
                               habitStats.water != null && (
-                                <span className="text-xs text-emerald-600">
-                                  {habitStats.water} ml today
+                            <span className="text-xs text-emerald-600">
+                              {habitStats.water} ml today
                                   {habitStats.water >= 2000
                                     ? " · Goal hit!"
                                     : ""}
-                                </span>
-                              )}
-                          </div>
+                            </span>
+                          )}
                         </div>
+                      </div>
                         <span
                           className={`text-xs font-bold px-2 py-1 rounded-md ${
                             goalHit
@@ -1533,7 +1543,7 @@ export function HomePage() {
                         >
                           +{quest.xp} XP
                         </span>
-                      </div>
+                    </div>
                     );
                   })}
                 </div>
@@ -1567,6 +1577,7 @@ export function HomePage() {
                     <Zap className="w-5 h-5 fill-white text-white" />
                   </Button>
                 </div>
+
               </div>
             )}
 
@@ -1710,7 +1721,7 @@ export function HomePage() {
                         }`}
                       >
                         {position === 0 && (
-                          <Crown className="w-6 h-6 text-yellow-500 mb-1 animate-bounce" />
+                    <Crown className="w-6 h-6 text-yellow-500 mb-1 animate-bounce" />
                         )}
                         <div
                           className={`${size} rounded-full border-4 flex items-center justify-center mb-2 relative ${badgeColor} ${borderColor} ${
@@ -1728,8 +1739,8 @@ export function HomePage() {
                             } text-white ${badgeTextSize} px-2 py-0.5 rounded-full font-bold`}
                           >
                             #{user.rank}
-                          </div>
-                        </div>
+                    </div>
+                  </div>
                         <p
                           className={`font-bold ${
                             position === 0 ? "text-sm" : "text-xs"
@@ -1744,7 +1755,7 @@ export function HomePage() {
                         >
                           {user.xp} XP
                         </p>
-                      </div>
+                    </div>
                     );
                   })}
                 </div>

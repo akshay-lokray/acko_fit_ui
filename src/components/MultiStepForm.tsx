@@ -173,11 +173,7 @@ export function MultiStepForm() {
   };
 
   return (
-    <div className="min-h-screen bg-white p-4 font-sans pb-24">
-      {/* Avatar Section - Fixed at bottom right */}
-      <div className="avatar-container-form">
-        <AvatarScene textToSpeak={getStepText()} voiceType={voiceType} isFullScreen={false} />
-      </div>
+    <div className="min-h-screen bg-white p-4 font-sans pb-24 setup-page">
 
       <div className="max-w-7xl mx-auto">
         <div className="w-full max-w-md mx-auto">
@@ -200,6 +196,9 @@ export function MultiStepForm() {
                 onNameChange={(name) => updateFormData({ name })}
                 onMobileChange={(mobile) => updateFormData({ mobile })}
               />
+            )}
+            {step === 1 && fetchError && (
+              <p className="text-xs text-red-500 text-center mt-2">{fetchError}</p>
             )}
 
             {/* Step 2: Options Selection */}
@@ -318,7 +317,7 @@ export function MultiStepForm() {
       {/* Fixed Bottom Navigation Buttons */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-20">
         <div className="max-w-md mx-auto">
-          <div className="flex justify-between gap-4">
+          <div className="flex flex-wrap gap-2 justify-between">
             {step !== 9 && (
               <Button
                 onClick={handleBack}
@@ -339,6 +338,13 @@ export function MultiStepForm() {
             >
               Next
               <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-12 px-6 flex-1 text-gray-600 border border-gray-200 hover:bg-gray-100"
+              onClick={() => navigate("/home", { state: { formData } })}
+            >
+              Back to Home
             </Button>
           </div>
         </div>

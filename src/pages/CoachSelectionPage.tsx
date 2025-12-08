@@ -11,7 +11,7 @@ export function CoachSelectionPage() {
     const coaches = [
         {
             id: "male",
-            name: "Atlas",
+            name: "Dhoni",
             role: "Strength & Power",
             description: "Push your limits with high-intensity strength training.",
             themeColor: "text-emerald-600",
@@ -23,7 +23,7 @@ export function CoachSelectionPage() {
         },
         {
             id: "female",
-            name: "Aria",
+            name: "Disha",
             role: "Agility & Balance",
             description: "Master control and flexibility with precision flows.",
             themeColor: "text-purple-700",

@@ -16,6 +16,6 @@ export interface FormData {
   xp?: number;
   streak?: number;
   avatarUrl?: string; // ReadyPlayer.me avatar URL
-  avatarName?: string; // Atlas or Aria
+  avatarName?: string; // Dhoni or Aria
 }
 
