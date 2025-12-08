@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 
 // Types
 type RecipeSuggestion = string;
@@ -367,33 +366,33 @@ function RecipeDetailView({
     (fatPercent / 100) * circumference;
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-white text-gray-900">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-black/95 backdrop-blur-sm border-b border-gray-800">
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-gray-200">
         <div className="flex items-center gap-4 px-4 py-3">
           <button
             onClick={onBack}
-            className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <ArrowLeft className="w-6 h-6 text-white" />
+            <ArrowLeft className="w-6 h-6 text-gray-900" />
           </button>
-          <h1 className="text-xl font-bold text-white flex-1 text-center">
+          <h1 className="text-xl font-bold text-gray-900 flex-1 text-center">
             Recipe Details
           </h1>
           <button
             onClick={onBookmark}
-            className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             {isBookmarked ? (
-              <BookmarkCheck className="w-6 h-6 text-green-500 fill-green-500" />
+              <BookmarkCheck className="w-6 h-6 text-emerald-500 fill-emerald-500" />
             ) : (
-              <Bookmark className="w-6 h-6 text-white" />
+              <Bookmark className="w-6 h-6 text-gray-900" />
             )}
           </button>
         </div>
       </div>
 
-      <div className="pb-24">
+      <div className="pb-24 bg-white">
         {/* Recipe Image */}
         {recipe.image && (
           <div className="w-full aspect-[4/3] overflow-hidden bg-gray-900">
@@ -410,7 +409,7 @@ function RecipeDetailView({
 
         <div className="px-4 py-6">
           {/* Title and Meta */}
-          <h2 className="text-2xl font-bold text-white mb-2">{recipe.title}</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">{recipe.title}</h2>
           {recipe.serves && (
             <p className="text-gray-400 mb-3">Serves {recipe.serves}</p>
           )}
@@ -932,33 +931,33 @@ export function RecipesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-white text-gray-900">
       {/* Loading Overlay */}
       {loading && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="text-white">Loading recipe...</div>
+        <div className="fixed inset-0 bg-white/80 z-50 flex items-center justify-center">
+          <div className="text-gray-900">Loading recipe...</div>
         </div>
       )}
 
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-black/95 backdrop-blur-sm border-b border-gray-800">
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-gray-200">
         <div className="flex items-center gap-4 px-4 py-3">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <ArrowLeft className="w-6 h-6 text-white" />
+            <ArrowLeft className="w-6 h-6 text-gray-900" />
           </button>
-          <h1 className="text-xl font-bold text-white flex-1">Recipes</h1>
-          <button className="p-2 hover:bg-gray-800 rounded-lg transition-colors">
-            <Bookmark className="w-6 h-6 text-white" />
+          <h1 className="text-xl font-bold text-gray-900 flex-1">Recipes</h1>
+          <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <Bookmark className="w-6 h-6 text-gray-900" />
           </button>
         </div>
 
         {/* Search Bar */}
         <div className="px-4 pb-4 relative" ref={suggestionsRef}>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
             <Input
               type="text"
               placeholder="Search for recipes..."
@@ -968,20 +967,20 @@ export function RecipesPage() {
               onFocus={() => {
                 if (suggestions.length > 0) setShowSuggestions(true);
               }}
-              className="pl-10 bg-gray-900 border-gray-700 text-white placeholder:text-gray-500 focus:border-gray-600"
+              className="pl-10 bg-gray-100 border border-gray-200 text-gray-900 placeholder:text-gray-500 focus:border-gray-400"
             />
           </div>
 
           {/* Suggestions Dropdown */}
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute top-full left-4 right-4 mt-2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-30 max-h-60 overflow-y-auto">
+            <div className="absolute top-full left-4 right-4 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-30 max-h-60 overflow-y-auto">
               {suggestions.map((suggestion, index) => (
                 <button
                   key={`${suggestion}-${index}`}
                   onClick={() => handleSuggestionClick(suggestion)}
-                  className="w-full px-4 py-3 text-left hover:bg-gray-800 transition-colors border-b border-gray-800 last:border-b-0"
+                  className="w-full px-4 py-3 text-left hover:bg-gray-100 transition-colors border-b border-gray-200 last:border-b-0"
                 >
-                  <span className="text-white">{suggestion}</span>
+                  <span className="text-gray-900">{suggestion}</span>
                 </button>
               ))}
             </div>
@@ -995,8 +994,8 @@ export function RecipesPage() {
           <div key={sectionIndex} className="mb-8">
             {/* Section Header */}
             <div className="flex items-center justify-between px-4 mb-4">
-              <h2 className="text-lg font-bold text-white">{section.title}</h2>
-              <button className="text-sm text-gray-400 hover:text-white transition-colors">
+              <h2 className="text-lg font-bold text-gray-900">{section.title}</h2>
+              <button className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
                 View More &gt;
               </button>
             </div>
@@ -1009,10 +1008,10 @@ export function RecipesPage() {
                   <Card
                     key={recipe.id}
                     onClick={() => handleRecipeClick(recipe)}
-                    className="min-w-[160px] bg-gray-900 border-gray-800 rounded-lg overflow-hidden cursor-pointer hover:border-gray-700 transition-all group"
+                    className="min-w-[160px] bg-white border border-gray-100 rounded-lg overflow-hidden cursor-pointer hover:border-gray-300 transition-all group"
                   >
                     {/* Recipe Image */}
-                    <div className="relative aspect-square w-full overflow-hidden bg-gray-800">
+                      <div className="relative aspect-square w-full overflow-hidden bg-gray-100">
                       <img
                         src={recipe.image}
                         alt={recipe.title}
@@ -1026,7 +1025,7 @@ export function RecipesPage() {
                       {/* Bookmark Button */}
                       <button
                         onClick={(e) => toggleBookmark(recipe.id, e)}
-                        className="absolute bottom-2 right-2 p-1.5 bg-black/50 backdrop-blur-sm rounded-full hover:bg-black/70 transition-colors"
+                        className="absolute bottom-2 right-2 p-1.5 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors"
                       >
                         {isBookmarked ? (
                           <BookmarkCheck className="w-4 h-4 text-green-500 fill-green-500" />
@@ -1038,10 +1037,10 @@ export function RecipesPage() {
 
                     {/* Recipe Info */}
                     <div className="p-3">
-                      <h3 className="text-sm font-semibold text-white line-clamp-2 mb-1">
+                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">
                         {recipe.title}
                       </h3>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-gray-500">
                         {recipe.calories} Cal
                       </p>
                     </div>

@@ -26,6 +26,7 @@ interface FoodItem {
     name: string;
     quantity: string;
     calories: number;
+    note?: string;
 }
 
 export function PhotoTrackingPage() {
@@ -43,6 +44,7 @@ export function PhotoTrackingPage() {
     const [mealName, setMealName] = useState("");
     const [loggingMeal, setLoggingMeal] = useState(false);
     const [logError, setLogError] = useState<string | null>(null);
+    const [healthNote, setHealthNote] = useState("");
     const { formData: profile } = useUserProfileStore();
     const streak = profile.streak ?? 0;
 
@@ -61,13 +63,43 @@ export function PhotoTrackingPage() {
         cameraInputRef.current?.click();
     };
 
+    const resizeImageFile = (inputFile: File, width: number, height: number): Promise<File> =>
+        new Promise((resolve, reject) => {
+            const img = new Image();
+            const url = URL.createObjectURL(inputFile);
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext("2d");
+                if (!ctx) {
+                    reject(new Error("Unable to resize image"));
+                    return;
+                }
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        reject(new Error("Failed to create blob"));
+                        return;
+                    }
+                    const resizedFile = new File([blob], inputFile.name, { type: blob.type });
+                    resolve(resizedFile);
+                }, "image/jpeg", 0.9);
+            };
+            img.onerror = (error) => {
+                reject(error);
+            };
+            img.src = url;
+        });
+
     const handleImageSelected = async (file: File | null) => {
         if (!file) return;
         setIsAnalyzing(true);
         setAnalysisError(null);
         try {
+            const resizedFile = await resizeImageFile(file, 1024, 1024);
             const form = new FormData();
-            form.append("image", file);
+            form.append("image", resizedFile);
             const response = await fetch("/api/habits/food/analyze-image", {
                 method: "POST",
                 body: form,
@@ -81,9 +113,11 @@ export function PhotoTrackingPage() {
                 name: item.name || "",
                 quantity: `${item.quantity ?? ""}${item.unit ? ` ${item.unit}` : ""}`,
                 calories: Number(item.calories ?? 0),
+                note: item.note || "",
             }));
             setItems(analyzedItems);
             setMealName(data.mealName ?? "");
+            setHealthNote(data.healthNote ?? "");
             const nextUrl = URL.createObjectURL(file);
             setImagePreview(nextUrl);
             if (prevImageRef.current) {
@@ -105,10 +139,12 @@ export function PhotoTrackingPage() {
         const userId = profile.mobile || "unknown-user";
         const mealMeta = {
             mealName: mealName.trim() || "Meal",
+            healthNote: healthNote.trim(),
             items: items.map((item) => ({
                 name: item.name,
                 quantity: item.quantity,
                 calories: item.calories,
+                note: item.note || "",
             })),
         };
 
@@ -175,6 +211,7 @@ export function PhotoTrackingPage() {
                 name: "",
                 quantity: "",
                 calories: 0,
+                note: "",
             },
         ]);
     };
@@ -329,6 +366,14 @@ export function PhotoTrackingPage() {
                             placeholder="e.g., Spicy Potato Stew"
                             className="text-sm"
                         />
+                        <label className="text-xs font-semibold text-gray-500">Health note</label>
+                        <textarea
+                            value={healthNote}
+                            onChange={(e) => setHealthNote(e.target.value)}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                            rows={2}
+                            placeholder="Rich in carbohydrates and provides a good source of energy."
+                        />
                     </div>
                     <div className="space-y-3">
                         {items.map((item, idx) => (
@@ -336,34 +381,41 @@ export function PhotoTrackingPage() {
                                 key={item.id}
                                 className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2 shadow-sm"
                             >
-                                <div className="flex-1">
-                                    <input
-                                        type="text"
-                                        value={item.name}
-                                        onChange={(e) => handleItemChange(idx, "name", e.target.value)}
-                                        placeholder="Food name"
-                                        className="w-full border-0 bg-transparent px-0 text-sm font-semibold text-gray-900 focus:outline-none"
-                                    />
-                                    <div className="flex gap-2 text-xs text-gray-500">
+                                    <div className="flex-1 space-y-1">
                                         <input
                                             type="text"
-                                            value={item.quantity}
-                                            onChange={(e) => handleItemChange(idx, "quantity", e.target.value)}
-                                            placeholder="e.g., 200 g"
-                                            className="flex-1 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                            value={item.name}
+                                            onChange={(e) => handleItemChange(idx, "name", e.target.value)}
+                                            placeholder="Food name"
+                                            className="w-full border-0 bg-transparent px-0 text-sm font-semibold text-gray-900 focus:outline-none"
                                         />
+                                        <div className="flex gap-2 text-xs text-gray-500">
+                                            <input
+                                                type="text"
+                                                value={item.quantity}
+                                                onChange={(e) => handleItemChange(idx, "quantity", e.target.value)}
+                                                placeholder="e.g., 200 g"
+                                                className="flex-1 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                            />
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={item.calories}
+                                                onChange={(e) =>
+                                                    handleItemChange(idx, "calories", Number(e.target.value))
+                                                }
+                                                placeholder="Calories"
+                                                className="w-24 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                            />
+                                        </div>
                                         <input
-                                            type="number"
-                                            min="0"
-                                            value={item.calories}
-                                            onChange={(e) =>
-                                                handleItemChange(idx, "calories", Number(e.target.value))
-                                            }
-                                            placeholder="Calories"
-                                            className="w-24 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                            type="text"
+                                            value={item.note ?? ""}
+                                            onChange={(e) => handleItemChange(idx, "note", e.target.value)}
+                                            placeholder="Add a short note (e.g., Boiled)"
+                                            className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-300"
                                         />
                                     </div>
-                                </div>
                                 <button
                                     type="button"
                                     onClick={() => handleDeleteItem(idx)}
