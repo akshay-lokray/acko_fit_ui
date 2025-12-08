@@ -366,7 +366,7 @@ function RecipeDetailView({
     (fatPercent / 100) * circumference;
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen bg-white text-black">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-gray-200">
         <div className="flex items-center gap-4 px-4 py-3">
@@ -374,9 +374,9 @@ function RecipeDetailView({
             onClick={onBack}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <ArrowLeft className="w-6 h-6 text-gray-900" />
+            <ArrowLeft className="w-6 h-6 text-black" />
           </button>
-          <h1 className="text-xl font-bold text-gray-900 flex-1 text-center">
+          <h1 className="text-xl font-bold text-black flex-1 text-center">
             Recipe Details
           </h1>
           <button
@@ -386,7 +386,7 @@ function RecipeDetailView({
             {isBookmarked ? (
               <BookmarkCheck className="w-6 h-6 text-emerald-500 fill-emerald-500" />
             ) : (
-              <Bookmark className="w-6 h-6 text-gray-900" />
+              <Bookmark className="w-6 h-6 text-black" />
             )}
           </button>
         </div>
@@ -409,19 +409,19 @@ function RecipeDetailView({
 
         <div className="px-4 py-6">
           {/* Title and Meta */}
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">{recipe.title}</h2>
+          <h2 className="text-2xl font-bold text-black mb-2">{recipe.title}</h2>
           {recipe.serves && (
-            <p className="text-gray-400 mb-3">Serves {recipe.serves}</p>
+            <p className="text-black mb-3">Serves {recipe.serves}</p>
           )}
           {recipe.category && (
-            <span className="inline-block px-3 py-1 bg-gray-800 text-gray-300 rounded-full text-sm mb-6">
+            <span className="inline-block px-3 py-1 bg-gray-800 text-white rounded-full text-sm mb-6">
               {recipe.category}
             </span>
           )}
 
           {/* Nutrition Per Serving */}
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-white mb-4">
+          <h3 className="text-lg font-semibold text-black mb-4">
               Nutrition Per Serving
             </h3>
             <div className="flex items-center gap-6">
@@ -472,10 +472,10 @@ function RecipeDetailView({
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-white">
+                    <div className="text-2xl font-bold text-black">
                       {calories}
                     </div>
-                    <div className="text-xs text-gray-400">Cal</div>
+                    <div className="text-xs text-black">Cal</div>
                   </div>
                 </div>
               </div>
@@ -485,13 +485,13 @@ function RecipeDetailView({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                    <span className="text-gray-300">Carbs</span>
+                    <span className="text-black">Carbs</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-white font-semibold">
+                    <span className="text-black font-semibold">
                       {Math.round(carbsPercent)}%
                     </span>
-                    <span className="text-gray-400 text-sm ml-1">
+                    <span className="text-black text-sm ml-1">
                       ({carbs}g)
                     </span>
                   </div>
@@ -499,25 +499,25 @@ function RecipeDetailView({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                    <span className="text-gray-300">Fat</span>
+                    <span className="text-black">Fat</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-white font-semibold">
+                    <span className="text-black font-semibold">
                       {Math.round(fatPercent)}%
                     </span>
-                    <span className="text-gray-400 text-sm ml-1">({fat}g)</span>
+                    <span className="text-black text-sm ml-1">({fat}g)</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-                    <span className="text-gray-300">Protein</span>
+                    <span className="text-black">Protein</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-white font-semibold">
+                    <span className="text-black font-semibold">
                       {Math.round(proteinPercent)}%
                     </span>
-                    <span className="text-gray-400 text-sm ml-1">
+                    <span className="text-black text-sm ml-1">
                       ({protein}g)
                     </span>
                   </div>
@@ -544,86 +544,86 @@ function RecipeDetailView({
               <div className="space-y-2 text-sm">
                 {nutrition.calories !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Calories</span>
-                    <span className="text-white">{nutrition.calories}</span>
+                    <span className="text-black">Calories</span>
+                    <span className="text-black">{nutrition.calories}</span>
                   </div>
                 )}
                 {nutrition.totalFat !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Total Fat (g)</span>
-                    <span className="text-white">{nutrition.totalFat}</span>
+                    <span className="text-black">Total Fat (g)</span>
+                    <span className="text-black">{nutrition.totalFat}</span>
                   </div>
                 )}
                 {nutrition.saturatedFat !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Saturated Fat (g)</span>
-                    <span className="text-white">{nutrition.saturatedFat}</span>
+                    <span className="text-black">Saturated Fat (g)</span>
+                    <span className="text-black">{nutrition.saturatedFat}</span>
                   </div>
                 )}
                 {nutrition.polyunsaturatedFat !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">
+                    <span className="text-black">
                       Polyunsaturated Fat (g)
                     </span>
-                    <span className="text-white">
+                    <span className="text-black">
                       {nutrition.polyunsaturatedFat}
                     </span>
                   </div>
                 )}
                 {nutrition.monounsaturatedFat !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">
+                    <span className="text-black">
                       Monounsaturated Fat (g)
                     </span>
-                    <span className="text-white">
+                    <span className="text-black">
                       {nutrition.monounsaturatedFat}
                     </span>
                   </div>
                 )}
                 {nutrition.transFat !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Trans Fat (g)</span>
-                    <span className="text-white">{nutrition.transFat}</span>
+                    <span className="text-black">Trans Fat (g)</span>
+                    <span className="text-black">{nutrition.transFat}</span>
                   </div>
                 )}
                 {nutrition.cholesterol !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Cholesterol (mg)</span>
-                    <span className="text-white">{nutrition.cholesterol}</span>
+                    <span className="text-black">Cholesterol (mg)</span>
+                    <span className="text-black">{nutrition.cholesterol}</span>
                   </div>
                 )}
                 {nutrition.sodium !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Sodium (mg)</span>
-                    <span className="text-white">{nutrition.sodium}</span>
+                    <span className="text-black">Sodium (mg)</span>
+                    <span className="text-black">{nutrition.sodium}</span>
                   </div>
                 )}
                 {nutrition.totalCarbohydrates !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">
+                    <span className="text-black">
                       Total Carbohydrates (g)
                     </span>
-                    <span className="text-white">
+                    <span className="text-black">
                       {nutrition.totalCarbohydrates}
                     </span>
                   </div>
                 )}
                 {nutrition.dietaryFiber !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Dietary Fiber (g)</span>
-                    <span className="text-white">{nutrition.dietaryFiber}</span>
+                    <span className="text-black">Dietary Fiber (g)</span>
+                    <span className="text-black">{nutrition.dietaryFiber}</span>
                   </div>
                 )}
                 {nutrition.sugars !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Sugars (g)</span>
-                    <span className="text-white">{nutrition.sugars}</span>
+                    <span className="text-black">Sugars (g)</span>
+                    <span className="text-black">{nutrition.sugars}</span>
                   </div>
                 )}
                 {nutrition.addedSugars !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Added Sugars (g)</span>
-                    <span className="text-white">
+                    <span className="text-black">Added Sugars (g)</span>
+                    <span className="text-black">
                       {nutrition.addedSugars !== null &&
                       nutrition.addedSugars !== undefined
                         ? nutrition.addedSugars
@@ -633,8 +633,8 @@ function RecipeDetailView({
                 )}
                 {nutrition.sugarAlcohols !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Sugar Alcohols (g)</span>
-                    <span className="text-white">
+                    <span className="text-black">Sugar Alcohols (g)</span>
+                    <span className="text-black">
                       {nutrition.sugarAlcohols !== null &&
                       nutrition.sugarAlcohols !== undefined
                         ? nutrition.sugarAlcohols
@@ -644,14 +644,14 @@ function RecipeDetailView({
                 )}
                 {nutrition.protein !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Protein (g)</span>
-                    <span className="text-white">{nutrition.protein}</span>
+                    <span className="text-black">Protein (g)</span>
+                    <span className="text-black">{nutrition.protein}</span>
                   </div>
                 )}
                 {nutrition.vitaminD !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Vitamin D (%)</span>
-                    <span className="text-white">
+                    <span className="text-black">Vitamin D (%)</span>
+                    <span className="text-black">
                       {nutrition.vitaminD !== null &&
                       nutrition.vitaminD !== undefined
                         ? nutrition.vitaminD
@@ -661,32 +661,32 @@ function RecipeDetailView({
                 )}
                 {nutrition.calcium !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Calcium (%)</span>
-                    <span className="text-white">{nutrition.calcium}</span>
+                    <span className="text-black">Calcium (%)</span>
+                    <span className="text-black">{nutrition.calcium}</span>
                   </div>
                 )}
                 {nutrition.iron !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Iron (%)</span>
-                    <span className="text-white">{nutrition.iron}</span>
+                    <span className="text-black">Iron (%)</span>
+                    <span className="text-black">{nutrition.iron}</span>
                   </div>
                 )}
                 {nutrition.potassium !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Potassium (mg)</span>
-                    <span className="text-white">{nutrition.potassium}</span>
+                    <span className="text-black">Potassium (mg)</span>
+                    <span className="text-black">{nutrition.potassium}</span>
                   </div>
                 )}
                 {nutrition.vitaminA !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Vitamin A (%)</span>
-                    <span className="text-white">{nutrition.vitaminA}</span>
+                    <span className="text-black">Vitamin A (%)</span>
+                    <span className="text-black">{nutrition.vitaminA}</span>
                   </div>
                 )}
                 {nutrition.vitaminC !== undefined && (
                   <div className="flex justify-between py-2 border-b border-gray-800">
-                    <span className="text-gray-400">Vitamin C (%)</span>
-                    <span className="text-white">{nutrition.vitaminC}</span>
+                    <span className="text-black">Vitamin C (%)</span>
+                    <span className="text-black">{nutrition.vitaminC}</span>
                   </div>
                 )}
               </div>
@@ -696,32 +696,33 @@ function RecipeDetailView({
           {/* Ingredients */}
           {recipe.ingredients && recipe.ingredients.length > 0 && (
             <div className="mb-6">
-              <h3 className="text-lg font-semibold text-white mb-4">
+              <h3 className="text-lg font-semibold text-black mb-4">
                 Ingredients
               </h3>
-              <ul className="space-y-2">
+              <div className="space-y-3 rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-4 shadow-sm">
                 {recipe.ingredients.map((ingredient, index) => (
-                  <li
+                  <div
                     key={index}
-                    className="text-gray-300 text-sm border-b border-gray-800 pb-2"
+                    className="flex items-start gap-3 border-b border-gray-100 pb-3 last:border-b-0 last:pb-0"
                   >
-                    {ingredient}
-                  </li>
+                    <span className="mt-1 h-3 w-3 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-300 shadow-sm" />
+                    <p className="text-sm text-black leading-snug">{ingredient}</p>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           )}
 
           {/* Directions */}
           {recipe.directions && recipe.directions.length > 0 && (
             <div className="mb-6">
-              <h3 className="text-lg font-semibold text-white mb-4">
+              <h3 className="text-lg font-semibold text-black mb-4">
                 Directions
               </h3>
               <ol className="space-y-3">
                 {recipe.directions.map((direction, index) => (
-                  <li key={index} className="text-gray-300 text-sm">
-                    <span className="font-semibold text-white mr-2">
+                  <li key={index} className="text-black text-sm">
+                    <span className="font-semibold text-black mr-2">
                       {index + 1}.
                     </span>
                     {direction}
@@ -736,7 +737,7 @@ function RecipeDetailView({
             (!recipe.directions || recipe.directions.length === 0) &&
             recipe.description && (
               <div className="mb-6">
-                <p className="text-gray-300 text-sm whitespace-pre-wrap">
+                <p className="text-black text-sm whitespace-pre-wrap">
                   {recipe.description}
                 </p>
               </div>
@@ -931,11 +932,11 @@ export function RecipesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen bg-white text-black">
       {/* Loading Overlay */}
       {loading && (
         <div className="fixed inset-0 bg-white/80 z-50 flex items-center justify-center">
-          <div className="text-gray-900">Loading recipe...</div>
+          <div className="text-black">Loading recipe...</div>
         </div>
       )}
 
@@ -946,18 +947,18 @@ export function RecipesPage() {
             onClick={() => navigate(-1)}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <ArrowLeft className="w-6 h-6 text-gray-900" />
+            <ArrowLeft className="w-6 h-6 text-black" />
           </button>
-          <h1 className="text-xl font-bold text-gray-900 flex-1">Recipes</h1>
+          <h1 className="text-xl font-bold text-black flex-1">Recipes</h1>
           <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <Bookmark className="w-6 h-6 text-gray-900" />
+            <Bookmark className="w-6 h-6 text-black" />
           </button>
         </div>
 
         {/* Search Bar */}
         <div className="px-4 pb-4 relative" ref={suggestionsRef}>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-black" />
             <Input
               type="text"
               placeholder="Search for recipes..."
@@ -967,7 +968,7 @@ export function RecipesPage() {
               onFocus={() => {
                 if (suggestions.length > 0) setShowSuggestions(true);
               }}
-              className="pl-10 bg-gray-100 border border-gray-200 text-gray-900 placeholder:text-gray-500 focus:border-gray-400"
+              className="pl-10 bg-gray-100 border border-gray-200 text-black placeholder:text-black focus:border-gray-400"
             />
           </div>
 
@@ -980,7 +981,7 @@ export function RecipesPage() {
                   onClick={() => handleSuggestionClick(suggestion)}
                   className="w-full px-4 py-3 text-left hover:bg-gray-100 transition-colors border-b border-gray-200 last:border-b-0"
                 >
-                  <span className="text-gray-900">{suggestion}</span>
+                  <span className="text-black">{suggestion}</span>
                 </button>
               ))}
             </div>
@@ -994,8 +995,8 @@ export function RecipesPage() {
           <div key={sectionIndex} className="mb-8">
             {/* Section Header */}
             <div className="flex items-center justify-between px-4 mb-4">
-              <h2 className="text-lg font-bold text-gray-900">{section.title}</h2>
-              <button className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
+              <h2 className="text-lg font-bold text-black">{section.title}</h2>
+              <button className="text-sm text-black hover:text-black transition-colors">
                 View More &gt;
               </button>
             </div>
@@ -1030,17 +1031,17 @@ export function RecipesPage() {
                         {isBookmarked ? (
                           <BookmarkCheck className="w-4 h-4 text-green-500 fill-green-500" />
                         ) : (
-                          <Bookmark className="w-4 h-4 text-white" />
+                          <Bookmark className="w-4 h-4 text-black" />
                         )}
                       </button>
                     </div>
 
                     {/* Recipe Info */}
                     <div className="p-3">
-                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">
+                      <h3 className="text-sm font-semibold text-black line-clamp-2 mb-1">
                         {recipe.title}
                       </h3>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-black">
                         {recipe.calories} Cal
                       </p>
                     </div>

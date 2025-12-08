@@ -15,7 +15,6 @@ export function Step1NameInput({
   onMobileChange,
 }: Step1NameInputProps) {
   const handleMobileChange = (value: string) => {
-    // Keep only digits to ensure a clean mobile number input
     const numericValue = value.replace(/\D/g, "")
     onMobileChange(numericValue)
   }

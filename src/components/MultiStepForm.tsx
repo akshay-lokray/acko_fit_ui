@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUserProfileStore } from "@/store/userProfileStore";
 import AvatarScene from "./AvatarScene";
@@ -22,12 +22,14 @@ export function MultiStepForm() {
   const location = useLocation();
   const navigate = useNavigate();
   const initialGender = location.state?.gender || "female"; // Default fallback
-  const { step, formData, nextStep, prevStep, updateFormData } = useUserProfileStore();
+  const { step, setStep, formData, nextStep, prevStep, updateFormData } = useUserProfileStore();
+  const [fetchingUser, setFetchingUser] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const submitUserData = async () => {
     const payload = {
-      userId: formData.mobile, // use mobile as userId
       ...formData,
+      userId: formData.mobile,
     };
 
     try {
@@ -54,7 +56,15 @@ export function MultiStepForm() {
     }
   }, [initialGender, formData.gender, updateFormData]);
 
+  useEffect(() => {
+    setStep(1);
+  }, [setStep]);
+
   const handleNext = async () => {
+    if (step === 1) {
+      const found = await handleFetchUser();
+      if (found) return;
+    }
     if (step < TOTAL_STEPS) {
       nextStep();
     } else {
@@ -132,6 +142,36 @@ export function MultiStepForm() {
     }
   };
 
+  const handleFetchUser = async (): Promise<boolean> => {
+    const mobile = formData.mobile || "";
+    if (!/^\d{10}$/.test(mobile)) {
+      setFetchError("Enter a valid 10-digit mobile number first.");
+      return false;
+    }
+    setFetchError(null);
+    setFetchingUser(true);
+    try {
+      const res = await fetch(`/api/users/${encodeURIComponent(mobile)}`);
+      if (res.ok) {
+        const data = await res.json();
+        updateFormData(data);
+        navigate("/home");
+        return true;
+      }
+      if (res.status === 404) {
+        setFetchError("No profile found. Please continue with the steps.");
+      } else {
+        throw new Error("Unexpected status");
+      }
+    } catch (error) {
+      console.error("Failed to load user", error);
+      setFetchError("Unable to fetch your profile right now.");
+    } finally {
+      setFetchingUser(false);
+    }
+    return false;
+  };
+
   return (
     <div className="min-h-screen bg-white p-4 font-sans pb-24">
       {/* Avatar Section - Fixed at bottom right */}
@@ -153,14 +193,17 @@ export function MultiStepForm() {
           </div>
 
           {/* Step 1: Name Input */}
-          {step === 1 && (
-            <Step1NameInput
-              name={formData.name}
-              mobile={formData.mobile}
-              onNameChange={(name) => updateFormData({ name })}
-              onMobileChange={(mobile) => updateFormData({ mobile })}
-            />
-          )}
+            {step === 1 && (
+              <Step1NameInput
+                name={formData.name}
+                mobile={formData.mobile}
+                onNameChange={(name) => updateFormData({ name })}
+                onMobileChange={(mobile) => updateFormData({ mobile })}
+              />
+            )}
+            {step === 1 && fetchError && (
+              <p className="text-center text-xs text-destructive">{fetchError}</p>
+            )}
 
           {/* Step 2: Options Selection */}
           {step === 2 && (
@@ -293,7 +336,7 @@ export function MultiStepForm() {
             )}
             <Button
               onClick={handleNext}
-              disabled={!canProceed()}
+              disabled={!canProceed() || (step === 1 && fetchingUser)}
               className={`h-12 px-8 ${step === 9 ? 'flex-1' : 'flex-1'}`}
               size="lg"
             >
