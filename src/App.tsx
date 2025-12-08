@@ -1,23 +1,23 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import AvatarPage from './pages/AvatarPage';
-import { MultiStepForm } from '@/components/MultiStepForm'
-import './App.css';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import AvatarPage from "./pages/AvatarPage";
+import { SetupPage } from "./pages/SetupPage";
+import "./App.css";
 
-import { useState } from 'react';
+import { useState } from "react";
 
-import { CoachSelectionPage } from './pages/CoachSelectionPage';
-import { CoachIntroPage } from './pages/CoachIntroPage';
-import { PremiumPlanPage } from './pages/PremiumPlanPage';
-import { HomePage } from './pages/HomePage';
-import { RecipesPage } from './pages/RecipesPage';
-import { WorkoutPlansPage } from './pages/WorkoutPlansPage';
-import { PhotoTrackingPage } from './pages/PhotoTrackingPage';
-import { HabitTrackerPage } from './pages/HabitTrackerPage';
-import { UserLockerPage } from './pages/UserLockerPage';
-import { DevicesPage } from './pages/DevicesPage';
-import { RewardsPage } from './pages/RewardsPage';
-import { RankingsPage } from './pages/RankingsPage';
-import { LogLunchPage } from './pages/LogLunchPage';
+import { CoachSelectionPage } from "./pages/CoachSelectionPage";
+import { CoachIntroPage } from "./pages/CoachIntroPage";
+import { PremiumPlanPage } from "./pages/PremiumPlanPage";
+import { HomePage } from "./pages/HomePage";
+import { RecipesPage } from "./pages/RecipesPage";
+import { WorkoutPlansPage } from "./pages/WorkoutPlansPage";
+import { PhotoTrackingPage } from "./pages/PhotoTrackingPage";
+import { HabitTrackerPage } from "./pages/HabitTrackerPage";
+import { UserLockerPage } from "./pages/UserLockerPage";
+import { DevicesPage } from "./pages/DevicesPage";
+import { RewardsPage } from "./pages/RewardsPage";
+import { RankingsPage } from "./pages/RankingsPage";
+import { LogLunchPage } from "./pages/LogLunchPage";
 
 function App() {
   const [showIntro, setShowIntro] = useState(true);
@@ -49,7 +49,7 @@ function App() {
       <Routes>
         <Route path="/" element={<CoachSelectionPage />} />
         <Route path="/coach-intro" element={<CoachIntroPage />} />
-        <Route path="/setup" element={<MultiStepForm />} />
+        <Route path="/setup" element={<SetupPage />} />
         <Route path="/premium" element={<PremiumPlanPage />} />
         <Route path="/home" element={<HomePage />} />
         <Route path="/recipes" element={<RecipesPage />} />
