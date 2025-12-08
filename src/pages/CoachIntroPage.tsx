@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import AvatarScene from "@/components/AvatarScene";
 import { Button } from "@/components/ui/button";
@@ -9,20 +9,9 @@ export function CoachIntroPage() {
     const location = useLocation();
     const navigate = useNavigate();
     const { gender, coachName } = location.state || { gender: "female", coachName: "Disha" };
-    const [showButton, setShowButton] = useState(false);
-    const [isButtonVisible, setIsButtonVisible] = useState(false);
+    const [showButton] = useState(true);
+    const [isButtonVisible] = useState(true);
     const [isClicked, setIsClicked] = useState(false);
-
-    useEffect(() => {
-        // Start showing the button after delay
-        const showTimer = setTimeout(() => setShowButton(true), 3000);
-        // Make it fully visible and clickable after fade-in completes
-        const visibleTimer = setTimeout(() => setIsButtonVisible(true), 3500); // 500ms fade-in
-        return () => {
-            clearTimeout(showTimer);
-            clearTimeout(visibleTimer);
-        };
-    }, []);
 
     const introText = `Hi! I'm ${coachName}. I'm here to push you to your limits and help you achieve your goals. Let's get started!`;
 
