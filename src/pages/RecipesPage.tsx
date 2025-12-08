@@ -746,17 +746,6 @@ function RecipeDetailView({
       </div>
 
       {/* Add to Diary Button */}
-      <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 p-4 z-10">
-        <Button
-          className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg"
-          onClick={() => {
-            // TODO: Implement add to diary functionality
-            console.log("Add to diary:", recipe.title);
-          }}
-        >
-          ADD TO DIARY
-        </Button>
-      </div>
     </div>
   );
 }

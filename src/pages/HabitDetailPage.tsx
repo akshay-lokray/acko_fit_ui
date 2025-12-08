@@ -21,6 +21,7 @@ export function HabitDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [hover, setHover] = useState<{ date: string; value: number; x: number; y: number } | null>(null);
   const [logValue, setLogValue] = useState<string>("");
+  const [logNote, setLogNote] = useState<string>("");
   const [logLoading, setLogLoading] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
 
@@ -89,6 +90,13 @@ export function HabitDetailPage() {
         userId,
         habit,
         value: Number(logValue),
+        ...(logNote.trim()
+          ? {
+              meta: {
+                quickNote: logNote.trim(),
+              },
+            }
+          : {}),
       };
       await fetch("/api/habits", {
         method: "POST",
@@ -96,6 +104,7 @@ export function HabitDetailPage() {
         body: JSON.stringify(payload),
       });
       setLogValue("");
+      setLogNote("");
       // refresh series
       const res = await fetch(
         `/api/habits/last30?userId=${encodeURIComponent(userId)}&habit=${encodeURIComponent(habit)}`
@@ -134,36 +143,12 @@ export function HabitDetailPage() {
             <p className="text-sm text-gray-500">No data for the last 30 days.</p>
           )}
 
-          {/* Log habit form */}
-          <div className="flex flex-col gap-2 md:flex-row md:items-center">
-            <div className="flex-1">
-              <Input
-                type="number"
-                placeholder={`Enter ${habit} value`}
-                value={logValue}
-                onChange={(e) => setLogValue(e.target.value)}
-              />
-            </div>
-            <Button className="md:w-auto w-full" onClick={handleLogHabit} disabled={logLoading}>
-              {logLoading ? "Saving..." : "Log value"}
-            </Button>
-          </div>
-          {logError && <p className="text-xs text-red-500">{logError}</p>}
-
           {!loading && !error && dataPoints.length > 0 && (
             <div className="space-y-4 relative">
-              <div className="grid grid-cols-3 gap-2 text-sm">
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
-                  <p className="text-xs text-emerald-700 font-semibold">Latest</p>
-                  <p className="text-lg font-bold text-emerald-800">{dataPoints[dataPoints.length - 1][1]}</p>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                 <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3">
                   <p className="text-xs text-amber-700 font-semibold">Average (30d)</p>
                   <p className="text-lg font-bold text-amber-800">{avgValue}</p>
-                </div>
-                <div className="rounded-xl border border-purple-100 bg-purple-50/50 p-3">
-                  <p className="text-xs text-purple-700 font-semibold">Max (30d)</p>
-                  <p className="text-lg font-bold text-purple-800">{maxValue}</p>
                 </div>
               </div>
 
@@ -251,14 +236,44 @@ export function HabitDetailPage() {
                 )}
               </div>
 
-              <div className="text-sm text-gray-600">
-                <p>
-                  Latest: <span className="font-semibold">{dataPoints[dataPoints.length - 1][1]}</span>
-                </p>
-                <p>
-                  Max (30d): <span className="font-semibold">{maxValue}</span>
-                </p>
+              {/* Log habit form (below graph, richer UX) */}
+              <div className="space-y-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-gray-900">
+                    Enter {habit ? habit.toLowerCase() : "habit"} value
+                  </p>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="e.g., 650"
+                    value={logValue}
+                    onChange={(e) => setLogValue(e.target.value)}
+                    className="h-11 text-base"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-gray-900">Add a quick note</p>
+                  <textarea
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                    rows={3}
+                    placeholder="e.g., evening session, post-run"
+                    value={logNote}
+                    onChange={(e) => setLogNote(e.target.value)}
+                  />
+                </div>
+
+                {logError && <p className="text-xs text-red-500">{logError}</p>}
+
+                <Button
+                  className="w-full h-11 bg-slate-900 hover:bg-slate-800"
+                  onClick={handleLogHabit}
+                  disabled={logLoading}
+                >
+                  {logLoading ? "Saving..." : "Save log"}
+                </Button>
               </div>
+
             </div>
           )}
         </Card>
