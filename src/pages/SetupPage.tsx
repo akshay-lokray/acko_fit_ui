@@ -57,26 +57,27 @@ export function SetupPage() {
   const gender = location.state?.gender || "female";
   const coachName = gender === "male" ? "Atlas" : "Aria";
   const isMale = gender === "male";
-  const avatar = isMale ? "atlas" : "aria";
 
   // State
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      sender: "coach",
-      text: `Hi! I'm ${coachName}. Let's get started with your setup. I'll ask you a few questions.`,
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
+  const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
+  const [selectionConfig, setSelectionConfig] = useState<{
+    possibleValues: string[];
+    multiSelect: boolean;
+    keyName: string;
+  } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const contextRef = useRef<unknown[]>([]); // Store context from server responses
 
   // Socket and recognition refs
   const socketRef = useRef<Socket | null>(null);
   const SOCKET_URL = "http://192.168.233.159:5000";
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const recognitionResultRef = useRef<string>("");
+  const interimTranscriptRef = useRef<string>(""); // Store interim transcripts
   const maxListeningTimeoutRef = useRef<number | null>(null);
   const silenceTimeoutRef = useRef<number | null>(null);
   const lastSpeechTimeRef = useRef<number>(0);
@@ -249,18 +250,12 @@ export function SetupPage() {
     [isMale]
   );
 
-  // Load voices when available and speak initial message
+  // Load voices when available
   useEffect(() => {
-    const initialMessage = `Hi! I'm ${coachName}. Let's get started with your setup. I'll ask you a few questions.`;
-
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
       if (voices.length > 0) {
         console.log("🔊 Available voices loaded:", voices.length);
-        // Speak the initial welcome message once voices are loaded
-        setTimeout(() => {
-          speakText(initialMessage);
-        }, 500);
       }
     };
 
@@ -275,7 +270,132 @@ export function SetupPage() {
         window.speechSynthesis.cancel();
       }
     };
-  }, [speakText, coachName]);
+  }, []);
+
+  // Function to parse context and find sections with possible_values
+  const checkForSelectionOptions = useCallback(() => {
+    const context = contextRef.current;
+    if (!Array.isArray(context)) return;
+
+    // Find the first pending section with possible_values
+    for (const section of context) {
+      if (
+        typeof section === "object" &&
+        section !== null &&
+        "status" in section &&
+        (section as { status?: string }).status === "pending" &&
+        "keys" in section
+      ) {
+        const keys = (section as { keys?: Record<string, unknown> }).keys;
+        if (keys && typeof keys === "object") {
+          // Look for keys with possible_values
+          for (const [keyName, keyData] of Object.entries(keys)) {
+            if (
+              keyData &&
+              typeof keyData === "object" &&
+              "possible_values" in keyData &&
+              Array.isArray(
+                (keyData as { possible_values?: unknown[] }).possible_values
+              ) &&
+              (keyData as { possible_values?: unknown[] }).possible_values!
+                .length > 0
+            ) {
+              const keyDataTyped = keyData as {
+                possible_values: string[];
+                multi_select?: boolean;
+              };
+              setSelectionConfig({
+                possibleValues: keyDataTyped.possible_values,
+                multiSelect: keyDataTyped.multi_select === true,
+                keyName: keyName,
+              });
+              setSelectedOptions([]);
+              console.log("📋 Found selection options:", {
+                keyName,
+                multiSelect: keyDataTyped.multi_select,
+                options: keyDataTyped.possible_values,
+              });
+              return;
+            }
+          }
+        }
+      }
+    }
+    // No selection options found, clear the config
+    setSelectionConfig(null);
+    setSelectedOptions([]);
+  }, []);
+
+  // Function to clean message text by removing options list when selection UI is available
+  const cleanMessageText = useCallback(
+    (text: string, possibleValues?: string[]): string => {
+      const optionsToRemove =
+        possibleValues || selectionConfig?.possibleValues || [];
+
+      if (!optionsToRemove.length) {
+        return text;
+      }
+
+      // Remove the options list from the text
+      // Look for patterns like "Here are some options" or "Feel free to select"
+      let cleanedText = text;
+
+      // Remove text after common phrases that introduce options
+      const optionIntroPatterns = [
+        /Here are some options.*$/i,
+        /Here are the options.*$/i,
+        /Here are.*options.*$/i,
+        /Feel free to select.*$/i,
+        /You can choose.*$/i,
+        /Select.*from.*$/i,
+        /Options.*$/i,
+      ];
+
+      for (const pattern of optionIntroPatterns) {
+        cleanedText = cleanedText.replace(pattern, "").trim();
+      }
+
+      // Also remove any quoted options that match our possible values
+      optionsToRemove.forEach((option) => {
+        // Remove quoted option (e.g., "'Lose weight'")
+        const quotedOption = `'${option}'`;
+        const doubleQuotedOption = `"${option}"`;
+        cleanedText = cleanedText
+          .replace(
+            new RegExp(
+              quotedOption.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+              "g"
+            ),
+            ""
+          )
+          .replace(
+            new RegExp(
+              doubleQuotedOption.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+              "g"
+            ),
+            ""
+          )
+          .replace(
+            new RegExp(option.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"),
+            ""
+          );
+      });
+
+      // Clean up extra commas, periods, and whitespace
+      cleanedText = cleanedText
+        .replace(/,\s*,/g, ",") // Remove double commas
+        .replace(/,\s*\./g, ".") // Remove comma before period
+        .replace(/\s+/g, " ") // Multiple spaces to single space
+        .replace(/\.\s*\./g, ".") // Double periods
+        .trim();
+
+      // Remove trailing commas and periods
+      cleanedText = cleanedText.replace(/[,.]+$/, "").trim();
+
+      return cleanedText || text; // Return original if cleaned text is empty
+    },
+    [selectionConfig]
+  );
 
   // Socket connection
   useEffect(() => {
@@ -304,9 +424,274 @@ export function SetupPage() {
           },
         };
         console.log("📤 Sending start message:", startPayload);
-        socket.emit("process_audio", startPayload);
+        socket.emit("process_journey", startPayload);
       } catch (e) {
         console.warn("Socket.IO start message send failed", e);
+      }
+    });
+
+    // Listen for 'journey_response' event from server
+    // Format: ["journey_response", "{\"data\": {\"text\": \"...\", \"context\": [...]}}"]
+    // or just the JSON string directly
+    socket.on("journey_response", (...args: unknown[]) => {
+      console.log("📥 Received journey_response event:", args);
+
+      try {
+        // Handle different formats: array or direct JSON string
+        let jsonString: string = "";
+
+        if (Array.isArray(args) && args.length > 0) {
+          // If it's an array, the JSON string is typically the second element or the first if it's a string
+          if (args.length >= 2 && typeof args[1] === "string") {
+            jsonString = args[1];
+          } else if (typeof args[0] === "string") {
+            jsonString = args[0];
+          }
+        } else if (typeof args[0] === "string") {
+          jsonString = args[0];
+        }
+
+        // Parse the JSON string
+        let parsedData: unknown;
+        if (jsonString) {
+          // Check if the string looks like JSON before parsing
+          const trimmedJson = jsonString.trim();
+          if (
+            (trimmedJson.startsWith("{") && trimmedJson.endsWith("}")) ||
+            (trimmedJson.startsWith("[") && trimmedJson.endsWith("]"))
+          ) {
+            try {
+              parsedData = JSON.parse(jsonString);
+            } catch (parseError) {
+              console.error(
+                "❌ Failed to parse JSON string:",
+                parseError,
+                "String:",
+                jsonString.substring(0, 100)
+              );
+              // If it's not valid JSON, treat it as plain text
+              parsedData = {
+                data: {
+                  text: jsonString,
+                  context: [],
+                },
+              };
+            }
+          } else {
+            // Not JSON, treat as plain text
+            console.warn(
+              "⚠️ Received non-JSON string, treating as plain text:",
+              jsonString.substring(0, 100)
+            );
+            parsedData = {
+              data: {
+                text: jsonString,
+                context: [],
+              },
+            };
+          }
+        } else if (args[0] && typeof args[0] === "object") {
+          // If it's already an object, use it directly
+          parsedData = args[0];
+        } else {
+          console.warn(
+            "⚠️ Could not extract JSON string from journey_response:",
+            args
+          );
+          return;
+        }
+
+        console.log("📦 Parsed journey response:", parsedData);
+
+        let journeyText = "";
+        let journeyContext: unknown[] = [];
+
+        // Extract text and context from the parsed data
+        // Handle both formats: {data: {text: "...", context: [...]}} and {text: "...", context: [...]}
+        if (
+          parsedData &&
+          typeof parsedData === "object" &&
+          parsedData !== null
+        ) {
+          const data = parsedData as {
+            data?: { text?: string; context?: unknown[] };
+            text?: string;
+            context?: unknown[];
+          };
+
+          // Check nested format first: {data: {text: "...", context: [...]}}
+          if (
+            data.data &&
+            typeof data.data === "object" &&
+            data.data !== null
+          ) {
+            journeyText = String(data.data.text || "");
+            journeyContext = Array.isArray(data.data.context)
+              ? data.data.context
+              : [];
+          } else if (data.text !== undefined || data.context !== undefined) {
+            // Handle direct format: {text: "...", context: [...]}
+            journeyText = String(data.text || "");
+            journeyContext = Array.isArray(data.context) ? data.context : [];
+          }
+        }
+
+        // Ensure we have a valid string
+        if (!journeyText || journeyText === "[object Object]") {
+          console.warn(
+            "⚠️ Invalid journey text, attempting to extract from structure:",
+            parsedData
+          );
+          if (
+            parsedData &&
+            typeof parsedData === "object" &&
+            parsedData !== null
+          ) {
+            const data = parsedData as { data?: { text?: string } };
+            if (data.data?.text) {
+              journeyText = String(data.data.text);
+            } else {
+              journeyText =
+                "Received a response, but couldn't extract the text.";
+            }
+          }
+        }
+
+        // Store the context for future messages
+        if (
+          journeyContext &&
+          Array.isArray(journeyContext) &&
+          journeyContext.length > 0
+        ) {
+          contextRef.current = journeyContext;
+          console.log(
+            "📋 Stored context:",
+            JSON.stringify(contextRef.current, null, 2)
+          );
+          // Check for selection options after storing context
+          checkForSelectionOptions();
+        }
+
+        // Extract possible values synchronously from context for message cleaning
+        let possibleValuesForCleaning: string[] = [];
+        if (Array.isArray(journeyContext)) {
+          for (const section of journeyContext) {
+            if (
+              typeof section === "object" &&
+              section !== null &&
+              "status" in section &&
+              (section as { status?: string }).status === "pending" &&
+              "keys" in section
+            ) {
+              const keys = (section as { keys?: Record<string, unknown> }).keys;
+              if (keys && typeof keys === "object") {
+                for (const keyData of Object.values(keys)) {
+                  if (
+                    keyData &&
+                    typeof keyData === "object" &&
+                    "possible_values" in keyData &&
+                    Array.isArray(
+                      (keyData as { possible_values?: unknown[] })
+                        .possible_values
+                    )
+                  ) {
+                    possibleValuesForCleaning = (
+                      keyData as { possible_values: string[] }
+                    ).possible_values;
+                    break;
+                  }
+                }
+                if (possibleValuesForCleaning.length > 0) break;
+              }
+            }
+          }
+        }
+
+        // Check if there's a pending section in the stored context
+        const hasPendingSection =
+          Array.isArray(contextRef.current) &&
+          contextRef.current.some(
+            (section: unknown) =>
+              typeof section === "object" &&
+              section !== null &&
+              "status" in section &&
+              (section as { status?: string }).status === "pending"
+          );
+
+        // Display the message if available and valid
+        if (
+          journeyText &&
+          journeyText.trim() &&
+          journeyText !== "[object Object]"
+        ) {
+          // Clean the message text to remove options list if selection UI is available
+          const cleanedText = cleanMessageText(
+            journeyText.trim(),
+            possibleValuesForCleaning
+          );
+          const journeyMsg: Message = {
+            id: Date.now().toString(),
+            sender: "coach",
+            text: cleanedText,
+          };
+          setMessages((prev) => [...prev, journeyMsg]);
+          setShowTextInput(false);
+
+          // Speak the cleaned response using text-to-speech
+          speakText(cleanedText);
+
+          // After displaying the message, check if there's a pending section
+          // If yes, automatically continue to the next section
+          if (hasPendingSection) {
+            console.log(
+              "🔄 Message displayed but pending section found, continuing to next section..."
+            );
+            const socket = socketRef.current;
+            if (socket && socket.connected) {
+              setTimeout(() => {
+                const continuePayload = {
+                  data: {
+                    text: "continue",
+                    context: contextRef.current,
+                  },
+                };
+                console.log(
+                  "📤 Auto-continuing to next section:",
+                  continuePayload
+                );
+                socket.emit("process_journey", continuePayload);
+              }, 1000); // Delay to let the user hear the current message
+            }
+          }
+        } else if (hasPendingSection) {
+          // If there's a pending section but no text response, automatically continue
+          console.log(
+            "🔄 No text response but pending section found, continuing..."
+          );
+          const socket = socketRef.current;
+          if (socket && socket.connected) {
+            setTimeout(() => {
+              const continuePayload = {
+                data: {
+                  text: "continue",
+                  context: contextRef.current,
+                },
+              };
+              console.log(
+                "📤 Auto-continuing to next section:",
+                continuePayload
+              );
+              socket.emit("process_journey", continuePayload);
+            }, 500); // Small delay to ensure context is stored
+          }
+        } else {
+          console.warn(
+            "⚠️ Skipping journey_response message display - invalid or empty text:",
+            journeyText
+          );
+        }
+      } catch (error) {
+        console.error("Error processing journey_response:", error);
       }
     });
 
@@ -340,24 +725,142 @@ export function SetupPage() {
         return;
       }
 
-      // Handle text response - format: {'text': response_text}
+      // Handle response with data.text and data.context
       let responseText = "";
+      let responseContext: unknown[] = [];
+
       try {
         if (typeof data === "string") {
-          try {
-            const parsed = JSON.parse(data);
-            responseText = parsed.text || String(data);
-          } catch {
-            responseText = data;
+          // Check if the string looks like JSON before parsing
+          const trimmedData = data.trim();
+          if (
+            (trimmedData.startsWith("{") && trimmedData.endsWith("}")) ||
+            (trimmedData.startsWith("[") && trimmedData.endsWith("]"))
+          ) {
+            try {
+              const parsed = JSON.parse(data);
+              // Check if it's the new format with data.data
+              if (parsed.data && typeof parsed.data === "object") {
+                responseText = String(parsed.data.text || "");
+                responseContext = Array.isArray(parsed.data.context)
+                  ? parsed.data.context
+                  : [];
+              } else if (parsed.text) {
+                responseText = String(parsed.text);
+                responseContext = Array.isArray(parsed.context)
+                  ? parsed.context
+                  : [];
+              } else {
+                responseText = String(data);
+              }
+            } catch (parseError) {
+              console.error(
+                "❌ Failed to parse JSON string in response event:",
+                parseError,
+                "String:",
+                data.substring(0, 100)
+              );
+              // If it's not valid JSON, treat it as plain text
+              responseText = String(data);
+            }
+          } else {
+            // Not JSON, treat as plain text
+            responseText = String(data);
           }
         } else if (typeof data === "object" && data !== null) {
-          responseText = data.text || String(data);
+          // Check if it's the new format: { data: { text: "...", context: [...] } }
+          if (
+            data.data &&
+            typeof data.data === "object" &&
+            data.data !== null
+          ) {
+            responseText = String(data.data.text || "");
+            responseContext = Array.isArray(data.data.context)
+              ? data.data.context
+              : [];
+          } else if (data.text !== undefined) {
+            // Old format: { text: "..." }
+            responseText = String(data.text);
+            responseContext = Array.isArray(data.context) ? data.context : [];
+          } else {
+            // Fallback: try to stringify the object
+            responseText = JSON.stringify(data);
+          }
         } else {
           responseText = String(data);
         }
       } catch (error) {
         console.error("Error parsing response:", error);
-        responseText = String(data);
+        responseText =
+          typeof data === "object" ? JSON.stringify(data) : String(data);
+      }
+
+      // Ensure we have a valid string (not empty and not "[object Object]")
+      if (!responseText || responseText === "[object Object]") {
+        console.warn(
+          "⚠️ Invalid response text, attempting to extract from structure:",
+          data
+        );
+        // Try one more time to extract text
+        if (typeof data === "object" && data !== null) {
+          if (data.data?.text) {
+            responseText = String(data.data.text);
+          } else if (data.text) {
+            responseText = String(data.text);
+          } else {
+            responseText =
+              "Received a response, but couldn't extract the text.";
+          }
+        }
+      }
+
+      // Store the context for future messages
+      if (
+        responseContext &&
+        Array.isArray(responseContext) &&
+        responseContext.length > 0
+      ) {
+        contextRef.current = responseContext;
+        console.log(
+          "📋 Stored context:",
+          JSON.stringify(contextRef.current, null, 2)
+        );
+        // Check for selection options after storing context
+        checkForSelectionOptions();
+      }
+
+      // Extract possible values synchronously from context for message cleaning
+      let possibleValuesForCleaning: string[] = [];
+      if (Array.isArray(responseContext)) {
+        for (const section of responseContext) {
+          if (
+            typeof section === "object" &&
+            section !== null &&
+            "status" in section &&
+            (section as { status?: string }).status === "pending" &&
+            "keys" in section
+          ) {
+            const keys = (section as { keys?: Record<string, unknown> }).keys;
+            if (keys && typeof keys === "object") {
+              for (const keyData of Object.values(keys)) {
+                if (
+                  keyData &&
+                  typeof keyData === "object" &&
+                  "possible_values" in keyData &&
+                  Array.isArray(
+                    (keyData as { possible_values?: unknown[] }).possible_values
+                  )
+                ) {
+                  possibleValuesForCleaning = (
+                    keyData as { possible_values: string[] }
+                  ).possible_values;
+                  break;
+                }
+              }
+              if (possibleValuesForCleaning.length > 0) break;
+            }
+          }
+        }
       }
 
       console.log("📝 Response text:", responseText);
@@ -386,17 +889,214 @@ export function SetupPage() {
         silenceTimeoutRef.current = null;
       }
 
-      // Add message to chat
-      const coachMsg: Message = {
-        id: Date.now().toString(),
-        sender: "coach",
-        text: responseText,
-      };
-      setMessages((prev) => [...prev, coachMsg]);
-      setShowTextInput(false);
+      // Only add message if we have valid text
+      if (
+        responseText &&
+        responseText.trim() &&
+        responseText !== "[object Object]"
+      ) {
+        // Clean the message text to remove options list if selection UI is available
+        const cleanedText = cleanMessageText(
+          responseText.trim(),
+          possibleValuesForCleaning
+        );
+        const coachMsg: Message = {
+          id: Date.now().toString(),
+          sender: "coach",
+          text: cleanedText,
+        };
+        setMessages((prev) => [...prev, coachMsg]);
+        setShowTextInput(false);
 
-      // Speak the response using text-to-speech
-      speakText(responseText);
+        // Speak the cleaned response using text-to-speech
+        speakText(cleanedText);
+      } else {
+        console.warn(
+          "⚠️ Skipping message display - invalid or empty text:",
+          responseText
+        );
+      }
+    });
+
+    // Listen for 'process_journey' event from server
+    socket.on("process_journey", (data) => {
+      console.log("📥 Received process_journey event:", data);
+
+      // Handle the journey data
+      try {
+        // Log the journey data for debugging
+        console.log("🎯 Journey data:", JSON.stringify(data, null, 2));
+
+        let journeyText = "";
+        let journeyContext: unknown[] = [];
+
+        // Parse the response format: { data: { text: "...", context: [...] } }
+        if (data && typeof data === "object" && data !== null) {
+          if (
+            data.data &&
+            typeof data.data === "object" &&
+            data.data !== null
+          ) {
+            journeyText = String(data.data.text || "");
+            journeyContext = Array.isArray(data.data.context)
+              ? data.data.context
+              : [];
+          } else if (data.text !== undefined) {
+            journeyText = String(data.text);
+            journeyContext = Array.isArray(data.context) ? data.context : [];
+          }
+        }
+
+        // Ensure we have a valid string
+        if (!journeyText || journeyText === "[object Object]") {
+          console.warn(
+            "⚠️ Invalid journey text, attempting to extract from structure:",
+            data
+          );
+          if (data && typeof data === "object" && data !== null) {
+            if (data.data?.text) {
+              journeyText = String(data.data.text);
+            } else if (data.text) {
+              journeyText = String(data.text);
+            } else {
+              journeyText =
+                "Received a response, but couldn't extract the text.";
+            }
+          }
+        }
+
+        // Store the context for future messages
+        if (
+          journeyContext &&
+          Array.isArray(journeyContext) &&
+          journeyContext.length > 0
+        ) {
+          contextRef.current = journeyContext;
+          console.log(
+            "📋 Stored context:",
+            JSON.stringify(contextRef.current, null, 2)
+          );
+          // Check for selection options after storing context
+          checkForSelectionOptions();
+        }
+
+        // Extract possible values synchronously from context for message cleaning
+        let possibleValuesForCleaning: string[] = [];
+        if (Array.isArray(journeyContext)) {
+          for (const section of journeyContext) {
+            if (
+              typeof section === "object" &&
+              section !== null &&
+              "status" in section &&
+              (section as { status?: string }).status === "pending" &&
+              "keys" in section
+            ) {
+              const keys = (section as { keys?: Record<string, unknown> }).keys;
+              if (keys && typeof keys === "object") {
+                for (const keyData of Object.values(keys)) {
+                  if (
+                    keyData &&
+                    typeof keyData === "object" &&
+                    "possible_values" in keyData &&
+                    Array.isArray(
+                      (keyData as { possible_values?: unknown[] })
+                        .possible_values
+                    )
+                  ) {
+                    possibleValuesForCleaning = (
+                      keyData as { possible_values: string[] }
+                    ).possible_values;
+                    break;
+                  }
+                }
+                if (possibleValuesForCleaning.length > 0) break;
+              }
+            }
+          }
+        }
+
+        // Check if there's a pending section in the stored context
+        const hasPendingSection =
+          Array.isArray(contextRef.current) &&
+          contextRef.current.some(
+            (section: unknown) =>
+              typeof section === "object" &&
+              section !== null &&
+              "status" in section &&
+              (section as { status?: string }).status === "pending"
+          );
+
+        // Display the message if available and valid
+        if (
+          journeyText &&
+          journeyText.trim() &&
+          journeyText !== "[object Object]"
+        ) {
+          // Clean the message text to remove options list if selection UI is available
+          const cleanedText = cleanMessageText(
+            journeyText.trim(),
+            possibleValuesForCleaning
+          );
+          const journeyMsg: Message = {
+            id: Date.now().toString(),
+            sender: "coach",
+            text: cleanedText,
+          };
+          setMessages((prev) => [...prev, journeyMsg]);
+          speakText(cleanedText);
+
+          // After displaying the message, check if there's a pending section
+          if (hasPendingSection) {
+            console.log(
+              "🔄 Message displayed but pending section found, continuing to next section..."
+            );
+            const socket = socketRef.current;
+            if (socket && socket.connected) {
+              setTimeout(() => {
+                const continuePayload = {
+                  data: {
+                    text: "continue",
+                    context: contextRef.current,
+                  },
+                };
+                console.log(
+                  "📤 Auto-continuing to next section:",
+                  continuePayload
+                );
+                socket.emit("process_journey", continuePayload);
+              }, 1000); // Delay to let the user hear the current message
+            }
+          }
+        } else if (hasPendingSection) {
+          // If there's a pending section but no text response, automatically continue
+          console.log(
+            "🔄 No text response but pending section found, continuing..."
+          );
+          const socket = socketRef.current;
+          if (socket && socket.connected) {
+            setTimeout(() => {
+              const continuePayload = {
+                data: {
+                  text: "continue",
+                  context: contextRef.current,
+                },
+              };
+              console.log(
+                "📤 Auto-continuing to next section:",
+                continuePayload
+              );
+              socket.emit("process_journey", continuePayload);
+            }, 500); // Small delay to ensure context is stored
+          }
+        } else {
+          console.warn(
+            "⚠️ Skipping journey message display - invalid or empty text:",
+            journeyText
+          );
+        }
+      } catch (error) {
+        console.error("Error processing journey data:", error);
+      }
     });
 
     return () => {
@@ -410,7 +1110,7 @@ export function SetupPage() {
       }
       socketRef.current = null;
     };
-  }, [SOCKET_URL, speakText]);
+  }, [SOCKET_URL, speakText, checkForSelectionOptions, cleanMessageText]);
 
   // Helper function to stop listening and send the result
   const stopListeningAndSend = useCallback(() => {
@@ -446,24 +1146,41 @@ export function SetupPage() {
     }
 
     // Send the transcribed text if available
-    if (recognitionResultRef.current.trim() && socket && socket.connected) {
+    // Use final transcript if available, otherwise fall back to interim transcript
+    const finalText = recognitionResultRef.current.trim();
+    const interimText = interimTranscriptRef.current.trim();
+    const textToSend = finalText || interimText;
+
+    if (textToSend && socket && socket.connected) {
+      // Add user message to chat
+      const userMsg: Message = {
+        id: Date.now().toString(),
+        sender: "user",
+        text: textToSend,
+      };
+      setMessages((prev) => [...prev, userMsg]);
+
       const payload = {
-        event: "process_audio",
         data: {
-          text: recognitionResultRef.current.trim(),
-          user_id: "user123",
-          avatar: avatar,
+          text: textToSend,
+          context: contextRef.current, // Include the stored context
         },
       };
 
       console.log("📤 Sending transcribed text:", payload);
-      socket.emit("process_audio", payload);
+      if (interimText && !finalText) {
+        console.log(
+          "⚠️ Using interim transcript as final transcript was not available"
+        );
+      }
+      socket.emit("process_journey", payload);
       recognitionResultRef.current = "";
+      interimTranscriptRef.current = "";
     }
 
     // Play end sound
     playEndSound();
-  }, [avatar, playEndSound]);
+  }, [playEndSound]);
 
   // Voice input handler
   const handleVoiceInput = useCallback(() => {
@@ -490,6 +1207,15 @@ export function SetupPage() {
     if (isListening) {
       stopListeningAndSend();
       return;
+    }
+
+    // Stop any ongoing speech synthesis when user starts listening (mic takes priority)
+    if (window.speechSynthesis.speaking) {
+      console.log("🔇 Stopping speech synthesis - microphone activated");
+      window.speechSynthesis.cancel();
+      if (speechSynthesisRef.current) {
+        speechSynthesisRef.current = null;
+      }
     }
 
     // Ensure any previous recognition is cleaned up
@@ -558,12 +1284,14 @@ export function SetupPage() {
 
           if (finalTranscript) {
             recognitionResultRef.current += finalTranscript;
+            interimTranscriptRef.current = ""; // Clear interim when we get final
             console.log("🎤 Final transcript:", finalTranscript);
             lastSpeechTimeRef.current = Date.now();
             resetSilenceTimeout();
           }
 
           if (interimTranscript) {
+            interimTranscriptRef.current = interimTranscript; // Store interim transcript
             console.log("🎤 Interim transcript:", interimTranscript);
             lastSpeechTimeRef.current = Date.now();
             resetSilenceTimeout();
@@ -657,6 +1385,7 @@ export function SetupPage() {
         recognition.start();
         setIsListening(true);
         recognitionResultRef.current = "";
+        interimTranscriptRef.current = ""; // Clear interim transcript on start
         lastSpeechTimeRef.current = Date.now();
 
         playStartSound();
@@ -694,16 +1423,14 @@ export function SetupPage() {
 
     if (socket && socket.connected) {
       const payload = {
-        event: "process_audio",
         data: {
           text: textToSend,
-          user_id: "user123",
-          avatar: avatar,
+          context: contextRef.current, // Include the stored context
         },
       };
 
       console.log("📤 Sending chat message:", payload);
-      socket.emit("process_audio", payload);
+      socket.emit("process_journey", payload);
     }
   };
 
@@ -716,6 +1443,64 @@ export function SetupPage() {
         inputRef.current?.focus();
       }, 100);
     }
+  };
+
+  // Check for selection options whenever context changes
+  useEffect(() => {
+    checkForSelectionOptions();
+  }, [checkForSelectionOptions]);
+
+  // Handle option selection
+  const handleOptionToggle = (option: string) => {
+    if (!selectionConfig) return;
+
+    if (selectionConfig.multiSelect) {
+      // Multi-select: toggle the option
+      setSelectedOptions((prev) =>
+        prev.includes(option)
+          ? prev.filter((o) => o !== option)
+          : [...prev, option]
+      );
+    } else {
+      // Single-select: replace the selection
+      setSelectedOptions([option]);
+    }
+  };
+
+  // Handle submit selection
+  const handleSubmitSelection = () => {
+    if (!selectionConfig || selectedOptions.length === 0) return;
+
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    // Format the response based on multi-select
+    const responseText = selectionConfig.multiSelect
+      ? selectedOptions.join(", ")
+      : selectedOptions[0];
+
+    // Add user message to chat
+    const userMsg: Message = {
+      id: Date.now().toString(),
+      sender: "user",
+      text: responseText,
+    };
+    setMessages((prev) => [...prev, userMsg]);
+
+    // Send the selection to the server
+    const payload = {
+      data: {
+        text: responseText,
+        context: contextRef.current,
+      },
+    };
+
+    console.log("📤 Sending selection:", payload);
+    socket.emit("process_journey", payload);
+
+    // Clear selection UI
+    setSelectionConfig(null);
+    setSelectedOptions([]);
   };
 
   return (
@@ -770,6 +1555,65 @@ export function SetupPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Selection Options UI */}
+          {selectionConfig && (
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+              <p className="text-sm font-medium text-gray-700 mb-3">
+                {selectionConfig.multiSelect
+                  ? "Select one or more options:"
+                  : "Select an option:"}
+              </p>
+              <div className="space-y-2 mb-4">
+                {selectionConfig.possibleValues.map((option) => {
+                  const isSelected = selectedOptions.includes(option);
+                  return (
+                    <label
+                      key={option}
+                      className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        isSelected
+                          ? isMale
+                            ? "border-emerald-500 bg-emerald-50"
+                            : "border-purple-500 bg-purple-50"
+                          : "border-gray-200 hover:border-gray-300 bg-white"
+                      }`}
+                    >
+                      <input
+                        type={
+                          selectionConfig.multiSelect ? "checkbox" : "radio"
+                        }
+                        checked={isSelected}
+                        onChange={() => handleOptionToggle(option)}
+                        className={`w-5 h-5 ${
+                          selectionConfig.multiSelect
+                            ? "rounded"
+                            : "rounded-full"
+                        } ${
+                          isMale
+                            ? "text-emerald-600 focus:ring-emerald-500"
+                            : "text-purple-600 focus:ring-purple-500"
+                        } cursor-pointer`}
+                      />
+                      <span
+                        className={`flex-1 text-sm ${
+                          isSelected ? "font-medium" : "font-normal"
+                        } text-gray-800`}
+                      >
+                        {option}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <Button
+                onClick={handleSubmitSelection}
+                disabled={selectedOptions.length === 0}
+                className={`w-full ${buttonBg} disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                Submit
+              </Button>
             </div>
           )}
         </div>
