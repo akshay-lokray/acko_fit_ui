@@ -15,5 +15,7 @@ export interface FormData {
   medicalConditions: string[];
   xp?: number;
   streak?: number;
+  avatarUrl?: string; // ReadyPlayer.me avatar URL
+  avatarName?: string; // Atlas or Aria
 }
 

@@ -10,7 +10,7 @@
   box-shadow: none;
   z-index: 10;
   pointer-events: none;
-}
+  }
 
 .avatar-container-form .avatar-scene-container {
   height: 100%;

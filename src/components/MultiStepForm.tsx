@@ -181,16 +181,16 @@ export function MultiStepForm() {
 
       <div className="max-w-7xl mx-auto">
         <div className="w-full max-w-md mx-auto">
-          {/* Progress dots */}
-          <div className="flex justify-center gap-2 mb-8">
-            {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
-              <div
-                key={s}
+            {/* Progress dots */}
+            <div className="flex justify-center gap-2 mb-8">
+              {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
+                <div
+                  key={s}
                 className={`h-2 w-2 rounded-full transition-colors ${s <= step ? "bg-green-600" : "bg-gray-300"
                   }`}
-              />
-            ))}
-          </div>
+                />
+              ))}
+            </div>
 
           {/* Step 1: Name Input */}
             {step === 1 && (
@@ -201,120 +201,117 @@ export function MultiStepForm() {
                 onMobileChange={(mobile) => updateFormData({ mobile })}
               />
             )}
-            {step === 1 && fetchError && (
-              <p className="text-center text-xs text-destructive">{fetchError}</p>
+
+            {/* Step 2: Options Selection */}
+            {step === 2 && (
+              <Step2OptionsSelection
+                selectedOptions={formData.selectedOptions}
+                onToggleOption={(optionId) => {
+                  const newOptions = formData.selectedOptions.includes(optionId)
+                    ? formData.selectedOptions.filter((id) => id !== optionId)
+                    : [...formData.selectedOptions, optionId];
+                  updateFormData({ selectedOptions: newOptions });
+                }}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
             )}
 
-          {/* Step 2: Options Selection */}
-          {step === 2 && (
-            <Step2OptionsSelection
-              selectedOptions={formData.selectedOptions}
-              onToggleOption={(optionId) => {
-                const newOptions = formData.selectedOptions.includes(optionId)
-                  ? formData.selectedOptions.filter((id) => id !== optionId)
-                  : [...formData.selectedOptions, optionId];
-                updateFormData({ selectedOptions: newOptions });
-              }}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 3: Activity Level */}
+            {step === 3 && (
+              <Step3ActivityLevel
+                activityLevel={formData.activityLevel}
+                onActivityLevelChange={(level) =>
+                  updateFormData({ activityLevel: level })
+                }
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-          {/* Step 3: Activity Level */}
-          {step === 3 && (
-            <Step3ActivityLevel
-              activityLevel={formData.activityLevel}
-              onActivityLevelChange={(level) =>
-                updateFormData({ activityLevel: level })
-              }
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 4: Age Picker */}
+            {step === 4 && (
+              <Step4AgePicker
+                age={formData.age}
+                onAgeChange={(age) => updateFormData({ age })}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-          {/* Step 4: Age Picker */}
-          {step === 4 && (
-            <Step4AgePicker
-              age={formData.age}
-              onAgeChange={(age) => updateFormData({ age })}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 5: Height Picker */}
+            {step === 5 && (
+              <Step5HeightPicker
+                height={formData.height}
+                heightUnit={formData.heightUnit}
+                onHeightChange={(height) => updateFormData({ height })}
+                onUnitChange={(unit) => updateFormData({ heightUnit: unit })}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-          {/* Step 5: Height Picker */}
-          {step === 5 && (
-            <Step5HeightPicker
-              height={formData.height}
-              heightUnit={formData.heightUnit}
-              onHeightChange={(height) => updateFormData({ height })}
-              onUnitChange={(unit) => updateFormData({ heightUnit: unit })}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 6: Current Weight Picker */}
+            {step === 6 && (
+              <Step6WeightPicker
+                currentWeight={formData.currentWeight}
+                weightUnit={formData.weightUnit}
+                onWeightChange={(weight) =>
+                  updateFormData({ currentWeight: weight })
+                }
+                onUnitChange={(unit) => updateFormData({ weightUnit: unit })}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-          {/* Step 6: Current Weight Picker */}
-          {step === 6 && (
-            <Step6WeightPicker
-              currentWeight={formData.currentWeight}
-              weightUnit={formData.weightUnit}
-              onWeightChange={(weight) =>
-                updateFormData({ currentWeight: weight })
-              }
-              onUnitChange={(unit) => updateFormData({ weightUnit: unit })}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 7: Goal Pace */}
+            {step === 7 && (
+              <Step7GoalPace
+                goalPace={formData.goalPace}
+                onGoalPaceChange={(pace) => updateFormData({ goalPace: pace })}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-          {/* Step 7: Goal Pace */}
-          {step === 7 && (
-            <Step7GoalPace
-              goalPace={formData.goalPace}
-              onGoalPaceChange={(pace) => updateFormData({ goalPace: pace })}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 8: Target Weight */}
+            {step === 8 && (
+              <Step8TargetWeight
+                targetWeight={formData.targetWeight}
+                weightUnit={formData.weightUnit}
+                onTargetWeightChange={(weight) =>
+                  updateFormData({ targetWeight: weight })
+                }
+                onUnitChange={(unit) => updateFormData({ weightUnit: unit })}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-          {/* Step 8: Target Weight */}
-          {step === 8 && (
-            <Step8TargetWeight
-              targetWeight={formData.targetWeight}
-              weightUnit={formData.weightUnit}
-              onTargetWeightChange={(weight) =>
-                updateFormData({ targetWeight: weight })
-              }
-              onUnitChange={(unit) => updateFormData({ weightUnit: unit })}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 9: Auto Track */}
+            {step === 9 && (
+              <Step9AutoTrack
+                autoTrackEnabled={formData.autoTrackEnabled}
+                onAutoTrackChange={(enabled) =>
+                  updateFormData({ autoTrackEnabled: enabled })
+                }
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-          {/* Step 9: Auto Track */}
-          {step === 9 && (
-            <Step9AutoTrack
-              autoTrackEnabled={formData.autoTrackEnabled}
-              onAutoTrackChange={(enabled) =>
-                updateFormData({ autoTrackEnabled: enabled })
-              }
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
-
-          {/* Step 10: Medical Conditions */}
-          {step === 10 && (
-            <Step10MedicalConditions
-              medicalConditions={formData.medicalConditions}
-              onMedicalConditionsChange={(conditions) =>
-                updateFormData({ medicalConditions: conditions })
-              }
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 10: Medical Conditions */}
+            {step === 10 && (
+              <Step10MedicalConditions
+                medicalConditions={formData.medicalConditions}
+                onMedicalConditionsChange={(conditions) =>
+                  updateFormData({ medicalConditions: conditions })
+                }
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
         </div>
       </div>
 

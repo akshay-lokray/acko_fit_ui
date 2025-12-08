@@ -1,10 +1,11 @@
 import { useRef, useEffect } from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import { MALE_DHONI_AVATAR_URL } from '@/constants/avatarUrls';
 
 export function MaleAvatarModel(props: any) {
   try {
-    const gltf = useGLTF('/male.glb') as any;
+    const gltf = useGLTF(MALE_DHONI_AVATAR_URL) as any;
     const { nodes, materials } = gltf || {};
     const groupRef = useRef<THREE.Group>(null);
     const lastFullScreenRef = useRef<boolean | undefined>(undefined);
@@ -135,5 +136,5 @@ export function MaleAvatarModel(props: any) {
   }
 }
 
-useGLTF.preload('/male.glb');
+useGLTF.preload(MALE_DHONI_AVATAR_URL);
 
