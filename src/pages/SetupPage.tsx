@@ -1513,7 +1513,7 @@ export function SetupPage() {
       <header className="bg-white border-b border-gray-100 p-4 sticky top-0 z-50 shadow-sm">
         <div className="max-w-2xl mx-auto">
           <h1 className="text-xl font-bold text-gray-900">
-            Setup with {coachName}
+            Setup your profile with {coachName}
           </h1>
           <p className="text-sm text-gray-500">Let's get you started</p>
         </div>
