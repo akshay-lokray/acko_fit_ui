@@ -4,6 +4,9 @@ import { io, Socket } from "socket.io-client";
 import { Send, Zap, Mic, Keyboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import AvatarScene from "@/components/AvatarScene";
+import type { VoiceType } from "@/types/voice";
+import "./SetupPage.css";
 
 // Type definitions for Speech Recognition API
 interface SpeechRecognition extends EventTarget {
@@ -719,7 +722,7 @@ export function SetupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans flex flex-col">
+    <div className="setup-page-root min-h-screen bg-white font-sans flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-gray-100 p-4 sticky top-0 z-50 shadow-sm">
         <div className="max-w-2xl mx-auto">
@@ -731,7 +734,7 @@ export function SetupPage() {
       </header>
 
       {/* Chat Messages */}
-      <main className="flex-1 overflow-y-auto p-4 bg-gray-50/50">
+      <main className="setup-chat-area p-4 bg-gray-50/50">
         <div className="max-w-2xl mx-auto space-y-4">
           {messages.map((msg) => (
             <div
@@ -774,6 +777,19 @@ export function SetupPage() {
           )}
         </div>
       </main>
+
+      <div className="setup-page-avatar-zone">
+        <div className="setup-avatar-panel">
+          <div className="setup-avatar-inner">
+            <AvatarScene
+              textToSpeak={messages[messages.length - 1]?.text || ""}
+              voiceType={gender as VoiceType}
+              isFullScreen={false}
+            />
+          </div>
+        </div>
+      </div>
+      
 
       {/* Input Area */}
       <div className="bg-white border-t border-gray-100 p-4 sticky bottom-0 z-50">

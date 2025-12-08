@@ -174,10 +174,6 @@ export function MultiStepForm() {
 
   return (
     <div className="min-h-screen bg-white p-4 font-sans pb-24 setup-page">
-      {/* Avatar Section - Fixed at bottom right */}
-      <div className="avatar-container-form">
-        <AvatarScene textToSpeak={getStepText()} voiceType={voiceType} isFullScreen={false} />
-      </div>
 
       <div className="max-w-7xl mx-auto">
         <div className="w-full max-w-md mx-auto">
