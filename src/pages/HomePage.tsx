@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
 import {
@@ -172,6 +172,10 @@ export function HomePage() {
   const SOCKET_URL = "http://192.168.233.159:5000";
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const recognitionResultRef = useRef<string>("");
+  const wakeWordRecognitionRef = useRef<SpeechRecognition | null>(null);
+  const maxListeningTimeoutRef = useRef<number | null>(null);
+  const silenceTimeoutRef = useRef<number | null>(null);
+  const lastSpeechTimeRef = useRef<number>(0);
 
   // Handle audio response from server
   const handleAudioResponse = async (
@@ -404,6 +408,301 @@ export function HomePage() {
     };
   }, [SOCKET_URL]);
 
+  // Helper function to stop listening and send the result
+  const stopListeningAndSend = useCallback(() => {
+    const socket = socketRef.current;
+    setIsListening(false);
+
+    // Clear all timeouts
+    if (maxListeningTimeoutRef.current) {
+      window.clearTimeout(maxListeningTimeoutRef.current);
+      maxListeningTimeoutRef.current = null;
+    }
+    if (silenceTimeoutRef.current) {
+      window.clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+
+    // Send the transcribed text if available
+    if (recognitionResultRef.current.trim() && socket && socket.connected) {
+      const payload = {
+        event: "process_audio",
+        data: {
+          text: recognitionResultRef.current.trim(),
+          user_id: "user123", // You can change this to use actual user ID
+        },
+      };
+
+      console.log("📤 Sending transcribed text:", payload);
+
+      socket.emit("process_audio", payload);
+      recognitionResultRef.current = "";
+    }
+  }, []);
+
+  // Voice input handler - wrapped in useCallback for use in wake word detection
+  const handleVoiceInput = useCallback(() => {
+    // Check if SpeechRecognition is available
+    const SpeechRecognition =
+      (
+        window as unknown as {
+          SpeechRecognition?: { new (): SpeechRecognition };
+        }
+      ).SpeechRecognition ||
+      (
+        window as unknown as {
+          webkitSpeechRecognition?: { new (): SpeechRecognition };
+        }
+      ).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert(
+        "Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari."
+      );
+      return;
+    }
+
+    // If already listening, stop recognition manually
+    if (isListening) {
+      stopListeningAndSend();
+      return;
+    }
+
+    // Start speech recognition
+    try {
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+
+      // Configure recognition
+      recognition.continuous = true; // Keep listening until stopped
+      recognition.interimResults = true; // Show interim results
+      recognition.lang = "en-US"; // Set language (you can make this configurable)
+
+      // Constants for timeout management
+      const MAX_LISTENING_TIME = 35000; // 35 seconds maximum
+      const SILENCE_TIMEOUT = 3000; // 3 seconds of silence to auto-stop
+
+      // Set maximum listening time (35 seconds)
+      maxListeningTimeoutRef.current = window.setTimeout(() => {
+        console.log("⏱️ Maximum listening time reached (35s), stopping...");
+        stopListeningAndSend();
+      }, MAX_LISTENING_TIME);
+
+      // Track speech activity
+      lastSpeechTimeRef.current = Date.now();
+
+      // Function to reset silence timeout
+      const resetSilenceTimeout = () => {
+        if (silenceTimeoutRef.current) {
+          window.clearTimeout(silenceTimeoutRef.current);
+        }
+        silenceTimeoutRef.current = window.setTimeout(() => {
+          const timeSinceLastSpeech = Date.now() - lastSpeechTimeRef.current;
+          if (timeSinceLastSpeech >= SILENCE_TIMEOUT && isListening) {
+            console.log("🔇 Silence detected for 3s, stopping...");
+            stopListeningAndSend();
+          }
+        }, SILENCE_TIMEOUT);
+      };
+
+      // Handle recognition results
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let interimTranscript = "";
+        let finalTranscript = "";
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + " ";
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        // Update the result
+        if (finalTranscript) {
+          recognitionResultRef.current += finalTranscript;
+          console.log("🎤 Final transcript:", finalTranscript);
+          // Update last speech time when we get final results
+          lastSpeechTimeRef.current = Date.now();
+          // Reset silence timeout since we detected speech
+          resetSilenceTimeout();
+        }
+
+        // Update last speech time for interim results too (user is still speaking)
+        if (interimTranscript) {
+          console.log("🎤 Interim transcript:", interimTranscript);
+          lastSpeechTimeRef.current = Date.now();
+          // Reset silence timeout since we detected speech
+          resetSilenceTimeout();
+        }
+      };
+
+      // Handle errors
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error("Speech recognition error:", event.error);
+        if (event.error === "no-speech") {
+          console.log("No speech detected, checking silence timeout...");
+          // Don't stop immediately, let silence timeout handle it
+        } else if (event.error === "audio-capture") {
+          alert("No microphone found. Please check your microphone.");
+          stopListeningAndSend();
+        } else if (event.error === "not-allowed") {
+          alert("Microphone access denied. Please allow microphone access.");
+          stopListeningAndSend();
+        } else {
+          // For other errors, stop listening
+          stopListeningAndSend();
+        }
+      };
+
+      // Handle when recognition ends
+      recognition.onend = () => {
+        console.log("🎤 Speech recognition ended");
+        if (isListening) {
+          // If still listening, restart recognition (for continuous mode)
+          try {
+            recognition.start();
+          } catch (error) {
+            console.error("Failed to restart recognition:", error);
+            stopListeningAndSend();
+          }
+        }
+      };
+
+      // Start recognition
+      recognition.start();
+      setIsListening(true);
+      recognitionResultRef.current = "";
+      lastSpeechTimeRef.current = Date.now();
+
+      // Start silence detection
+      resetSilenceTimeout();
+
+      console.log(
+        "🎤 Started speech recognition (max 35s, auto-stop after 3s silence)"
+      );
+    } catch (error) {
+      console.error("Failed to start speech recognition:", error);
+      setIsListening(false);
+      alert(
+        "Failed to start speech recognition. Please check your microphone permissions."
+      );
+    }
+  }, [isListening, stopListeningAndSend]);
+
+  // Wake word listener - listens for "okay atlas" or "ok aria"
+  useEffect(() => {
+    const SpeechRecognition =
+      (
+        window as unknown as {
+          SpeechRecognition?: { new (): SpeechRecognition };
+        }
+      ).SpeechRecognition ||
+      (
+        window as unknown as {
+          webkitSpeechRecognition?: { new (): SpeechRecognition };
+        }
+      ).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      console.warn("Speech recognition not available for wake word detection");
+      return;
+    }
+
+    // Don't start wake word detection if already listening
+    if (isListening) {
+      return;
+    }
+
+    let wakeWordRecognition: SpeechRecognition | null = null;
+
+    const startWakeWordDetection = () => {
+      try {
+        wakeWordRecognition = new SpeechRecognition();
+        wakeWordRecognitionRef.current = wakeWordRecognition;
+
+        // Configure for wake word detection
+        wakeWordRecognition.continuous = true;
+        wakeWordRecognition.interimResults = true;
+        wakeWordRecognition.lang = "en-US";
+
+        // Define wake words based on coach gender
+        const wakeWords = isMale
+          ? ["okay atlas", "ok atlas", "hey atlas", "atlas"]
+          : ["okay aria", "ok aria", "hey aria", "aria"];
+
+        wakeWordRecognition.onresult = (event: SpeechRecognitionEvent) => {
+          // Don't process if already listening
+          if (isListening) {
+            return;
+          }
+
+          let transcript = "";
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript.toLowerCase() + " ";
+          }
+
+          // Check if any wake word is detected
+          const detected = wakeWords.some((wakeWord) =>
+            transcript.includes(wakeWord.toLowerCase())
+          );
+
+          if (detected && !isListening) {
+            console.log("🔔 Wake word detected:", transcript.trim());
+            // Stop wake word detection
+            if (wakeWordRecognition) {
+              wakeWordRecognition.stop();
+              wakeWordRecognitionRef.current = null;
+            }
+            // Start main voice input
+            handleVoiceInput();
+          }
+        };
+
+        wakeWordRecognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+          // Ignore "no-speech" errors for wake word detection
+          if (event.error !== "no-speech") {
+            console.error("Wake word recognition error:", event.error);
+          }
+        };
+
+        wakeWordRecognition.onend = () => {
+          // Restart wake word detection if not listening
+          if (!isListening && wakeWordRecognitionRef.current === null) {
+            setTimeout(() => {
+              startWakeWordDetection();
+            }, 100);
+          }
+        };
+
+        wakeWordRecognition.start();
+        console.log(
+          `👂 Wake word detection started. Listening for: ${wakeWords.join(
+            ", "
+          )}`
+        );
+      } catch (error) {
+        console.error("Failed to start wake word detection:", error);
+      }
+    };
+
+    // Start wake word detection
+    startWakeWordDetection();
+
+    return () => {
+      if (wakeWordRecognition) {
+        wakeWordRecognition.stop();
+        wakeWordRecognitionRef.current = null;
+      }
+    };
+  }, [isListening, isMale, handleVoiceInput]);
+
   // Helper: Chat Response Logic (Mock Narrative AI)
   const handleSendMessage = (textOverride?: string) => {
     const textToSend = textOverride || inputValue;
@@ -451,135 +750,6 @@ export function HomePage() {
       }
     } else {
       sendFallbackCoachResponse();
-    }
-  };
-
-  const handleVoiceInput = () => {
-    const socket = socketRef.current;
-
-    // Check if SpeechRecognition is available
-    const SpeechRecognition =
-      (
-        window as unknown as {
-          SpeechRecognition?: { new (): SpeechRecognition };
-        }
-      ).SpeechRecognition ||
-      (
-        window as unknown as {
-          webkitSpeechRecognition?: { new (): SpeechRecognition };
-        }
-      ).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      alert(
-        "Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari."
-      );
-      return;
-    }
-
-    // If already listening, stop recognition
-    if (isListening) {
-      setIsListening(false);
-
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-        recognitionRef.current = null;
-      }
-
-      // Send the transcribed text if available
-      if (recognitionResultRef.current.trim() && socket && socket.connected) {
-        const payload = {
-          event: "process_audio",
-          data: {
-            text: recognitionResultRef.current.trim(),
-            user_id: "user123", // You can change this to use actual user ID
-          },
-        };
-
-        console.log("📤 Sending transcribed text:", payload);
-
-        socket.emit("process_audio", payload);
-        recognitionResultRef.current = "";
-      }
-
-      return;
-    }
-
-    // Start speech recognition
-    try {
-      const recognition = new SpeechRecognition();
-      recognitionRef.current = recognition;
-
-      // Configure recognition
-      recognition.continuous = true; // Keep listening until stopped
-      recognition.interimResults = true; // Show interim results
-      recognition.lang = "en-US"; // Set language (you can make this configurable)
-
-      // Handle recognition results
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        let interimTranscript = "";
-        let finalTranscript = "";
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript + " ";
-          } else {
-            interimTranscript += transcript;
-          }
-        }
-
-        // Update the result
-        if (finalTranscript) {
-          recognitionResultRef.current += finalTranscript;
-          console.log("🎤 Final transcript:", finalTranscript);
-        }
-
-        // Optionally show interim results in console
-        if (interimTranscript) {
-          console.log("🎤 Interim transcript:", interimTranscript);
-        }
-      };
-
-      // Handle errors
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error("Speech recognition error:", event.error);
-        if (event.error === "no-speech") {
-          console.log("No speech detected, continuing...");
-        } else if (event.error === "audio-capture") {
-          alert("No microphone found. Please check your microphone.");
-          setIsListening(false);
-        } else if (event.error === "not-allowed") {
-          alert("Microphone access denied. Please allow microphone access.");
-          setIsListening(false);
-        }
-      };
-
-      // Handle when recognition ends
-      recognition.onend = () => {
-        console.log("🎤 Speech recognition ended");
-        if (isListening) {
-          // If still listening, restart recognition (for continuous mode)
-          try {
-            recognition.start();
-          } catch (error) {
-            console.error("Failed to restart recognition:", error);
-            setIsListening(false);
-          }
-        }
-      };
-
-      // Start recognition
-      recognition.start();
-      setIsListening(true);
-      recognitionResultRef.current = "";
-      console.log("🎤 Started speech recognition");
-    } catch (error) {
-      console.error("Failed to start speech recognition:", error);
-      setIsListening(false);
-      alert(
-        "Failed to start speech recognition. Please check your microphone permissions."
-      );
     }
   };
 
