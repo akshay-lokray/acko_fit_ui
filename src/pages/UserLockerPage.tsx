@@ -115,6 +115,17 @@ export function UserLockerPage() {
     if (!hasAvatar) {
         return (
             <div className="min-h-screen bg-black text-white flex flex-col font-sans">
+                {/* Back Button */}
+                <div className="absolute top-4 left-4 z-20">
+                    <Button 
+                        variant="outline" 
+                        onClick={() => navigate("/home")} 
+                        className="flex items-center gap-2 bg-white/10 border-white/20 text-white hover:bg-white/20"
+                    >
+                        <ArrowLeft className="w-5 h-5" />
+                        <span>Back</span>
+                    </Button>
+                </div>
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
 
                     {/* Background Ambience */}
@@ -222,8 +233,9 @@ export function UserLockerPage() {
         <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
             <div className="bg-white p-4 shadow-sm z-10 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="icon" onClick={() => navigate("/home")}>
-                        <ArrowLeft className="w-6 h-6 text-gray-900" />
+                    <Button variant="outline" onClick={() => navigate("/home")} className="flex items-center gap-2">
+                        <ArrowLeft className="w-5 h-5" />
+                        <span>Back</span>
                     </Button>
                     <h1 className="text-xl font-bold text-gray-900">Your Locker</h1>
                 </div>

@@ -10,12 +10,18 @@ export function CoachIntroPage() {
     const navigate = useNavigate();
     const { gender, coachName } = location.state || { gender: "female", coachName: "Aria" };
     const [showButton, setShowButton] = useState(false);
+    const [isButtonVisible, setIsButtonVisible] = useState(false);
     const [isClicked, setIsClicked] = useState(false);
 
     useEffect(() => {
-        // Show the "Start" button after a slight delay or when speaking finishes
-        const timer = setTimeout(() => setShowButton(true), 3000);
-        return () => clearTimeout(timer);
+        // Start showing the button after delay
+        const showTimer = setTimeout(() => setShowButton(true), 3000);
+        // Make it fully visible and clickable after fade-in completes
+        const visibleTimer = setTimeout(() => setIsButtonVisible(true), 3500); // 500ms fade-in
+        return () => {
+            clearTimeout(showTimer);
+            clearTimeout(visibleTimer);
+        };
     }, []);
 
     const introText = `Hi! I'm ${coachName}. I'm here to push you to your limits and help you achieve your goals. Let's get started!`;
@@ -62,10 +68,15 @@ export function CoachIntroPage() {
                     </div>
                 </div>
 
-                {showButton && !isClicked && (
+                {!isClicked && (
                     <Button
                         onClick={handleButtonClick}
-                        className={`h-14 px-10 text-lg text-white shadow-lg transition-all hover:scale-105 hover:shadow-xl rounded-full mt-8 ${buttonBg}`}
+                        disabled={!isButtonVisible}
+                        className={`h-14 px-10 text-lg text-white shadow-lg transition-all duration-500 hover:scale-105 hover:shadow-xl rounded-full mt-8 ${buttonBg} ${
+                            showButton 
+                                ? 'opacity-100 pointer-events-auto' 
+                                : 'opacity-0 pointer-events-none'
+                        }`}
                     >
                         Start Assessment
                         <ArrowRight className="ml-3 h-6 w-6" />
@@ -73,10 +84,8 @@ export function CoachIntroPage() {
                 )}
             </div>
 
-            {/* Avatar at bottom when clicked, otherwise full screen */}
-            <div className={`absolute inset-0 z-0 transition-all duration-500 ${
-                isClicked ? 'top-auto bottom-0 h-1/2' : ''
-            }`}>
+            {/* Avatar fills the remaining space */}
+            <div className="absolute inset-0 z-0">
                 <AvatarScene
                     textToSpeak={introText}
                     voiceType={gender as VoiceType}

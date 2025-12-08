@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { ArrowLeft, ArrowRight, Camera, X } from "lucide-react"
+import { ArrowRight, Camera, X } from "lucide-react"
 
 interface Step9AutoTrackProps {
   autoTrackEnabled: boolean
@@ -12,7 +12,6 @@ interface Step9AutoTrackProps {
 export function Step9AutoTrack({
   onAutoTrackChange,
   onNext,
-  onBack,
 }: Step9AutoTrackProps) {
   return (
     <div className="space-y-6">
@@ -74,16 +73,7 @@ export function Step9AutoTrack({
         Enable Auto-Track from Gallery
       </Button>
 
-      <div className="flex justify-between gap-4">
-        <Button
-          onClick={onBack}
-          variant="outline"
-          className="h-12 px-6"
-          size="lg"
-        >
-          <ArrowLeft className="mr-2 h-5 w-5" />
-          Back
-        </Button>
+      <div className="flex justify-end gap-4">
         <Button
           onClick={() => {
             onAutoTrackChange(false)

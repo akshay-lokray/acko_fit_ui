@@ -279,20 +279,22 @@ export function MultiStepForm() {
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-20">
         <div className="max-w-md mx-auto">
           <div className="flex justify-between gap-4">
-            <Button
-              onClick={handleBack}
-              variant="outline"
-              className="h-12 px-6 flex-1"
-              size="lg"
-              disabled={step === 1}
-            >
-              <ArrowLeft className="mr-2 h-5 w-5" />
-              Back
-            </Button>
+            {step !== 9 && (
+              <Button
+                onClick={handleBack}
+                variant="outline"
+                className="h-12 px-6 flex-1"
+                size="lg"
+                disabled={step === 1}
+              >
+                <ArrowLeft className="mr-2 h-5 w-5" />
+                Back
+              </Button>
+            )}
             <Button
               onClick={handleNext}
               disabled={!canProceed()}
-              className="h-12 px-8 flex-1"
+              className={`h-12 px-8 ${step === 9 ? 'flex-1' : 'flex-1'}`}
               size="lg"
             >
               Next

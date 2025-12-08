@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Shield, Zap, Heart, Sparkles, ArrowRight } from "lucide-react";
+import { Shield, Zap, Heart, Sparkles, ArrowRight, ArrowLeft } from "lucide-react";
 import type { FormData } from "@/types/form";
 import AvatarScene from "@/components/AvatarScene";
 import type { VoiceType } from "@/types/voice";
@@ -49,7 +49,7 @@ export function PremiumPlanPage() {
                 <div className={`absolute bottom-[-10%] left-[-5%] w-[50%] h-[50%] ${isMale ? 'bg-emerald-100/40' : 'bg-purple-100/40'} rounded-full blur-[100px]`} />
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10 min-h-screen pt-20">
+            <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10 min-h-screen pt-20 pb-24">
 
                 {/* Left Column: The Pitch */}
                 <div className="space-y-8 animate-fade-in-up">
@@ -126,6 +126,31 @@ export function PremiumPlanPage() {
                                 <p className="text-lg font-bold text-gray-900">98/100 (Excellent)</p>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Fixed Bottom Navigation Buttons */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-20">
+                <div className="max-w-md mx-auto">
+                    <div className="flex justify-between gap-4">
+                        <Button
+                            onClick={() => navigate("/setup", { state: { formData } })}
+                            variant="outline"
+                            className="h-12 px-6 flex-1"
+                            size="lg"
+                        >
+                            <ArrowLeft className="mr-2 h-5 w-5" />
+                            Back
+                        </Button>
+                        <Button
+                            onClick={() => navigate("/home", { state: { formData } })}
+                            className={`h-12 px-8 flex-1 ${buttonBg}`}
+                            size="lg"
+                        >
+                            Next
+                            <ArrowRight className="ml-2 h-5 w-5" />
+                        </Button>
                     </div>
                 </div>
             </div>
