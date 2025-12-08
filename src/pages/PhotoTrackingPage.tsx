@@ -1,25 +1,23 @@
-import { useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     ArrowLeft,
-    Camera,
-    Upload,
     ScanLine,
     Coffee,
     Utensils,
     Moon,
     Apple,
+    ChevronLeft,
+    Star,
+    Flame,
     Minus,
     Plus,
-    ChevronLeft,
-    Check,
-    Star,
-    Flame
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import AvatarScene from "@/components/AvatarScene";
+import { useUserProfileStore } from "@/store/userProfileStore";
 
 type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snack";
 
@@ -34,31 +32,151 @@ export function PhotoTrackingPage() {
     const navigate = useNavigate();
     const [step, setStep] = useState<"camera" | "review" | "success">("camera");
     const [selectedType, setSelectedType] = useState<MealType>("Breakfast");
-    const [items, setItems] = useState<FoodItem[]>([
-        { id: "1", name: "Roti (Whole Wheat)", quantity: "2x", calories: 240 },
-        { id: "2", name: "Dal Tadka", quantity: "150g", calories: 180 },
-        { id: "3", name: "White Rice", quantity: "1 cup", calories: 160 },
-    ]);
+    const [items, setItems] = useState<FoodItem[]>([]);
     const [showConfetti, setShowConfetti] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analysisError, setAnalysisError] = useState<string | null>(null);
+    const cameraInputRef = useRef<HTMLInputElement>(null);
+    const uploadInputRef = useRef<HTMLInputElement>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const prevImageRef = useRef<string | null>(null);
+    const [mealName, setMealName] = useState("");
+    const [loggingMeal, setLoggingMeal] = useState(false);
+    const [logError, setLogError] = useState<string | null>(null);
+    const { formData: profile } = useUserProfileStore();
+    const streak = profile.streak ?? 0;
+
+    useEffect(() => {
+        return () => {
+            if (prevImageRef.current) {
+                URL.revokeObjectURL(prevImageRef.current);
+            }
+        };
+    }, []);
 
     // Mock total calories
     const totalCalories = items.reduce((acc, item) => acc + item.calories, 0);
 
-    const handleTakeShit = () => { // Funny typo in thought but let's be professional in code :P
-        // Simulate processing time
-        setTimeout(() => {
+    const handleTakeShit = () => {
+        cameraInputRef.current?.click();
+    };
+
+    const handleImageSelected = async (file: File | null) => {
+        if (!file) return;
+        setIsAnalyzing(true);
+        setAnalysisError(null);
+        try {
+            const form = new FormData();
+            form.append("image", file);
+            const response = await fetch("/api/habits/food/analyze-image", {
+                method: "POST",
+                body: form,
+            });
+            if (!response.ok) {
+                throw new Error("Unable to analyze photo");
+            }
+            const data = await response.json();
+            const analyzedItems = (data.items || []).map((item: any, idx: number) => ({
+                id: `${item.name}-${idx}-${Date.now()}`,
+                name: item.name || "",
+                quantity: `${item.quantity ?? ""}${item.unit ? ` ${item.unit}` : ""}`,
+                calories: Number(item.calories ?? 0),
+            }));
+            setItems(analyzedItems);
+            setMealName(data.mealName ?? "");
+            const nextUrl = URL.createObjectURL(file);
+            setImagePreview(nextUrl);
+            if (prevImageRef.current) {
+                URL.revokeObjectURL(prevImageRef.current);
+            }
+            prevImageRef.current = nextUrl;
             setStep("review");
-        }, 800);
+        } catch (err) {
+            console.error(err);
+            setAnalysisError("Unable to analyze the photo right now.");
+        } finally {
+            setIsAnalyzing(false);
+        }
     };
 
-    const handleConfirmLog = () => {
-        setStep("success");
-        setShowConfetti(true);
+    const handleConfirmLog = async () => {
+        setLogError(null);
+        setLoggingMeal(true);
+        const userId = profile.mobile || "unknown-user";
+        const mealMeta = {
+            mealName: mealName.trim() || "Meal",
+            items: items.map((item) => ({
+                name: item.name,
+                quantity: item.quantity,
+                calories: item.calories,
+            })),
+        };
+
+        try {
+            const calorieRes = await fetch("/api/habits", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userId,
+                    habit: "calorie",
+                    value: totalCalories,
+                    meta: mealMeta,
+                }),
+            });
+            if (!calorieRes.ok) {
+                throw new Error("Failed to log calories");
+            }
+            const mealRes = await fetch("/api/habits", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userId,
+                    habit: "meal",
+                    value: 1,
+                    meta: {
+                        ...mealMeta,
+                    },
+                }),
+            });
+            if (!mealRes.ok) {
+                throw new Error("Failed to log meal details");
+            }
+            setStep("success");
+            setShowConfetti(true);
+        } catch (error) {
+            console.error("Meal logging failed", error);
+            setLogError("Unable to log the meal right now.");
+        } finally {
+            setLoggingMeal(false);
+        }
     };
 
-    const handleQuantityChange = (id: string, delta: number) => {
-        // Just mock visual update for now
-        console.log("Update quantity", id, delta);
+    const handleItemChange = (index: number, field: keyof FoodItem, value: string | number) => {
+        setItems((prev) => {
+            const next = [...prev];
+            if (field === "calories") {
+                next[index] = { ...next[index], calories: Number(value) };
+            } else {
+                next[index] = { ...next[index], [field]: value };
+            }
+            return next;
+        });
+    };
+
+    const handleDeleteItem = (index: number) => {
+        setItems((prev) => prev.filter((_, idx) => idx !== index));
+    };
+
+    const handleAddRow = () => {
+        setItems((prev) => [
+            ...prev,
+            {
+                id: `new-${Date.now()}`,
+                name: "",
+                quantity: "",
+                calories: 0,
+            },
+        ]);
     };
 
     // --- Steps Renderers ---
@@ -96,11 +214,38 @@ export function PhotoTrackingPage() {
                 </div>
             </div>
 
+            {/* File picker */}
+            <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => handleImageSelected(e.target.files?.[0] || null)}
+            />
+            <input
+                ref={uploadInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleImageSelected(e.target.files?.[0] || null)}
+            />
+
+            <div className="flex justify-center mb-4">
+                <Button
+                    variant="outline"
+                    className="text-gray-500 text-xs uppercase tracking-wide"
+                    onClick={() => uploadInputRef.current?.click()}
+                >
+                    Upload from device
+                </Button>
+            </div>
+
             {/* Shutter Button area */}
             <div className="mt-auto pb-8 flex flex-col items-center">
                 <button
                     onClick={handleTakeShit}
-                    className="w-20 h-20 rounded-full border-4 border-gray-200 p-1 mb-10 transition-transform active:scale-95"
+                    className="w-20 h-20 rounded-full border-4 border-gray-200 p-1 mb-6 transition-transform active:scale-95"
                 >
                     <div className="w-full h-full bg-emerald-500 rounded-full shadow-lg" />
                 </button>
@@ -138,11 +283,28 @@ export function PhotoTrackingPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 pb-24">
+                {isAnalyzing && (
+                    <div className="mb-4 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-800">
+                        Analyzing your meal… this might take a moment.
+                    </div>
+                )}
+                {analysisError && (
+                    <div className="mb-4 rounded-2xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
+                        {analysisError}
+                    </div>
+                )}
                 {/* Captured Image Preview */}
                 <div className="relative mb-6">
                     <div className="w-full h-64 bg-gray-200 rounded-3xl overflow-hidden flex items-center justify-center text-6xl">
-                        🥘
-                        {/* In a real app this would be the captured image URL */}
+                        {imagePreview ? (
+                            <img
+                                src={imagePreview}
+                                alt="Captured meal"
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <span>🥘</span>
+                        )}
                     </div>
                     <button
                         onClick={() => setStep("camera")}
@@ -152,23 +314,75 @@ export function PhotoTrackingPage() {
                     </button>
                 </div>
 
-                {/* Items List */}
-                <div className="bg-white rounded-3xl p-6 shadow-sm mb-4 animate-fade-in-up">
-                    <h2 className="font-bold text-gray-900 mb-4">Review Meal</h2>
-                    <div className="space-y-4">
-                        {items.map(item => (
-                            <div key={item.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                                <div>
-                                    <p className="font-semibold text-gray-900">{item.name}</p>
-                                    <p className="text-xs text-gray-500">{item.calories} kcal</p>
+                <div className="bg-white rounded-3xl p-6 shadow-sm mb-4 animate-fade-in-up space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h2 className="font-bold text-gray-900">Review Meal</h2>
+                        <Button variant="ghost" size="sm" onClick={() => setStep("camera")}>
+                            Retake
+                        </Button>
+                    </div>
+                    <div className="space-y-2">
+                        <p className="text-xs font-semibold text-gray-500">Meal name</p>
+                        <Input
+                            value={mealName}
+                            onChange={(e) => setMealName(e.target.value)}
+                            placeholder="e.g., Spicy Potato Stew"
+                            className="text-sm"
+                        />
+                    </div>
+                    <div className="space-y-3">
+                        {items.map((item, idx) => (
+                            <div
+                                key={item.id}
+                                className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2 shadow-sm"
+                            >
+                                <div className="flex-1">
+                                    <input
+                                        type="text"
+                                        value={item.name}
+                                        onChange={(e) => handleItemChange(idx, "name", e.target.value)}
+                                        placeholder="Food name"
+                                        className="w-full border-0 bg-transparent px-0 text-sm font-semibold text-gray-900 focus:outline-none"
+                                    />
+                                    <div className="flex gap-2 text-xs text-gray-500">
+                                        <input
+                                            type="text"
+                                            value={item.quantity}
+                                            onChange={(e) => handleItemChange(idx, "quantity", e.target.value)}
+                                            placeholder="e.g., 200 g"
+                                            className="flex-1 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                        />
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={item.calories}
+                                            onChange={(e) =>
+                                                handleItemChange(idx, "calories", Number(e.target.value))
+                                            }
+                                            placeholder="Calories"
+                                            className="w-24 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-3 bg-gray-50 rounded-full px-2 py-1">
-                                    <button className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600">-</button>
-                                    <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
-                                    <button className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600">+</button>
-                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDeleteItem(idx)}
+                                    className="flex h-8 w-8 items-center justify-center rounded-full border border-red-100 bg-red-50 text-red-600 shadow-sm transition hover:bg-red-100"
+                                >
+                                    <Minus className="w-3 h-3" />
+                                </button>
                             </div>
                         ))}
+                    </div>
+                    <div className="flex justify-end">
+                        <button
+                            type="button"
+                            onClick={handleAddRow}
+                            className="flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-600 shadow-sm transition hover:bg-emerald-100"
+                        >
+                            <Plus className="w-3 h-3" />
+                            Add item
+                        </button>
                     </div>
                 </div>
 
@@ -179,17 +393,17 @@ export function PhotoTrackingPage() {
                 </div>
 
                 <div className="space-y-3">
+                    {logError && (
+                        <div className="rounded-xl bg-red-50 px-4 py-2 text-sm text-red-600 border border-red-100">
+                            {logError}
+                        </div>
+                    )}
                     <Button
                         onClick={handleConfirmLog}
                         className="w-full h-14 text-lg bg-emerald-500 hover:bg-emerald-600 rounded-2xl shadow-lg shadow-emerald-200"
+                        disabled={loggingMeal}
                     >
-                        Confirm & Log Meal
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        className="w-full text-gray-400 font-medium hover:text-gray-600 hover:bg-transparent"
-                    >
-                        Need to Edit More?
+                        {loggingMeal ? "Saving..." : "Confirm & Log Meal"}
                     </Button>
                 </div>
             </div>
@@ -237,10 +451,13 @@ export function PhotoTrackingPage() {
 
                 <div className="space-y-2 mb-8">
                     <div className="flex justify-between items-center text-sm font-medium">
-                        <span className="flex items-center gap-1 text-orange-500"><Flame className="w-4 h-4 fill-current" /> 7-Day Snap Streak</span>
-                        <span className="text-gray-400">3/7</span>
+                        <span className="flex items-center gap-1 text-orange-500">
+                            <Flame className="w-4 h-4 fill-current" />
+                            {streak}-Day Snap Streak
+                        </span>
+                        <span className="text-gray-400">{streak}/7</span>
                     </div>
-                    <Progress value={45} className="h-2" />
+                    <Progress value={Math.min((streak / 7) * 100, 100)} className="h-2" />
                 </div>
 
                 <Button

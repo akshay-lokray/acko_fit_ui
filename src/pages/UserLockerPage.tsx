@@ -46,7 +46,11 @@ const COLOR_CLASSES = [
     "bg-indigo-100 text-indigo-600",
 ];
 
-type HabitDaily = Record<string, Record<string, number>>;
+type HabitDailyEntry = {
+    value: number;
+    meta?: Record<string, any>;
+};
+type HabitDaily = Record<string, HabitDailyEntry>;
 
 export function UserLockerPage() {
     const navigate = useNavigate();
@@ -102,7 +106,22 @@ export function UserLockerPage() {
                 );
                 if (!dailyRes.ok) return;
                 const dailyData = await dailyRes.json();
-                setDailyProgress(dailyData as HabitDaily);
+
+                // Normalize to only totals numbers (avoid rendering meta objects)
+                const normalized: HabitDaily = {};
+                habitKeys.forEach((h) => {
+                    const entry = dailyData?.[h];
+                    const totals = entry?.totals;
+                    const firstKey = totals && typeof totals === "object" ? Object.keys(totals)[0] : undefined;
+                    const val =
+                        firstKey != null ? Number(totals[firstKey] ?? 0) || 0 : 0;
+                    normalized[h] = {
+                        value: val,
+                        meta: entry?.meta,
+                    };
+                });
+
+                setDailyProgress(normalized);
             } catch (e) {
                 console.error("Failed to load habits", e);
             }
@@ -363,10 +382,15 @@ export function UserLockerPage() {
                             <h3 className="font-bold text-gray-900 mb-4 px-1">Today's Timeline</h3>
                             <div className="relative border-l-2 border-gray-100 ml-4 space-y-8 pb-4">
                                 {Object.keys(dailyProgress).length > 0 &&
-                                    Object.entries(dailyProgress).map(([habit, dates], idx) => {
-                                        const todayVal = Object.values(dates)[0];
+                                    Object.entries(dailyProgress).map(([habit, entry], idx) => {
+                                        const todayVal = entry?.value ?? 0;
+                                        const metaName = entry?.meta?.mealName;
                                         const color = COLOR_CLASSES[idx % COLOR_CLASSES.length];
-                                        const displayName = habit ? habit.charAt(0).toUpperCase() + habit.slice(1) : habit;
+                                        const displayName = metaName
+                                            ? metaName
+                                            : habit
+                                            ? habit.charAt(0).toUpperCase() + habit.slice(1)
+                                            : habit;
                                         return (
                                             <div key={`${habit}-${idx}`} className="relative pl-8">
                                                 <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-white shadow-sm z-10 bg-emerald-500" />

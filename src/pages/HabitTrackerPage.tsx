@@ -214,7 +214,11 @@ export function HabitTrackerPage() {
                                 {getIconComponent((habitMeta[habit.name]?.icon as string) || habit.icon)}
                             </div>
                             <div>
-                                <h3 className="font-bold text-gray-900 text-sm md:text-base">{formatHabitName(habit.name)}</h3>
+                        <h3 className="font-bold text-gray-900 text-sm md:text-base">
+                            {habit.name === "meal" && habitMeta[habit.name]?.mealName
+                                ? habitMeta[habit.name]?.mealName
+                                : formatHabitName(habit.name)}
+                        </h3>
                                 <div className="text-xs text-gray-500 font-semibold">
                                     {habitValues[habit.name] ?? 0} logged today
                                 </div>

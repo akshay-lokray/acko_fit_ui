@@ -150,6 +150,10 @@ export function HabitDetailPage() {
                   <p className="text-xs text-amber-700 font-semibold">Average (30d)</p>
                   <p className="text-lg font-bold text-amber-800">{avgValue}</p>
                 </div>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
+                  <p className="text-xs text-emerald-700 font-semibold">Max (30d)</p>
+                  <p className="text-lg font-bold text-emerald-800">{maxValue}</p>
+                </div>
               </div>
 
               <div className="w-full h-64 relative">
@@ -163,15 +167,20 @@ export function HabitDetailPage() {
 
                   {/* horizontal grid lines */}
                   {[20, 40, 60, 80].map((y) => (
-                    <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="#e5e7eb" strokeWidth="0.3" />
+                    <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="#e5e7eb" strokeWidth="0.35" />
                   ))}
+                  {/* zero baseline */}
+                  <line x1="0" y1="95" x2="100" y2="95" stroke="#cbd5e1" strokeWidth="0.6" />
 
                   {(() => {
                     const count = dataPoints.length || 1;
                     const step = count > 1 ? 100 / (count - 1) : 0;
                     const points = dataPoints.map(([, value], idx) => {
                       const x = idx * step;
-                      const y = 95 - (value / maxValue) * 85; // top/bottom padding
+                      const topPad = 10;
+                      const bottomPad = 10;
+                      const span = 100 - topPad - bottomPad;
+                      const y = 100 - bottomPad - (value / maxValue) * span;
                       return `${x},${y}`;
                     });
                     // area fill
@@ -194,7 +203,10 @@ export function HabitDetailPage() {
                     const count = dataPoints.length || 1;
                     const step = count > 1 ? 100 / (count - 1) : 0;
                     const cx = idx * step;
-                    const cy = 95 - (value / maxValue) * 85;
+                    const topPad = 10;
+                    const bottomPad = 10;
+                    const span = 100 - topPad - bottomPad;
+                    const cy = 100 - bottomPad - (value / maxValue) * span;
                     return (
                       <g
                         key={date}
@@ -205,16 +217,6 @@ export function HabitDetailPage() {
                         onMouseLeave={() => setHover(null)}
                       >
                         <circle cx={cx} cy={cy} r={1.6} className="fill-white stroke-emerald-600 stroke-[0.6]" />
-                        {idx % 5 === 0 && (
-                          <text
-                            x={cx}
-                            y={98}
-                            textAnchor="middle"
-                            className="fill-gray-500 text-[6px]"
-                          >
-                            {date.slice(5)}
-                          </text>
-                        )}
                       </g>
                     );
                   })}
