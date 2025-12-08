@@ -291,9 +291,9 @@ function AvatarWithVisemes({
   return (
     <group ref={groupRef}>
       {voiceType === 'male' ? (
-        <MaleAvatarModel isFullScreen={isFullScreen} />
+        <MaleAvatarModel isFullScreen={isFullScreen} isSpeaking={isSpeaking} />
       ) : (
-        <FemaleAvatarModel isFullScreen={isFullScreen} />
+        <FemaleAvatarModel isFullScreen={isFullScreen} isSpeaking={isSpeaking} />
       )}
     </group>
   );

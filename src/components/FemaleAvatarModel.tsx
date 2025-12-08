@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { FEMALE_DEFAULT_AVATAR_URL } from '@/constants/avatarUrls';
@@ -9,7 +10,11 @@ export function FemaleAvatarModel(props: any) {
     const { nodes, materials } = gltf || {};
     const groupRef = useRef<THREE.Group>(null);
     const lastFullScreenRef = useRef<boolean | undefined>(undefined);
-    const { isFullScreen = false } = props || {};
+    const leftArmBoneRef = useRef<THREE.Bone | null>(null);
+    const rightArmBoneRef = useRef<THREE.Bone | null>(null);
+    const rightForearmBoneRef = useRef<THREE.Bone | null>(null);
+    const { isFullScreen = false, isSpeaking = false } = props || {};
+    const scene = gltf?.scene;
 
     console.log('Female avatar loaded:', { nodes: !!nodes, materials: !!materials });
 
@@ -45,6 +50,89 @@ export function FemaleAvatarModel(props: any) {
       
       lastFullScreenRef.current = isFullScreen;
     }, [nodes, isFullScreen]);
+
+    useEffect(() => {
+      const leftCandidates = [
+        nodes?.Wolf3D_LeftArm,
+        nodes?.mixamorigLeftArm,
+        nodes?.LeftArm,
+      ] as (THREE.Bone | undefined)[];
+      const rightCandidates = [
+        nodes?.Wolf3D_RightArm,
+        nodes?.mixamorigRightArm,
+        nodes?.RightArm,
+      ] as (THREE.Bone | undefined)[];
+      const rightForearmCandidates = [
+        nodes?.Wolf3D_RightForeArm,
+        nodes?.mixamorigRightForeArm,
+        nodes?.RightForeArm,
+      ] as (THREE.Bone | undefined)[];
+
+      leftArmBoneRef.current = leftCandidates.find(Boolean) ?? null;
+      rightArmBoneRef.current = rightCandidates.find(Boolean) ?? null;
+      rightForearmBoneRef.current =
+        rightForearmCandidates.find(Boolean) ?? null;
+
+      if (
+        (!leftArmBoneRef.current ||
+          !rightArmBoneRef.current ||
+          !rightForearmBoneRef.current) &&
+        scene
+      ) {
+        scene.traverse((child: THREE.Object3D) => {
+          if (!(child instanceof THREE.Bone)) return;
+          const name = child.name.toLowerCase();
+          if (!leftArmBoneRef.current && name.includes('left') && name.includes('arm')) {
+            leftArmBoneRef.current = child;
+          } else if (!rightArmBoneRef.current && name.includes('right') && name.includes('arm')) {
+            rightArmBoneRef.current = child;
+          } else if (
+            !rightForearmBoneRef.current &&
+            name.includes('right') &&
+            (name.includes('fore') || name.includes('forearm'))
+          ) {
+            rightForearmBoneRef.current = child;
+          }
+        });
+      }
+    }, [nodes, scene]);
+
+    useFrame(({ clock }) => {
+      const baseElbowX = 1.17;
+      const baseElbowZ = -0.1;
+
+      if (!isFullScreen || !isSpeaking) {
+        if (leftArmBoneRef.current) {
+          leftArmBoneRef.current.rotation.set(baseElbowX, 0.15, baseElbowZ);
+        }
+        if (rightArmBoneRef.current) {
+          rightArmBoneRef.current.rotation.set(1.2, 0.15, baseElbowZ);
+        }
+        if (rightForearmBoneRef.current) {
+          rightForearmBoneRef.current.rotation.set(0.1, 0, -0.2);
+        }
+        return;
+      }
+
+      const t = clock.getElapsedTime();
+      const explainingX = 0.9 + Math.sin(t * 1.7) * 0.2;
+      const explainingZ = -1.9 + Math.cos(t * 1.4) * 0.08;
+      const leftMotion = Math.sin(t * 1.7) * 0.01;
+      const leftTilt = Math.cos(t * 1.5) * 0.1;
+
+      if (leftArmBoneRef.current) {
+        leftArmBoneRef.current.rotation.set(
+          baseElbowX + leftMotion,
+          0.15,
+          baseElbowZ + leftTilt
+        );
+      }
+
+      if (rightForearmBoneRef.current) {
+        rightForearmBoneRef.current.rotation.x = explainingX;
+        rightForearmBoneRef.current.rotation.z = explainingZ;
+      }
+    });
 
     if (!nodes || !materials) {
       return null;
