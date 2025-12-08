@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useUserProfileStore } from "@/store/userProfileStore";
 import AvatarScene from "@/components/AvatarScene";
@@ -1296,43 +1295,37 @@ export function HomePage() {
   return (
     <div className="min-h-screen bg-white font-sans flex flex-col">
       {/* --- Top HUD (Head-Up Display) --- */}
-      <header className="bg-white border-b border-gray-100 p-4 sticky top-0 z-50 shadow-sm">
+      <header className="bg-white border-b border-gray-100 p-4 sticky top-0 z-50">
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div
             className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
             onClick={() => navigate("/profile")}
           >
-            <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
-                isMale ? "bg-emerald-600" : "bg-purple-600"
-              }`}
-            >
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold bg-emerald-600">
               {level}
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">
-                Level {level} Novice
+              <p className="text-xs text-gray-700 font-semibold">
+                LEVEL {level} NOVICE
               </p>
-              <div className="w-32 h-2 bg-gray-100 rounded-full mt-1">
+              <div className="w-32 h-1.5 bg-gray-200 rounded-full mt-1">
                 <div
-                  className={`h-full rounded-full ${
-                    isMale ? "bg-emerald-500" : "bg-purple-500"
-                  }`}
+                  className="h-full rounded-full bg-gray-300"
                   style={{ width: `${(xp / levelingXp) * 100}%` }}
                 />
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-4 text-sm font-medium text-gray-600">
+          <div className="flex items-center gap-4 text-sm font-medium text-gray-700">
             <div
-              className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+              className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
               onClick={() => navigate("/rewards")}
             >
               <Zap className="w-4 h-4 text-yellow-500 fill-yellow-500" />
               <span>{xp} XP</span>
             </div>
             <div
-              className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+              className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
               onClick={() => navigate("/rankings")}
             >
               <Shield className="w-4 h-4 text-blue-500" />
@@ -1345,13 +1338,9 @@ export function HomePage() {
       {/* --- Main Content Area --- */}
       <main className="flex-1 relative overflow-hidden flex flex-col">
         {/* Dynamic Background */}
-        <div className="absolute inset-0 pointer-events-none z-0 opacity-30">
-          <div
-            className={`absolute top-[-20%] left-[-20%] w-[80%] h-[80%] ${
-              isMale ? "bg-emerald-100" : "bg-purple-100"
-            } rounded-full blur-[120px]`}
-          />
-              </div>
+        <div className="absolute inset-0 pointer-events-none z-0">
+          <div className="absolute top-0 left-0 right-0 h-[40%] bg-gradient-to-b from-emerald-50/30 to-transparent" />
+        </div>
 
         {/* Listening Overlay - shown when listening */}
           {isListening && (
@@ -1384,49 +1373,52 @@ export function HomePage() {
         </div>
 
         {/* 2. Interface Tabs (Chat / Explore / Leaderboard) */}
-        <div className="flex-1 bg-white rounded-t-[2rem] shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] relative z-20 overflow-hidden flex flex-col">
+        <div className="flex-1 bg-white rounded-t-[2rem] relative z-20 overflow-hidden flex flex-col">
           {/* Tab Navigation */}
-          <div className="flex border-b border-gray-100">
+          <div className="flex border-b border-gray-100 bg-white">
             <button
               onClick={() => setActiveTab("chat")}
-              className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+              className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
                 activeTab === "chat"
-                  ? `${themeColor} border-b-2 ${
-                      isMale ? "border-emerald-500" : "border-purple-500"
-                    }`
+                  ? "text-emerald-600"
                   : "text-gray-400"
               }`}
             >
               <MessageSquare className="w-4 h-4" /> Comms
+              {activeTab === "chat" && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600" />
+              )}
             </button>
             <button
               onClick={() => setActiveTab("explore")}
-              className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+              className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
                 activeTab === "explore"
-                  ? `${themeColor} border-b-2 ${
-                      isMale ? "border-emerald-500" : "border-purple-500"
-                    }`
+                  ? "text-emerald-600"
                   : "text-gray-400"
               }`}
             >
               <Compass className="w-4 h-4" /> Explore
+              {activeTab === "explore" && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600" />
+              )}
             </button>
             <button
               onClick={() => setActiveTab("leaderboard")}
-              className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+              className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
                 activeTab === "leaderboard"
-                  ? `${themeColor} border-b-2 ${
-                      isMale ? "border-emerald-500" : "border-purple-500"
-                    }`
+                  ? "text-emerald-600"
                   : "text-gray-400"
               }`}
             >
               <Trophy className="w-4 h-4" /> Ranking
+              {activeTab === "leaderboard" && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600" />
+              )}
             </button>
           </div>
 
           {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50/50">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white">
             {activeTab === "chat" && (
               <div className="h-full flex flex-col max-w-2xl mx-auto justify-between">
                 <div className="flex-1 space-y-4 mb-4 overflow-auto">
@@ -1441,7 +1433,7 @@ export function HomePage() {
                         className={`max-w-[80%] rounded-2xl p-4 text-sm ${
                           msg.sender === "user"
                             ? "bg-gray-900 text-white rounded-br-none"
-                            : "bg-white border border-gray-100 shadow-sm text-gray-800 rounded-bl-none"
+                            : "bg-white border border-gray-200 shadow-sm text-gray-800 rounded-bl-none"
                         }`}
                       >
                         {msg.text}
@@ -1450,10 +1442,19 @@ export function HomePage() {
                   ))}
                 </div>
 
+                {/* Welcome Message Card */}
+                <div className="mb-4">
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+                    <p className="text-sm text-gray-700">
+                      Welcome back, {name.split(' ')[0]}. Ready to conquer today's mission?
+                    </p>
+                  </div>
+                </div>
+
                 {/* Task List (Mini) */}
-                <div className="mb-4 space-y-2">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">
-                    Daily Objectives
+                <div className="mb-4 space-y-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    DAILY OBJECTIVES
                   </p>
                   {DAILY_QUESTS.map((quest) => {
                     const goalHit =
@@ -1467,13 +1468,13 @@ export function HomePage() {
                     return (
                     <div
                       key={quest.id}
-                      className={`bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm ${
+                      className={`bg-white p-4 rounded-2xl border border-gray-200 flex items-center justify-between shadow-sm ${
                           quest.title === "Log Meal" ||
                           quest.title === "Walk 5,000 Steps" ||
                           quest.title === "Drink 2L Water"
-                          ? "cursor-pointer hover:border-emerald-300 hover:shadow-md"
+                          ? "cursor-pointer hover:shadow-md transition-shadow"
                           : ""
-                        } ${goalHit ? "border-emerald-400 bg-emerald-50" : ""}`}
+                        } ${goalHit ? "border-emerald-200" : ""}`}
                       onClick={() => {
                           if (quest.title === "Log Meal") {
                             navigate("/log-meal", {
@@ -1484,19 +1485,15 @@ export function HomePage() {
                       >
                         <div className="flex items-center gap-3 flex-1">
                         <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                          className={`w-5 h-5 rounded-full flex items-center justify-center border-2 ${
                               quest.completed || goalHit
-                                ? "bg-emerald-100 text-emerald-600"
-                                : "bg-gray-100 text-gray-400"
+                                ? "bg-emerald-500 border-emerald-500"
+                                : "bg-white border-gray-300"
                           }`}
                         >
-                          {quest.completed ? (
-                            <CheckCircle2 className="w-5 h-5" />
-                          ) : goalHit ? (
-                            <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                          ) : (
-                            <div className="w-3 h-3 rounded-full bg-gray-300" />
-                          )}
+                          {quest.completed || goalHit ? (
+                            <CheckCircle2 className="w-3 h-3 text-white fill-white" strokeWidth={3} />
+                          ) : null}
                         </div>
                         <div className="flex flex-col">
                             <span
@@ -1535,11 +1532,7 @@ export function HomePage() {
                         </div>
                       </div>
                         <span
-                          className={`text-xs font-bold px-2 py-1 rounded-md ${
-                            goalHit
-                              ? "text-emerald-700 bg-emerald-100"
-                              : "text-yellow-600 bg-yellow-50"
-                          }`}
+                          className="text-xs font-bold px-3 py-1 rounded-full bg-yellow-100 text-yellow-700"
                         >
                           +{quest.xp} XP
                         </span>
@@ -1555,13 +1548,13 @@ export function HomePage() {
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
                     placeholder={`Message ${coachName}...`}
-                    className="flex-1 py-6 rounded-full border-gray-200 shadow-sm focus-visible:ring-offset-0 focus-visible:ring-1 pr-12"
+                    className="flex-1 py-6 rounded-2xl border-gray-200 shadow-sm focus-visible:ring-offset-0 focus-visible:ring-1 pr-12"
                   />
                   {inputValue ? (
                     <Button
                       size="icon"
                       onClick={() => handleSendMessage()}
-                      className={`absolute right-14 top-2 rounded-full w-8 h-8 ${buttonBg}`}
+                      className={`absolute right-14 top-2 rounded-full w-8 h-8 bg-emerald-600 hover:bg-emerald-700`}
                     >
                       <Send className="w-4 h-4" />
                     </Button>
@@ -1571,7 +1564,7 @@ export function HomePage() {
                     size="icon"
                     onClick={handleVoiceInput}
                     className={`w-12 h-12 rounded-full shadow-md transition-all ${
-                      isListening ? "bg-red-500 animate-pulse" : buttonBg
+                      isListening ? "bg-red-500 animate-pulse" : "bg-emerald-600 hover:bg-emerald-700"
                     }`}
                   >
                     <Zap className="w-5 h-5 fill-white text-white" />
@@ -1585,64 +1578,64 @@ export function HomePage() {
             {activeTab === "explore" && (
               <div className="h-full max-w-2xl mx-auto space-y-6">
                 <div className="grid grid-cols-2 gap-4">
-                  <Card
-                    className="p-4 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white"
+                  <div
+                    className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
                     onClick={() => navigate("/recipes")}
                   >
-                    <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center text-orange-600">
-                      <Utensils className="w-6 h-6" />
+                    <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center text-orange-600">
+                      <Utensils className="w-7 h-7" />
                     </div>
-                    <span className="font-semibold text-gray-700">Recipes</span>
-                  </Card>
+                    <span className="font-semibold text-gray-700 text-sm">Recipes</span>
+                  </div>
 
-                  <Card
-                    className="p-4 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white"
+                  <div
+                    className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
                     onClick={() => navigate("/workouts")}
                   >
-                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
-                      <Dumbbell className="w-6 h-6" />
+                    <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                      <Dumbbell className="w-7 h-7" />
                     </div>
-                    <span className="font-semibold text-gray-700">
+                    <span className="font-semibold text-gray-700 text-sm">
                       Workouts
                     </span>
-                  </Card>
+                  </div>
 
-                  <Card
-                    className="p-4 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white"
+                  <div
+                    className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
                     onClick={() => navigate("/tracker")}
                   >
-                    <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-purple-600">
-                      <Camera className="w-6 h-6" />
+                    <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center text-purple-600">
+                      <Camera className="w-7 h-7" />
                     </div>
-                    <span className="font-semibold text-gray-700">
+                    <span className="font-semibold text-gray-700 text-sm">
                       Photo Track
                     </span>
-                  </Card>
+                  </div>
 
-                  <Card
-                    className="p-4 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white"
+                  <div
+                    className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
                     onClick={() => navigate("/habits")}
                   >
-                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-green-600">
-                      <CheckCircle2 className="w-6 h-6" />
+                    <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
+                      <CheckCircle2 className="w-7 h-7" />
                     </div>
-                    <span className="font-semibold text-gray-700">Habits</span>
-                  </Card>
+                    <span className="font-semibold text-gray-700 text-sm">Habits</span>
+                  </div>
 
-                  <Card
-                    className="p-4 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white md:col-span-2"
+                  <div
+                    className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
                     onClick={() => navigate("/devices")}
                   >
-                    <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
-                      <Zap className="w-6 h-6" />
+                    <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                      <Zap className="w-7 h-7" />
                     </div>
-                    <span className="font-semibold text-gray-700">
+                    <span className="font-semibold text-gray-700 text-sm">
                       Wearable Sync
                     </span>
-                  </Card>
+                  </div>
                 </div>
 
-                <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg">
+                <div className="bg-gradient-to-r from-purple-600 to-emerald-600 rounded-2xl p-6 text-white shadow-lg">
                   <h3 className="font-bold text-lg mb-2">Weekly Challenge</h3>
                   <p className="opacity-90 text-sm mb-4">
                     Complete 3 workouts this week to unlock the "Iron Will"
@@ -1687,31 +1680,23 @@ export function HomePage() {
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 items-end pt-4 mb-8">
+                <div className="grid grid-cols-3 gap-3 items-end pt-4 mb-8">
                   {[0, 1, 2].map((position) => {
                     const topUsers =
                       leaderboardData?.topUsers ?? FALLBACK_LEADERBOARD;
                     const user =
                       topUsers[position] ||
                       topUsers[position % topUsers.length];
-                    const medal =
-                      position === 1 ? "🥈" : position === 0 ? "🥇" : "🥉";
                     const badgeColor =
-                      position === 1
-                        ? "bg-gray-200"
-                        : position === 0
-                        ? "bg-yellow-100"
-                        : "bg-orange-100";
-                    const borderColor =
-                      position === 1
-                        ? "border-gray-300"
-                        : position === 0
-                        ? "border-yellow-400"
-                        : "border-orange-300";
-                    const size = position === 0 ? "w-20 h-20" : "w-14 h-14";
-                    const textSize = position === 0 ? "text-3xl" : "text-xl";
-                    const badgeTextSize =
-                      position === 0 ? "text-xs" : "text-[10px]";
+                      position === 0
+                        ? "bg-gradient-to-br from-yellow-400 to-yellow-600"
+                        : position === 1
+                        ? "bg-gradient-to-br from-gray-300 to-gray-500"
+                        : "bg-gradient-to-br from-orange-400 to-orange-600";
+                    const size = position === 0 ? "w-20 h-20" : "w-16 h-16";
+                    const innerSize = position === 0 ? "w-12 h-12" : "w-8 h-8";
+                    const badgeSize = position === 0 ? "w-6 h-6" : "w-5 h-5";
+                    const badgeTextSize = position === 0 ? "text-xs" : "text-[10px]";
 
                     return (
                       <div
@@ -1721,48 +1706,42 @@ export function HomePage() {
                         }`}
                       >
                         {position === 0 && (
-                    <Crown className="w-6 h-6 text-yellow-500 mb-1 animate-bounce" />
+                          <Crown className="w-6 h-6 text-yellow-500 mb-1" />
                         )}
                         <div
-                          className={`${size} rounded-full border-4 flex items-center justify-center mb-2 relative ${badgeColor} ${borderColor} ${
-                            position === 0 ? "shadow-lg" : ""
-                          }`}
+                          className={`${size} ${badgeColor} rounded-full flex items-center justify-center mb-2 relative shadow-md`}
                         >
-                          <span className={textSize}>{medal}</span>
+                          <div className={`${innerSize} bg-white rounded-full flex items-center justify-center`}>
+                            <span className="text-white font-bold text-sm">W</span>
+                          </div>
                           <div
-                            className={`absolute -bottom-2 ${
-                              position === 0
-                                ? "bg-yellow-500"
-                                : position === 1
-                                ? "bg-gray-600"
-                                : "bg-orange-600"
-                            } text-white ${badgeTextSize} px-2 py-0.5 rounded-full font-bold`}
+                            className={`absolute -bottom-1 ${badgeColor} text-white ${badgeTextSize} ${badgeSize} rounded-full flex items-center justify-center font-bold shadow-sm`}
                           >
                             #{user.rank}
-                    </div>
-                  </div>
+                          </div>
+                        </div>
                         <p
                           className={`font-bold ${
                             position === 0 ? "text-sm" : "text-xs"
-                          } text-center truncate w-full`}
+                          } text-center truncate w-full text-gray-900`}
                         >
                           {user.name || "Unknown"}
                         </p>
                         <p
                           className={`${
                             position === 0 ? "text-xs" : "text-[10px]"
-                          } text-gray-400`}
+                          } text-gray-500`}
                         >
-                          {user.xp} XP
+                          {user.xp.toLocaleString()} XP
                         </p>
-                    </div>
+                      </div>
                     );
                   })}
                 </div>
 
-                <Card className="bg-gradient-to-r from-gray-900 to-gray-800 p-4 rounded-xl flex items-center justify-between text-white shadow-lg transform scale-105 border-2 border-emerald-500/50">
+                <div className="bg-gray-900 p-4 rounded-2xl flex items-center justify-between text-white shadow-lg">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center font-bold text-sm border-2 border-white/20">
+                    <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center font-bold text-sm">
                       You
                     </div>
                     <div>
@@ -1784,11 +1763,11 @@ export function HomePage() {
                       XP
                     </p>
                   </div>
-                </Card>
+                </div>
 
                 <div className="space-y-4 pt-2">
-                  <p className="text-xs font-bold text-gray-400 uppercase">
-                    Runners Up
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    RUNNERS UP
                   </p>
                   {(
                     leaderboardData?.topUsers?.slice(3) ??
@@ -1796,7 +1775,7 @@ export function HomePage() {
                   ).map((user) => (
                     <div
                       key={`runner-${user.userId}`}
-                      className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100"
+                      className="flex items-center justify-between p-3 bg-white rounded-2xl border border-gray-200 shadow-sm"
                     >
                       <div className="flex items-center gap-3">
                         <span className="font-bold text-gray-400 text-sm w-6">
@@ -1810,7 +1789,7 @@ export function HomePage() {
                         </span>
                       </div>
                       <span className="text-xs font-bold text-gray-500">
-                        {user.xp} XP
+                        {user.xp.toLocaleString()} XP
                       </span>
                     </div>
                   ))}

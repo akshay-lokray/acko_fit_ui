@@ -24,11 +24,11 @@ export function PremiumPlanPage() {
     const calculatePremiumWithXp = (xp: number) => {
         const basePremium = 499;
         const maxDiscountXp = 10000;
-        const discountPer100Xp = 20;
-        const minPremium = 99;
+        const discountPer200Xp = 20;
+        const minPremium = 49;
 
         const effectiveXp = Math.min(xp, maxDiscountXp);
-        const discount = Math.floor(effectiveXp / 100) * discountPer100Xp;
+        const discount = Math.floor(effectiveXp / 200) * discountPer200Xp;
         return Math.max(basePremium - discount, minPremium);
     };
 
@@ -70,7 +70,7 @@ export function PremiumPlanPage() {
                     />
                     <FeatureItem
                         icon={Sparkles}
-                        title="Minimum ₹0/month - unbeatable value!"
+                        title="Minimum ₹49/month - unbeatable value!"
                         delay={400}
                     />
                 </div>
