@@ -23,7 +23,7 @@ import { LogWaterPage } from "./pages/LogWaterPage";
 import { HabitDetailPage } from "./pages/HabitDetailPage";
 
 function App() {
-  const [showIntro, setShowIntro] = useState(true);
+  const [showIntro, setShowIntro] = useState(false);
 
   if (showIntro) {
     return (

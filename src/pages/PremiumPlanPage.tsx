@@ -1,25 +1,19 @@
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Shield, Zap, Heart, Sparkles } from "lucide-react";
-import type { FormData } from "@/types/form";
-
 import { useState } from "react";
-
+import { useUserProfileStore } from "@/store/userProfileStore";
 
 import FeatureItem from "@/components/FeatureItem";
 import PricingCard from "@/components/PricingCard";
 
 export function PremiumPlanPage() {
-    const location = useLocation();
     const navigate = useNavigate();
-    const formData = location.state?.formData as FormData;
-    const gender = formData?.gender || "female";
+    const { formData } = useUserProfileStore();
     const [mockXp, setMockXp] = useState(1000); // Default XP for slider
 
-
-
-    // If no data, redirect to home
-    if (!formData) {
+    // If no gender is set (form not started), redirect to home
+    if (!formData?.gender) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <Button onClick={() => navigate("/")}>Go Home</Button>
@@ -27,23 +21,9 @@ export function PremiumPlanPage() {
         );
     }
 
-    // Calculate Mock Premium based on "Risk"
-    // Base: 499
-    // Age factor: +10 per year over 20
-    // BMI factor: if BMI > 25, add 50
-
-
-
-
-    // Theme colors
-    const isMale = gender === "male";
-    const themeColor = isMale ? "text-emerald-600" : "text-purple-700";
-    const buttonBg = isMale ? "bg-emerald-600 hover:bg-emerald-700" : "bg-purple-700 hover:bg-purple-800";
-    const borderColor = isMale ? "border-emerald-200" : "border-purple-200";
-
     const calculatePremiumWithXp = (xp: number) => {
         const basePremium = 499;
-        const maxDiscountXp = 2000;
+        const maxDiscountXp = 10000;
         const discountPer100Xp = 20;
         const minPremium = 99;
 
@@ -55,29 +35,24 @@ export function PremiumPlanPage() {
     const finalPremium = calculatePremiumWithXp(mockXp);
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-background via-muted/30 to-background relative overflow-hidden">
-            {/* Background effects */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-to-b from-accent/5 via-primary/5 to-transparent rounded-full blur-3xl" />
-                <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-accent/5 rounded-full blur-3xl" />
-                <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-3xl" />
-            </div>
-
-            <div className="relative z-10 container mx-auto px-4 py-12 max-w-md">
+        <div className="min-h-screen bg-white relative overflow-hidden">
+            <div className="relative z-10 container mx-auto px-4 py-8 max-w-md">
                 {/* Header */}
-                <div className="text-center mb-10 animate-fade-in">
+                <div className="text-center mb-8">
                     <h1 className="text-2xl md:text-3xl font-bold mb-2 leading-tight">
-                        <span className="gradient-text">First month is on us,</span>{" "}
-                        <span className="text-foreground">as you move forward,</span>
+                        <span className="bg-gradient-to-r from-purple-700 to-emerald-600 bg-clip-text text-transparent">
+                            First month is on us,
+                        </span>{" "}
+                        <span className="text-gray-900">as you move forward,</span>
                     </h1>
-                    <p className="text-lg md:text-xl text-muted-foreground">
+                    <p className="text-base md:text-lg text-gray-600 mt-2">
                         your next month premium will be based on{" "}
-                        <span className="text-primary font-semibold">XP you earned</span>
+                        <span className="text-emerald-600 font-semibold">XP you earned</span>
                     </p>
                 </div>
 
                 {/* Features */}
-                <div className="space-y-4 mb-10">
+                <div className="space-y-3 mb-8">
                     <FeatureItem
                         icon={Heart}
                         title="Start with ₹499/month"
@@ -101,7 +76,7 @@ export function PremiumPlanPage() {
                 </div>
 
                 {/* Pricing Card */}
-                <PricingCard finalPremium={finalPremium} mockXp={mockXp} setMockXp={setMockXp} buttonBg={buttonBg} themeColor={themeColor} borderColor={borderColor} />
+                <PricingCard finalPremium={finalPremium} mockXp={mockXp} setMockXp={setMockXp} />
             </div>
         </div>
     );

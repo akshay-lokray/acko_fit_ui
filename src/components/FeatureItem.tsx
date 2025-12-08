@@ -10,13 +10,13 @@ interface FeatureItemProps {
 const FeatureItem: React.FC<FeatureItemProps> = ({ icon: Icon, title, delay }) => {
   return (
     <div
-      className="flex items-center gap-3 p-4 rounded-xl bg-white border border-gray-100 shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-md animate-fade-in"
+      className="flex items-center gap-3 p-4 rounded-2xl bg-white border border-gray-200 shadow-sm transition-all duration-300 hover:shadow-md"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="p-3 rounded-lg bg-purple-50 transition-all duration-200 group-hover:scale-110">
-        <Icon className="w-6 h-6 text-purple-700" />
+      <div className="p-2.5 rounded-lg border-2 border-emerald-200 bg-emerald-50/30 transition-all duration-200">
+        <Icon className="w-5 h-5 text-emerald-600" strokeWidth={2} />
       </div>
-      <span className="font-medium text-gray-700">{title}</span>
+      <span className="font-medium text-gray-800 text-sm">{title}</span>
     </div>
   );
 };
