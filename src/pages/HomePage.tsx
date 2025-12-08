@@ -15,8 +15,6 @@ import {
   Trophy,
   Crown,
 } from "lucide-react";
-import AvatarScene from "@/components/AvatarScene";
-import type { VoiceType } from "@/types/voice";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
@@ -176,6 +174,218 @@ export function HomePage() {
   const maxListeningTimeoutRef = useRef<number | null>(null);
   const silenceTimeoutRef = useRef<number | null>(null);
   const lastSpeechTimeRef = useRef<number>(0);
+  const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  // Function to play audio feedback - start listening sound
+  const playStartSound = useCallback(() => {
+    try {
+      // Create AudioContext if it doesn't exist
+      if (!audioContextRef.current) {
+        const AudioContextClass =
+          window.AudioContext ||
+          (
+            window as unknown as {
+              webkitAudioContext?: { new (): AudioContext };
+            }
+          ).webkitAudioContext;
+        if (AudioContextClass) {
+          audioContextRef.current = new AudioContextClass();
+        } else {
+          console.warn("Web Audio API not supported");
+          return;
+        }
+      }
+      const audioContext = audioContextRef.current;
+
+      // Create a pleasant start sound (higher pitch, shorter)
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      // Configure the sound
+      oscillator.frequency.value = 800; // Higher pitch for start
+      oscillator.type = "sine"; // Smooth sine wave
+
+      // Envelope: quick fade in, then fade out
+      const now = audioContext.currentTime;
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+      oscillator.start(now);
+      oscillator.stop(now + 0.15);
+
+      console.log("🔊 Played start listening sound");
+    } catch (error) {
+      console.warn("Failed to play start sound:", error);
+    }
+  }, []);
+
+  // Function to play audio feedback - end listening sound
+  const playEndSound = useCallback(() => {
+    try {
+      // Create AudioContext if it doesn't exist
+      if (!audioContextRef.current) {
+        const AudioContextClass =
+          window.AudioContext ||
+          (
+            window as unknown as {
+              webkitAudioContext?: { new (): AudioContext };
+            }
+          ).webkitAudioContext;
+        if (AudioContextClass) {
+          audioContextRef.current = new AudioContextClass();
+        } else {
+          console.warn("Web Audio API not supported");
+          return;
+        }
+      }
+      const audioContext = audioContextRef.current;
+
+      // Create a pleasant end sound (lower pitch, slightly longer)
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      // Configure the sound
+      oscillator.frequency.value = 600; // Lower pitch for end
+      oscillator.type = "sine"; // Smooth sine wave
+
+      // Envelope: quick fade in, then fade out
+      const now = audioContext.currentTime;
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+
+      oscillator.start(now);
+      oscillator.stop(now + 0.2);
+
+      console.log("🔊 Played end listening sound");
+    } catch (error) {
+      console.warn("Failed to play end sound:", error);
+    }
+  }, []);
+
+  // Function to speak text using browser's Speech Synthesis API
+  const speakText = useCallback(
+    (text: string) => {
+      if (!text || !text.trim()) {
+        return;
+      }
+
+      // Check if Speech Synthesis is available
+      if (!("speechSynthesis" in window)) {
+        console.warn("Speech synthesis not supported in this browser");
+        return;
+      }
+
+      // Cancel any ongoing speech
+      if (speechSynthesisRef.current) {
+        window.speechSynthesis.cancel();
+      }
+
+      try {
+        const utterance = new SpeechSynthesisUtterance(text);
+        speechSynthesisRef.current = utterance;
+
+        // Configure voice based on gender
+        utterance.lang = "en-US";
+        utterance.rate = 1.0; // Normal speed
+        utterance.pitch = isMale ? 0.8 : 1.2; // Lower pitch for male, higher for female
+        utterance.volume = 1.0; // Full volume
+
+        // Try to select appropriate voice based on gender
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          // Prefer voices that match the gender
+          const preferredVoices = voices.filter((voice) => {
+            const voiceName = voice.name.toLowerCase();
+            if (isMale) {
+              // Prefer male-sounding voices
+              return (
+                voiceName.includes("male") ||
+                voiceName.includes("david") ||
+                voiceName.includes("daniel") ||
+                voiceName.includes("alex") ||
+                voice.lang.startsWith("en")
+              );
+            } else {
+              // Prefer female-sounding voices
+              return (
+                voiceName.includes("female") ||
+                voiceName.includes("samantha") ||
+                voiceName.includes("susan") ||
+                voiceName.includes("karen") ||
+                voiceName.includes("victoria") ||
+                voice.lang.startsWith("en")
+              );
+            }
+          });
+
+          if (preferredVoices.length > 0) {
+            utterance.voice = preferredVoices[0];
+          } else if (voices.length > 0) {
+            // Fallback to any English voice
+            const englishVoices = voices.filter((v) => v.lang.startsWith("en"));
+            if (englishVoices.length > 0) {
+              utterance.voice = englishVoices[0];
+            }
+          }
+        }
+
+        // Handle speech events
+        utterance.onstart = () => {
+          console.log("🔊 Started speaking response");
+        };
+
+        utterance.onend = () => {
+          console.log("🔊 Finished speaking response");
+          speechSynthesisRef.current = null;
+        };
+
+        utterance.onerror = (event) => {
+          console.error("❌ Speech synthesis error:", event.error);
+          speechSynthesisRef.current = null;
+        };
+
+        // Speak the text
+        window.speechSynthesis.speak(utterance);
+        console.log("🔊 Speaking response:", text.substring(0, 50) + "...");
+      } catch (error) {
+        console.error("Failed to speak text:", error);
+      }
+    },
+    [isMale]
+  );
+
+  // Load voices when they become available
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        console.log("🔊 Available voices loaded:", voices.length);
+      }
+    };
+
+    // Voices might be loaded asynchronously
+    if (window.speechSynthesis.getVoices().length > 0) {
+      loadVoices();
+    } else {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+
+    return () => {
+      // Cleanup: cancel any ongoing speech when component unmounts
+      if (speechSynthesisRef.current) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   // Handle audio response from server
   const handleAudioResponse = async (
@@ -357,6 +567,9 @@ export function HomePage() {
       };
       setMessages((prev) => [...prev, coachMsg]);
       setIsListening(false);
+
+      // Speak the response using text-to-speech
+      speakText(responseText);
     });
 
     // Listen for audio data specifically
@@ -413,6 +626,9 @@ export function HomePage() {
     const socket = socketRef.current;
     setIsListening(false);
 
+    // Play end sound to indicate listening has stopped
+    playEndSound();
+
     // Clear all timeouts
     if (maxListeningTimeoutRef.current) {
       window.clearTimeout(maxListeningTimeoutRef.current);
@@ -424,17 +640,38 @@ export function HomePage() {
     }
 
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      const recognition = recognitionRef.current;
+
+      // Remove all event handlers first to prevent them from firing
+      recognition.onend = null;
+      recognition.onerror = null;
+      recognition.onresult = null;
+
+      // Clear ref to prevent handlers from restarting
       recognitionRef.current = null;
+
+      try {
+        // Use stop() for graceful stop (abort() triggers error events)
+        recognition.stop();
+      } catch {
+        // If stop fails, try abort
+        try {
+          recognition.abort();
+        } catch {
+          // Ignore errors when stopping
+        }
+      }
     }
 
     // Send the transcribed text if available
     if (recognitionResultRef.current.trim() && socket && socket.connected) {
+      const avatar = isMale ? "atlas" : "aria";
       const payload = {
         event: "process_audio",
         data: {
           text: recognitionResultRef.current.trim(),
           user_id: "user123", // You can change this to use actual user ID
+          avatar: avatar,
         },
       };
 
@@ -443,7 +680,7 @@ export function HomePage() {
       socket.emit("process_audio", payload);
       recognitionResultRef.current = "";
     }
-  }, []);
+  }, [isMale, playEndSound]);
 
   // Voice input handler - wrapped in useCallback for use in wake word detection
   const handleVoiceInput = useCallback(() => {
@@ -473,128 +710,243 @@ export function HomePage() {
       return;
     }
 
-    // Start speech recognition
-    try {
-      const recognition = new SpeechRecognition();
-      recognitionRef.current = recognition;
-
-      // Configure recognition
-      recognition.continuous = true; // Keep listening until stopped
-      recognition.interimResults = true; // Show interim results
-      recognition.lang = "en-US"; // Set language (you can make this configurable)
-
-      // Constants for timeout management
-      const MAX_LISTENING_TIME = 35000; // 35 seconds maximum
-      const SILENCE_TIMEOUT = 3000; // 3 seconds of silence to auto-stop
-
-      // Set maximum listening time (35 seconds)
-      maxListeningTimeoutRef.current = window.setTimeout(() => {
-        console.log("⏱️ Maximum listening time reached (35s), stopping...");
-        stopListeningAndSend();
-      }, MAX_LISTENING_TIME);
-
-      // Track speech activity
-      lastSpeechTimeRef.current = Date.now();
-
-      // Function to reset silence timeout
-      const resetSilenceTimeout = () => {
-        if (silenceTimeoutRef.current) {
-          window.clearTimeout(silenceTimeoutRef.current);
-        }
-        silenceTimeoutRef.current = window.setTimeout(() => {
-          const timeSinceLastSpeech = Date.now() - lastSpeechTimeRef.current;
-          if (timeSinceLastSpeech >= SILENCE_TIMEOUT && isListening) {
-            console.log("🔇 Silence detected for 3s, stopping...");
-            stopListeningAndSend();
-          }
-        }, SILENCE_TIMEOUT);
-      };
-
-      // Handle recognition results
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        let interimTranscript = "";
-        let finalTranscript = "";
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript + " ";
-          } else {
-            interimTranscript += transcript;
-          }
-        }
-
-        // Update the result
-        if (finalTranscript) {
-          recognitionResultRef.current += finalTranscript;
-          console.log("🎤 Final transcript:", finalTranscript);
-          // Update last speech time when we get final results
-          lastSpeechTimeRef.current = Date.now();
-          // Reset silence timeout since we detected speech
-          resetSilenceTimeout();
-        }
-
-        // Update last speech time for interim results too (user is still speaking)
-        if (interimTranscript) {
-          console.log("🎤 Interim transcript:", interimTranscript);
-          lastSpeechTimeRef.current = Date.now();
-          // Reset silence timeout since we detected speech
-          resetSilenceTimeout();
-        }
-      };
-
-      // Handle errors
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error("Speech recognition error:", event.error);
-        if (event.error === "no-speech") {
-          console.log("No speech detected, checking silence timeout...");
-          // Don't stop immediately, let silence timeout handle it
-        } else if (event.error === "audio-capture") {
-          alert("No microphone found. Please check your microphone.");
-          stopListeningAndSend();
-        } else if (event.error === "not-allowed") {
-          alert("Microphone access denied. Please allow microphone access.");
-          stopListeningAndSend();
-        } else {
-          // For other errors, stop listening
-          stopListeningAndSend();
-        }
-      };
-
-      // Handle when recognition ends
-      recognition.onend = () => {
-        console.log("🎤 Speech recognition ended");
-        if (isListening) {
-          // If still listening, restart recognition (for continuous mode)
-          try {
-            recognition.start();
-          } catch (error) {
-            console.error("Failed to restart recognition:", error);
-            stopListeningAndSend();
-          }
-        }
-      };
-
-      // Start recognition
-      recognition.start();
-      setIsListening(true);
-      recognitionResultRef.current = "";
-      lastSpeechTimeRef.current = Date.now();
-
-      // Start silence detection
-      resetSilenceTimeout();
-
-      console.log(
-        "🎤 Started speech recognition (max 35s, auto-stop after 3s silence)"
-      );
-    } catch (error) {
-      console.error("Failed to start speech recognition:", error);
-      setIsListening(false);
-      alert(
-        "Failed to start speech recognition. Please check your microphone permissions."
-      );
+    // Ensure any previous recognition is fully cleaned up
+    if (recognitionRef.current) {
+      try {
+        const oldRecognition = recognitionRef.current;
+        // Remove all event handlers to prevent conflicts
+        oldRecognition.onend = null;
+        oldRecognition.onerror = null;
+        oldRecognition.onresult = null;
+        oldRecognition.stop();
+      } catch {
+        // Ignore errors when cleaning up
+      }
+      recognitionRef.current = null;
     }
-  }, [isListening, stopListeningAndSend]);
+
+    // Small delay to ensure previous recognition is fully stopped
+    setTimeout(() => {
+      // Double-check we're still not listening (user might have clicked again)
+      if (isListening) {
+        return;
+      }
+
+      // Start speech recognition
+      try {
+        const recognition = new SpeechRecognition();
+        recognitionRef.current = recognition;
+
+        // Configure recognition
+        recognition.continuous = true; // Keep listening until stopped
+        recognition.interimResults = true; // Show interim results
+        recognition.lang = "en-US"; // Set language (you can make this configurable)
+
+        // Constants for timeout management
+        const MAX_LISTENING_TIME = 35000; // 35 seconds maximum
+        const SILENCE_TIMEOUT = 3000; // 3 seconds of silence to auto-stop
+
+        // Set maximum listening time (35 seconds)
+        maxListeningTimeoutRef.current = window.setTimeout(() => {
+          console.log("⏱️ Maximum listening time reached (35s), stopping...");
+          stopListeningAndSend();
+        }, MAX_LISTENING_TIME);
+
+        // Track speech activity
+        lastSpeechTimeRef.current = Date.now();
+
+        // Function to reset silence timeout
+        const resetSilenceTimeout = () => {
+          if (silenceTimeoutRef.current) {
+            window.clearTimeout(silenceTimeoutRef.current);
+          }
+          silenceTimeoutRef.current = window.setTimeout(() => {
+            const timeSinceLastSpeech = Date.now() - lastSpeechTimeRef.current;
+            if (timeSinceLastSpeech >= SILENCE_TIMEOUT && isListening) {
+              console.log("🔇 Silence detected for 3s, stopping...");
+              stopListeningAndSend();
+            }
+          }, SILENCE_TIMEOUT);
+        };
+
+        // Handle recognition results
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+          let interimTranscript = "";
+          let finalTranscript = "";
+
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript + " ";
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          // Update the result
+          if (finalTranscript) {
+            recognitionResultRef.current += finalTranscript;
+            console.log("🎤 Final transcript:", finalTranscript);
+            // Update last speech time when we get final results
+            lastSpeechTimeRef.current = Date.now();
+            // Reset silence timeout since we detected speech
+            resetSilenceTimeout();
+          }
+
+          // Update last speech time for interim results too (user is still speaking)
+          if (interimTranscript) {
+            console.log("🎤 Interim transcript:", interimTranscript);
+            lastSpeechTimeRef.current = Date.now();
+            // Reset silence timeout since we detected speech
+            resetSilenceTimeout();
+          }
+        };
+
+        // Handle errors
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+          // Suppress "aborted" error - it's expected when we stop recognition
+          if (event.error === "aborted") {
+            // Silently handle aborted - it's intentional when stopping
+            return;
+          }
+
+          // Log all errors with details
+          console.log(`⚠️ Speech recognition error: ${event.error}`);
+
+          // Log other errors
+          if (event.error === "no-speech") {
+            console.log("No speech detected, checking silence timeout...");
+            // Don't stop immediately, let silence timeout handle it
+          } else if (event.error === "audio-capture") {
+            console.error("❌ Audio capture error - no microphone found");
+            alert("No microphone found. Please check your microphone.");
+            stopListeningAndSend();
+          } else if (event.error === "not-allowed") {
+            console.error("❌ Microphone access denied");
+            alert("Microphone access denied. Please allow microphone access.");
+            stopListeningAndSend();
+          } else if (event.error === "network") {
+            console.error("❌ Network error in speech recognition");
+            // Try to restart if still listening
+            if (isListening) {
+              setTimeout(() => {
+                if (isListening && recognitionRef.current === recognition) {
+                  try {
+                    console.log(
+                      "🔄 Attempting to restart after network error..."
+                    );
+                    recognition.start();
+                  } catch (error) {
+                    console.error(
+                      "Failed to restart after network error:",
+                      error
+                    );
+                    stopListeningAndSend();
+                  }
+                }
+              }, 500);
+            }
+          } else {
+            // For other errors, log with details
+            console.warn(
+              `⚠️ Speech recognition error (non-critical): ${event.error}`,
+              event
+            );
+          }
+        };
+
+        // Track when recognition started to prevent immediate restarts
+        const recognitionStartTime = Date.now();
+        const MIN_RECOGNITION_DURATION = 500; // Minimum 500ms before allowing restart
+
+        // Handle when recognition ends
+        recognition.onend = () => {
+          const duration = Date.now() - recognitionStartTime;
+          console.log(`🎤 Speech recognition ended (duration: ${duration}ms)`);
+
+          // If recognition ended very quickly (< 500ms), it might be an error
+          // Don't restart immediately in this case
+          if (duration < MIN_RECOGNITION_DURATION) {
+            console.warn(
+              "⚠️ Recognition ended too quickly, might be an error. Not restarting."
+            );
+            // Check if we're still supposed to be listening
+            if (isListening && recognitionRef.current === recognition) {
+              // Wait a bit longer before trying to restart
+              setTimeout(() => {
+                if (isListening && recognitionRef.current === recognition) {
+                  console.log(
+                    "🔄 Attempting to restart recognition after quick end..."
+                  );
+                  try {
+                    recognition.start();
+                  } catch (error) {
+                    console.error(
+                      "Failed to restart recognition after quick end:",
+                      error
+                    );
+                    stopListeningAndSend();
+                  }
+                }
+              }, 1000); // Wait 1 second before restarting
+            }
+            return;
+          }
+
+          // Only restart if we're still supposed to be listening
+          // and the recognition wasn't intentionally stopped
+          if (isListening && recognitionRef.current === recognition) {
+            console.log("🔄 Recognition ended normally, restarting...");
+            // Small delay before restarting to avoid conflicts
+            setTimeout(() => {
+              if (isListening && recognitionRef.current === recognition) {
+                try {
+                  recognition.start();
+                } catch (error) {
+                  console.error("Failed to restart recognition:", error);
+                  // If restart fails, stop listening
+                  if (
+                    error instanceof Error &&
+                    error.message.includes("already started")
+                  ) {
+                    // Recognition might already be running, ignore
+                    return;
+                  }
+                  stopListeningAndSend();
+                }
+              }
+            }, 100);
+          } else {
+            console.log(
+              "✅ Recognition ended and we're no longer listening (expected)"
+            );
+          }
+        };
+
+        // Start recognition
+        recognition.start();
+        setIsListening(true);
+        recognitionResultRef.current = "";
+        lastSpeechTimeRef.current = Date.now();
+
+        // Play start sound to indicate listening has started
+        playStartSound();
+
+        // Start silence detection
+        resetSilenceTimeout();
+
+        console.log(
+          "🎤 Started speech recognition (max 35s, auto-stop after 3s silence)"
+        );
+      } catch (error) {
+        console.error("Failed to start speech recognition:", error);
+        setIsListening(false);
+        alert(
+          "Failed to start speech recognition. Please check your microphone permissions."
+        );
+      }
+    }, 100); // Small delay to ensure previous recognition is fully stopped
+  }, [isListening, stopListeningAndSend, playStartSound]);
 
   // Wake word listener - listens for "okay atlas" or "ok aria"
   useEffect(() => {
@@ -655,29 +1007,57 @@ export function HomePage() {
 
           if (detected && !isListening) {
             console.log("🔔 Wake word detected:", transcript.trim());
-            // Stop wake word detection
+            // Stop wake word detection gracefully
             if (wakeWordRecognition) {
-              wakeWordRecognition.stop();
+              // Clear ref first to prevent error handler from logging
               wakeWordRecognitionRef.current = null;
+              try {
+                // Use stop() for graceful stop (abort() triggers error events)
+                wakeWordRecognition.stop();
+              } catch {
+                // If stop fails, try abort
+                try {
+                  wakeWordRecognition.abort();
+                } catch {
+                  // Ignore errors when stopping
+                }
+              }
             }
-            // Start main voice input
-            handleVoiceInput();
+            // Small delay before starting main recognition to ensure cleanup
+            setTimeout(() => {
+              if (!isListening) {
+                handleVoiceInput();
+              }
+            }, 50);
           }
         };
 
         wakeWordRecognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-          // Ignore "no-speech" errors for wake word detection
-          if (event.error !== "no-speech") {
-            console.error("Wake word recognition error:", event.error);
+          // Suppress "aborted" error - it's expected when we stop wake word detection
+          if (event.error === "aborted") {
+            // Silently handle aborted - it's intentional when stopping
+            return;
           }
+          // Ignore "no-speech" errors for wake word detection
+          if (event.error === "no-speech") {
+            return;
+          }
+          // Log other errors
+          console.error("Wake word recognition error:", event.error);
         };
 
         wakeWordRecognition.onend = () => {
-          // Restart wake word detection if not listening
+          // Only restart if:
+          // 1. We're not currently listening (main recognition not active)
+          // 2. The ref is null (meaning it was intentionally stopped, not just ended)
           if (!isListening && wakeWordRecognitionRef.current === null) {
+            // Add a delay to avoid rapid restart loops
             setTimeout(() => {
-              startWakeWordDetection();
-            }, 100);
+              // Double-check state before restarting
+              if (!isListening && wakeWordRecognitionRef.current === null) {
+                startWakeWordDetection();
+              }
+            }, 200);
           }
         };
 
@@ -697,8 +1077,17 @@ export function HomePage() {
 
     return () => {
       if (wakeWordRecognition) {
-        wakeWordRecognition.stop();
+        // Clear ref first to prevent error handler from logging
         wakeWordRecognitionRef.current = null;
+        try {
+          wakeWordRecognition.stop();
+        } catch {
+          try {
+            wakeWordRecognition.abort();
+          } catch {
+            // Ignore errors during cleanup
+          }
+        }
       }
     };
   }, [isListening, isMale, handleVoiceInput]);
@@ -735,11 +1124,13 @@ export function HomePage() {
 
     const socket = socketRef.current;
     if (socket && socket.connected) {
+      const avatar = isMale ? "atlas" : "aria";
       const payload = {
         event: "process_audio",
         data: {
           text: textToSend,
           user_id: "user123", // You can change this to use actual user ID
+          avatar: avatar,
         },
       };
       try {
@@ -813,56 +1204,27 @@ export function HomePage() {
           />
         </div>
 
-        {/* 1. The Coach View (Bigger Height) */}
-        {/* Increased height from h-[40vh] to h-[55vh] */}
-        <div className="relative z-10 h-[55vh] md:h-[60vh] flex-shrink-0">
-          <AvatarScene
-            textToSpeak={
-              messages[messages.length - 1].sender === "coach"
-                ? messages[messages.length - 1].text
-                : ""
-            }
-            voiceType={gender as VoiceType}
-          />
-
-          {/* Contextual Nudge Bubble (Hidden if listening to avoid clutter) */}
-          {!isListening && (
-            <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-8 md:w-80">
-              <div className="bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-lg animate-fade-in-up">
-                <p className={`text-xs font-bold uppercase mb-1 ${themeColor}`}>
-                  Current Mission
-                </p>
-                <p className="text-sm text-gray-800 font-medium">
-                  Log your meal to maintain your 3-day streak!
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Listening Overlay */}
-          {isListening && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm animate-in fade-in">
-              <div
-                className={`w-24 h-24 rounded-full flex items-center justify-center ${
-                  isMale ? "bg-emerald-500" : "bg-purple-500"
-                } animate-pulse shadow-[0_0_40px_rgba(0,0,0,0.2)]`}
-              >
-                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
-                  <div
-                    className={`w-16 h-16 rounded-full flex items-center justify-center animate-ping ${
-                      isMale ? "bg-emerald-100" : "bg-purple-100"
-                    }`}
-                  >
-                    <Zap className={`w-8 h-8 ${themeColor}`} />
-                  </div>
+        {/* Listening Overlay - shown when listening */}
+        {isListening && (
+          <div className="relative z-10 flex flex-col items-center justify-center py-8">
+            <div
+              className={`w-24 h-24 rounded-full flex items-center justify-center ${
+                isMale ? "bg-emerald-500" : "bg-purple-500"
+              } animate-pulse shadow-[0_0_40px_rgba(0,0,0,0.2)]`}
+            >
+              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
+                <div
+                  className={`w-16 h-16 rounded-full flex items-center justify-center animate-ping ${
+                    isMale ? "bg-emerald-100" : "bg-purple-100"
+                  }`}
+                >
+                  <Zap className={`w-8 h-8 ${themeColor}`} />
                 </div>
               </div>
-              <p className="mt-6 text-white font-bold text-lg drop-shadow-md">
-                Listening...
-              </p>
             </div>
-          )}
-        </div>
+            <p className="mt-6 text-gray-700 font-bold text-lg">Listening...</p>
+          </div>
+        )}
 
         {/* 2. Interface Tabs (Chat / Explore / Leaderboard) */}
         <div className="flex-1 bg-white rounded-t-[2rem] shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] relative z-20 overflow-hidden flex flex-col">
