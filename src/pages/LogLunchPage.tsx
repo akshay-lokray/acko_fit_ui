@@ -106,7 +106,7 @@ export function LogLunchPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-4 pb-24 font-sans relative">
+    <div className="min-h-screen bg-white p-4 font-sans relative">
       <div className="max-w-md mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" onClick={() => navigate(-1)}>

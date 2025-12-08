@@ -13,5 +13,9 @@ export interface FormData {
   targetWeight: number;
   autoTrackEnabled: boolean;
   medicalConditions: string[];
+  xp?: number;
+  streak?: number;
+  avatarUrl?: string; // ReadyPlayer.me avatar URL
+  avatarName?: string; // Atlas or Aria
 }
 

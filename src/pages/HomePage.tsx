@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useUserProfileStore } from "@/store/userProfileStore";
 
 // Type definitions for Speech Recognition API
 interface SpeechRecognition extends EventTarget {
@@ -77,13 +78,27 @@ interface Quest {
 }
 
 interface LeaderboardUser {
+  userId: string;
   rank: number;
   name: string;
   xp: number;
-  avatarColor: string;
-  isUser?: boolean;
-  location?: string;
 }
+
+type LeaderboardApiResponse = {
+  topUsers: Array<{
+    userId: string;
+    name: string | null;
+    xp: number;
+    rank: number;
+  }>;
+  currentUser: {
+    userId: string;
+    name: string | null;
+    xp: number;
+    rank: number;
+    percentile?: number;
+  };
+};
 
 // --- Mock Data ---
 const DAILY_QUESTS: Quest[] = [
@@ -98,45 +113,26 @@ const DAILY_QUESTS: Quest[] = [
   { id: "3", title: "Drink 2L Water", xp: 50, completed: true, type: "daily" },
 ];
 
-const MOCK_LEADERBOARD: LeaderboardUser[] = [
-  {
-    rank: 1,
-    name: "Aarav P.",
-    xp: 15400,
-    avatarColor: "bg-orange-500",
-    location: "Mumbai",
-  },
-  {
-    rank: 2,
-    name: "Sneha K.",
-    xp: 14200,
-    avatarColor: "bg-blue-500",
-    location: "Delhi",
-  },
-  {
-    rank: 3,
-    name: "Rohan M.",
-    xp: 13850,
-    avatarColor: "bg-green-500",
-    location: "Bangalore",
-  },
-  {
-    rank: 144,
-    name: "You",
-    xp: 350,
-    avatarColor: "bg-purple-600",
-    isUser: true,
-    location: "Pune",
-  }, // User's rank
+const FALLBACK_LEADERBOARD: LeaderboardUser[] = [
+  { userId: "1", rank: 1, name: "Aarav P.", xp: 15400 },
+  { userId: "2", rank: 2, name: "Sneha K.", xp: 14200 },
+  { userId: "3", rank: 3, name: "Rohan M.", xp: 13850 },
+  { userId: "you", rank: 144, name: "You", xp: 350 },
 ];
 
 export function HomePage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { formData: profile, updateFormData } = useUserProfileStore();
+  const fetchedUserRef = useRef<string | null>(null);
+  const goalStateRef = useRef<{ userId: string | null; hits: Set<string> }>({
+    userId: null,
+    hits: new Set(),
+  });
+  const routeFormData = location.state?.formData || {};
   // Safe access to formData with defaults
-  const formData = location.state?.formData || {};
-  const gender = formData.gender || "female";
-  const name = formData.name || "Traveller";
+  const gender = profile.gender || routeFormData.gender || "female";
+  const name = profile.name || routeFormData.name || "Traveller";
   const coachName = gender === "male" ? "Atlas" : "Aria";
 
   // State
@@ -152,11 +148,162 @@ export function HomePage() {
     },
   ]);
   const [inputValue, setInputValue] = useState("");
-  const [xp] = useState(350);
-  const [userLocation, setUserLocation] = useState("India"); // Default location
+  const xp = profile.xp ?? routeFormData.xp ?? 350;
+  const [userLocation, setUserLocation] = useState("India"); // Default location (show actual percentile from API)
+  const [habitStats, setHabitStats] = useState<{
+    calorie?: number;
+    water?: number;
+    steps?: number;
+  }>({});
+  const [leaderboardData, setLeaderboardData] =
+    useState<LeaderboardApiResponse | null>(null);
+  const currentPercentile = Math.round(
+    leaderboardData?.currentUser?.percentile ?? 15
+  );
 
   const levelingXp = 1000;
   const level = 1;
+
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const res = await fetch(`/api/users/${encodeURIComponent(userId)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      updateFormData(data);
+    } catch (e) {
+      console.error("Failed to fetch user profile", e);
+    }
+  };
+
+  const awardXp = async (userId: string, delta: number) => {
+    try {
+      const res = await fetch(
+        `/api/users/${encodeURIComponent(userId)}/xp?delta=${delta}`,
+        {
+          method: "POST",
+        }
+      );
+      if (!res.ok) return;
+      await fetchUserProfile(userId); // refresh xp
+    } catch (e) {
+      console.error("Failed to award XP", e);
+    }
+  };
+
+  // Fetch user profile on mount
+  useEffect(() => {
+    const userId = profile.mobile || routeFormData.mobile || "";
+    if (!userId) return;
+    if (fetchedUserRef.current === userId) return;
+    fetchedUserRef.current = userId;
+
+    fetchUserProfile(userId);
+  }, [profile.mobile, routeFormData.mobile]);
+
+  // Fetch daily habit stats on mount
+  useEffect(() => {
+    const userId = profile.mobile || routeFormData.mobile || "";
+    if (!userId) return;
+
+    const fetchHabits = async () => {
+      try {
+        const res = await fetch(
+          `/api/habits/daily/batch?userId=${encodeURIComponent(
+            userId
+          )}&habits=water,calorie,steps`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const calorie = data?.calorie ?? {};
+        const water = data?.water ?? {};
+        const steps = data?.steps ?? {};
+
+        const parseTotals = (
+          totals: Record<string, unknown> | null | undefined
+        ) => {
+          if (!totals || typeof totals !== "object") return undefined;
+          const firstKey = Object.keys(totals)[0];
+          const val = totals[firstKey];
+          return Number(val ?? 0) || 0;
+        };
+
+        setHabitStats({
+          calorie: parseTotals(calorie.totals),
+          water: parseTotals(water.totals),
+          steps: parseTotals(steps.totals),
+        });
+      } catch (e) {
+        console.error("Failed to fetch habit stats", e);
+      }
+    };
+
+    fetchHabits();
+  }, [profile.mobile, routeFormData.mobile]);
+
+  useEffect(() => {
+    const userId = profile.mobile || routeFormData.mobile || "";
+    if (!userId) return;
+
+    const loadLeaderboard = async () => {
+      try {
+        const res = await fetch(
+          `/api/users/leaderboard?userId=${encodeURIComponent(userId)}`
+        );
+        if (!res.ok) return;
+        const data: LeaderboardApiResponse = await res.json();
+        setLeaderboardData(data);
+      } catch (e) {
+        console.error("Failed to load leaderboard", e);
+      }
+    };
+
+    loadLeaderboard();
+  }, [profile.mobile, routeFormData.mobile]);
+
+  // Award XP when goals are reached (once per goal per user)
+  useEffect(() => {
+    const userId = profile.mobile || routeFormData.mobile || "";
+    if (!userId) return;
+
+    // Reset goal state when user changes
+    if (goalStateRef.current.userId !== userId) {
+      goalStateRef.current = { userId, hits: new Set() };
+    }
+
+    const goals = [
+      {
+        key: "steps",
+        hit: habitStats.steps != null && habitStats.steps >= 5000,
+        xp: 100,
+      },
+      {
+        key: "water",
+        hit: habitStats.water != null && habitStats.water >= 3000,
+        xp: 50,
+      },
+    ];
+
+    let delta = 0;
+    goals.forEach(({ key, hit, xp }) => {
+      const marker = `${userId}:${key}`;
+      const alreadyHit = goalStateRef.current.hits.has(marker);
+
+      // If goal is already achieved before this render, only award when transitioning from not-hit -> hit
+      if (hit && !alreadyHit) {
+        goalStateRef.current.hits.add(marker);
+        delta += xp;
+      }
+
+      // If not hit, ensure we don't accidentally award next time without a transition
+      if (!hit && alreadyHit) {
+        goalStateRef.current.hits.delete(marker);
+      }
+    });
+
+    if (delta > 0) {
+      awardXp(userId, delta);
+    }
+  }, [habitStats, profile.mobile, routeFormData.mobile]);
 
   // Determining "Persona" styles
   const isMale = gender === "male";
@@ -1298,49 +1445,97 @@ export function HomePage() {
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">
                     Daily Objectives
                   </p>
-                  {DAILY_QUESTS.map((quest) => (
-                    <div
-                      key={quest.id}
-                      className={`bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm ${
-                        quest.title === "Log Lunch"
-                          ? "cursor-pointer hover:border-emerald-300 hover:shadow-md"
-                          : ""
-                      }`}
-                      onClick={() => {
-                        if (quest.title === "Log Meal") {
-                          navigate("/log-meal", { state: { formData } });
-                        }
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                            quest.completed
-                              ? "bg-green-100 text-green-600"
-                              : "bg-gray-100 text-gray-400"
-                          }`}
-                        >
-                          {quest.completed ? (
-                            <CheckCircle2 className="w-5 h-5" />
-                          ) : (
-                            <div className="w-3 h-3 rounded-full bg-gray-300" />
-                          )}
+                  {DAILY_QUESTS.map((quest) => {
+                    const goalHit =
+                      (quest.title === "Walk 5,000 Steps" &&
+                        habitStats.steps != null &&
+                        habitStats.steps >= 5000) ||
+                      (quest.title === "Drink 2L Water" &&
+                        habitStats.water != null &&
+                        habitStats.water >= 2000);
+
+                    return (
+                      <div
+                        key={quest.id}
+                        className={`bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm ${
+                          quest.title === "Log Meal" ||
+                          quest.title === "Walk 5,000 Steps" ||
+                          quest.title === "Drink 2L Water"
+                            ? "cursor-pointer hover:border-emerald-300 hover:shadow-md"
+                            : ""
+                        } ${goalHit ? "border-emerald-400 bg-emerald-50" : ""}`}
+                        onClick={() => {
+                          if (quest.title === "Log Meal") {
+                            navigate("/log-meal", {
+                              state: { formData: profile },
+                            });
+                          }
+                        }}
+                      >
+                        <div className="flex items-center gap-3 flex-1">
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                              quest.completed || goalHit
+                                ? "bg-emerald-100 text-emerald-600"
+                                : "bg-gray-100 text-gray-400"
+                            }`}
+                          >
+                            {quest.completed ? (
+                              <CheckCircle2 className="w-5 h-5" />
+                            ) : goalHit ? (
+                              <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                            ) : (
+                              <div className="w-3 h-3 rounded-full bg-gray-300" />
+                            )}
+                          </div>
+                          <div className="flex flex-col">
+                            <span
+                              className={`text-sm font-medium ${
+                                quest.completed
+                                  ? "text-gray-400 line-through"
+                                  : "text-gray-700"
+                              }`}
+                            >
+                              {quest.title}
+                            </span>
+                            {quest.title === "Log Meal" &&
+                              habitStats.calorie != null && (
+                                <span className="text-xs text-emerald-600">
+                                  {habitStats.calorie} kcal today
+                                </span>
+                              )}
+                            {quest.title === "Walk 5,000 Steps" &&
+                              habitStats.steps != null && (
+                                <span className="text-xs text-emerald-600">
+                                  {habitStats.steps} steps today
+                                  {habitStats.steps >= 5000
+                                    ? " · Goal hit!"
+                                    : ""}
+                                </span>
+                              )}
+                            {quest.title === "Drink 2L Water" &&
+                              habitStats.water != null && (
+                                <span className="text-xs text-emerald-600">
+                                  {habitStats.water} ml today
+                                  {habitStats.water >= 2000
+                                    ? " · Goal hit!"
+                                    : ""}
+                                </span>
+                              )}
+                          </div>
                         </div>
                         <span
-                          className={`text-sm font-medium ${
-                            quest.completed
-                              ? "text-gray-400 line-through"
-                              : "text-gray-700"
+                          className={`text-xs font-bold px-2 py-1 rounded-md ${
+                            goalHit
+                              ? "text-emerald-700 bg-emerald-100"
+                              : "text-yellow-600 bg-yellow-50"
                           }`}
                         >
-                          {quest.title}
+                          +{quest.xp} XP
                         </span>
                       </div>
-                      <span className="text-xs font-bold text-yellow-600 bg-yellow-50 px-2 py-1 rounded-md">
-                        +{quest.xp} XP
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Input Area */}
@@ -1481,59 +1676,79 @@ export function HomePage() {
                   </Button>
                 </div>
 
-                {/* Top 3 Podium */}
                 <div className="grid grid-cols-3 gap-2 items-end pt-4 mb-8">
-                  {/* Silver */}
-                  <div className="flex flex-col items-center">
-                    <div className="w-14 h-14 bg-gray-200 rounded-full border-4 border-gray-300 flex items-center justify-center mb-2 relative">
-                      <span className="text-xl">🥈</span>
-                      <div className="absolute -bottom-2 bg-gray-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
-                        #2
-                      </div>
-                    </div>
-                    <p className="font-bold text-xs text-center truncate w-full">
-                      {MOCK_LEADERBOARD[1].name}
-                    </p>
-                    <p className="text-[10px] text-gray-400">
-                      {MOCK_LEADERBOARD[1].xp} XP
-                    </p>
-                  </div>
+                  {[0, 1, 2].map((position) => {
+                    const topUsers =
+                      leaderboardData?.topUsers ?? FALLBACK_LEADERBOARD;
+                    const user =
+                      topUsers[position] ||
+                      topUsers[position % topUsers.length];
+                    const medal =
+                      position === 1 ? "🥈" : position === 0 ? "🥇" : "🥉";
+                    const badgeColor =
+                      position === 1
+                        ? "bg-gray-200"
+                        : position === 0
+                        ? "bg-yellow-100"
+                        : "bg-orange-100";
+                    const borderColor =
+                      position === 1
+                        ? "border-gray-300"
+                        : position === 0
+                        ? "border-yellow-400"
+                        : "border-orange-300";
+                    const size = position === 0 ? "w-20 h-20" : "w-14 h-14";
+                    const textSize = position === 0 ? "text-3xl" : "text-xl";
+                    const badgeTextSize =
+                      position === 0 ? "text-xs" : "text-[10px]";
 
-                  {/* Gold */}
-                  <div className="flex flex-col items-center -mt-4">
-                    <Crown className="w-6 h-6 text-yellow-500 mb-1 animate-bounce" />
-                    <div className="w-20 h-20 bg-yellow-100 rounded-full border-4 border-yellow-400 flex items-center justify-center mb-2 relative shadow-lg">
-                      <span className="text-3xl">🥇</span>
-                      <div className="absolute -bottom-2 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                        #1
+                    return (
+                      <div
+                        key={`podium-${position}`}
+                        className={`flex flex-col items-center ${
+                          position === 0 ? "-mt-4" : ""
+                        }`}
+                      >
+                        {position === 0 && (
+                          <Crown className="w-6 h-6 text-yellow-500 mb-1 animate-bounce" />
+                        )}
+                        <div
+                          className={`${size} rounded-full border-4 flex items-center justify-center mb-2 relative ${badgeColor} ${borderColor} ${
+                            position === 0 ? "shadow-lg" : ""
+                          }`}
+                        >
+                          <span className={textSize}>{medal}</span>
+                          <div
+                            className={`absolute -bottom-2 ${
+                              position === 0
+                                ? "bg-yellow-500"
+                                : position === 1
+                                ? "bg-gray-600"
+                                : "bg-orange-600"
+                            } text-white ${badgeTextSize} px-2 py-0.5 rounded-full font-bold`}
+                          >
+                            #{user.rank}
+                          </div>
+                        </div>
+                        <p
+                          className={`font-bold ${
+                            position === 0 ? "text-sm" : "text-xs"
+                          } text-center truncate w-full`}
+                        >
+                          {user.name || "Unknown"}
+                        </p>
+                        <p
+                          className={`${
+                            position === 0 ? "text-xs" : "text-[10px]"
+                          } text-gray-400`}
+                        >
+                          {user.xp} XP
+                        </p>
                       </div>
-                    </div>
-                    <p className="font-bold text-sm text-center truncate w-full">
-                      {MOCK_LEADERBOARD[0].name}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {MOCK_LEADERBOARD[0].xp} XP
-                    </p>
-                  </div>
-
-                  {/* Bronze */}
-                  <div className="flex flex-col items-center">
-                    <div className="w-14 h-14 bg-orange-100 rounded-full border-4 border-orange-300 flex items-center justify-center mb-2 relative">
-                      <span className="text-xl">🥉</span>
-                      <div className="absolute -bottom-2 bg-orange-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
-                        #3
-                      </div>
-                    </div>
-                    <p className="font-bold text-xs text-center truncate w-full">
-                      {MOCK_LEADERBOARD[2].name}
-                    </p>
-                    <p className="text-[10px] text-gray-400">
-                      {MOCK_LEADERBOARD[2].xp} XP
-                    </p>
-                  </div>
+                    );
+                  })}
                 </div>
 
-                {/* User Rank Card */}
                 <Card className="bg-gradient-to-r from-gray-900 to-gray-800 p-4 rounded-xl flex items-center justify-between text-white shadow-lg transform scale-105 border-2 border-emerald-500/50">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center font-bold text-sm border-2 border-white/20">
@@ -1542,39 +1757,49 @@ export function HomePage() {
                     <div>
                       <p className="font-bold text-sm">Your Rank</p>
                       <p className="text-xs text-gray-400">
-                        Top 15% in {userLocation}
+                        Top {currentPercentile}% in {userLocation}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xl font-bold text-emerald-400">#144</p>
-                    <p className="text-xs text-gray-400">{xp} XP</p>
+                    <p className="text-xl font-bold text-emerald-400">
+                      #
+                      {leaderboardData?.currentUser?.rank ??
+                        FALLBACK_LEADERBOARD[3].rank}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {leaderboardData?.currentUser?.xp ??
+                        FALLBACK_LEADERBOARD[3].xp}{" "}
+                      XP
+                    </p>
                   </div>
                 </Card>
 
-                {/* REST OF LIST */}
                 <div className="space-y-4 pt-2">
                   <p className="text-xs font-bold text-gray-400 uppercase">
                     Runners Up
                   </p>
-                  {[4, 5, 6].map((rank) => (
+                  {(
+                    leaderboardData?.topUsers?.slice(3) ??
+                    FALLBACK_LEADERBOARD.slice(3)
+                  ).map((user) => (
                     <div
-                      key={rank}
+                      key={`runner-${user.userId}`}
                       className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100"
                     >
                       <div className="flex items-center gap-3">
                         <span className="font-bold text-gray-400 text-sm w-6">
-                          #{rank}
+                          #{user.rank}
                         </span>
                         <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-xs font-bold text-gray-500">
-                          U{rank}
+                          {user.name ? user.name.charAt(0) : "U"}
                         </div>
                         <span className="font-medium text-sm text-gray-700">
-                          User_{9200 + rank}
+                          {user.name || "Unknown"}
                         </span>
                       </div>
                       <span className="text-xs font-bold text-gray-500">
-                        {13000 - rank * 500} XP
+                        {user.xp} XP
                       </span>
                     </div>
                   ))}

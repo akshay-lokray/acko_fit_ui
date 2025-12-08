@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUserProfileStore } from "@/store/userProfileStore";
 import AvatarScene from "./AvatarScene";
@@ -22,12 +22,14 @@ export function MultiStepForm() {
   const location = useLocation();
   const navigate = useNavigate();
   const initialGender = location.state?.gender || "female"; // Default fallback
-  const { step, formData, nextStep, prevStep, updateFormData } = useUserProfileStore();
+  const { step, setStep, formData, nextStep, prevStep, updateFormData } = useUserProfileStore();
+  const [fetchingUser, setFetchingUser] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const submitUserData = async () => {
     const payload = {
-      userId: formData.mobile, // use mobile as userId
       ...formData,
+      userId: formData.mobile,
     };
 
     try {
@@ -54,7 +56,15 @@ export function MultiStepForm() {
     }
   }, [initialGender, formData.gender, updateFormData]);
 
+  useEffect(() => {
+    setStep(1);
+  }, [setStep]);
+
   const handleNext = async () => {
+    if (step === 1) {
+      const found = await handleFetchUser();
+      if (found) return;
+    }
     if (step < TOTAL_STEPS) {
       nextStep();
     } else {
@@ -132,6 +142,36 @@ export function MultiStepForm() {
     }
   };
 
+  const handleFetchUser = async (): Promise<boolean> => {
+    const mobile = formData.mobile || "";
+    if (!/^\d{10}$/.test(mobile)) {
+      setFetchError("Enter a valid 10-digit mobile number first.");
+      return false;
+    }
+    setFetchError(null);
+    setFetchingUser(true);
+    try {
+      const res = await fetch(`/api/users/${encodeURIComponent(mobile)}`);
+      if (res.ok) {
+        const data = await res.json();
+        updateFormData(data);
+        navigate("/home");
+        return true;
+      }
+      if (res.status === 404) {
+        setFetchError("No profile found. Please continue with the steps.");
+      } else {
+        throw new Error("Unexpected status");
+      }
+    } catch (error) {
+      console.error("Failed to load user", error);
+      setFetchError("Unable to fetch your profile right now.");
+    } finally {
+      setFetchingUser(false);
+    }
+    return false;
+  };
+
   return (
     <div className="min-h-screen bg-white p-4 font-sans pb-24">
       {/* Avatar Section - Fixed at bottom right */}
@@ -141,137 +181,137 @@ export function MultiStepForm() {
 
       <div className="max-w-7xl mx-auto">
         <div className="w-full max-w-md mx-auto">
-          {/* Progress dots */}
-          <div className="flex justify-center gap-2 mb-8">
-            {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
-              <div
-                key={s}
+            {/* Progress dots */}
+            <div className="flex justify-center gap-2 mb-8">
+              {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
+                <div
+                  key={s}
                 className={`h-2 w-2 rounded-full transition-colors ${s <= step ? "bg-green-600" : "bg-gray-300"
                   }`}
-              />
-            ))}
-          </div>
+                />
+              ))}
+            </div>
 
           {/* Step 1: Name Input */}
-          {step === 1 && (
-            <Step1NameInput
-              name={formData.name}
-              mobile={formData.mobile}
-              onNameChange={(name) => updateFormData({ name })}
-              onMobileChange={(mobile) => updateFormData({ mobile })}
-            />
-          )}
+            {step === 1 && (
+              <Step1NameInput
+                name={formData.name}
+                mobile={formData.mobile}
+                onNameChange={(name) => updateFormData({ name })}
+                onMobileChange={(mobile) => updateFormData({ mobile })}
+              />
+            )}
 
-          {/* Step 2: Options Selection */}
-          {step === 2 && (
-            <Step2OptionsSelection
-              selectedOptions={formData.selectedOptions}
-              onToggleOption={(optionId) => {
-                const newOptions = formData.selectedOptions.includes(optionId)
-                  ? formData.selectedOptions.filter((id) => id !== optionId)
-                  : [...formData.selectedOptions, optionId];
-                updateFormData({ selectedOptions: newOptions });
-              }}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 2: Options Selection */}
+            {step === 2 && (
+              <Step2OptionsSelection
+                selectedOptions={formData.selectedOptions}
+                onToggleOption={(optionId) => {
+                  const newOptions = formData.selectedOptions.includes(optionId)
+                    ? formData.selectedOptions.filter((id) => id !== optionId)
+                    : [...formData.selectedOptions, optionId];
+                  updateFormData({ selectedOptions: newOptions });
+                }}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-          {/* Step 3: Activity Level */}
-          {step === 3 && (
-            <Step3ActivityLevel
-              activityLevel={formData.activityLevel}
-              onActivityLevelChange={(level) =>
-                updateFormData({ activityLevel: level })
-              }
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 3: Activity Level */}
+            {step === 3 && (
+              <Step3ActivityLevel
+                activityLevel={formData.activityLevel}
+                onActivityLevelChange={(level) =>
+                  updateFormData({ activityLevel: level })
+                }
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-          {/* Step 4: Age Picker */}
-          {step === 4 && (
-            <Step4AgePicker
-              age={formData.age}
-              onAgeChange={(age) => updateFormData({ age })}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 4: Age Picker */}
+            {step === 4 && (
+              <Step4AgePicker
+                age={formData.age}
+                onAgeChange={(age) => updateFormData({ age })}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-          {/* Step 5: Height Picker */}
-          {step === 5 && (
-            <Step5HeightPicker
-              height={formData.height}
-              heightUnit={formData.heightUnit}
-              onHeightChange={(height) => updateFormData({ height })}
-              onUnitChange={(unit) => updateFormData({ heightUnit: unit })}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 5: Height Picker */}
+            {step === 5 && (
+              <Step5HeightPicker
+                height={formData.height}
+                heightUnit={formData.heightUnit}
+                onHeightChange={(height) => updateFormData({ height })}
+                onUnitChange={(unit) => updateFormData({ heightUnit: unit })}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-          {/* Step 6: Current Weight Picker */}
-          {step === 6 && (
-            <Step6WeightPicker
-              currentWeight={formData.currentWeight}
-              weightUnit={formData.weightUnit}
-              onWeightChange={(weight) =>
-                updateFormData({ currentWeight: weight })
-              }
-              onUnitChange={(unit) => updateFormData({ weightUnit: unit })}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 6: Current Weight Picker */}
+            {step === 6 && (
+              <Step6WeightPicker
+                currentWeight={formData.currentWeight}
+                weightUnit={formData.weightUnit}
+                onWeightChange={(weight) =>
+                  updateFormData({ currentWeight: weight })
+                }
+                onUnitChange={(unit) => updateFormData({ weightUnit: unit })}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-          {/* Step 7: Goal Pace */}
-          {step === 7 && (
-            <Step7GoalPace
-              goalPace={formData.goalPace}
-              onGoalPaceChange={(pace) => updateFormData({ goalPace: pace })}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 7: Goal Pace */}
+            {step === 7 && (
+              <Step7GoalPace
+                goalPace={formData.goalPace}
+                onGoalPaceChange={(pace) => updateFormData({ goalPace: pace })}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-          {/* Step 8: Target Weight */}
-          {step === 8 && (
-            <Step8TargetWeight
-              targetWeight={formData.targetWeight}
-              weightUnit={formData.weightUnit}
-              onTargetWeightChange={(weight) =>
-                updateFormData({ targetWeight: weight })
-              }
-              onUnitChange={(unit) => updateFormData({ weightUnit: unit })}
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 8: Target Weight */}
+            {step === 8 && (
+              <Step8TargetWeight
+                targetWeight={formData.targetWeight}
+                weightUnit={formData.weightUnit}
+                onTargetWeightChange={(weight) =>
+                  updateFormData({ targetWeight: weight })
+                }
+                onUnitChange={(unit) => updateFormData({ weightUnit: unit })}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-          {/* Step 9: Auto Track */}
-          {step === 9 && (
-            <Step9AutoTrack
-              autoTrackEnabled={formData.autoTrackEnabled}
-              onAutoTrackChange={(enabled) =>
-                updateFormData({ autoTrackEnabled: enabled })
-              }
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 9: Auto Track */}
+            {step === 9 && (
+              <Step9AutoTrack
+                autoTrackEnabled={formData.autoTrackEnabled}
+                onAutoTrackChange={(enabled) =>
+                  updateFormData({ autoTrackEnabled: enabled })
+                }
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-          {/* Step 10: Medical Conditions */}
-          {step === 10 && (
-            <Step10MedicalConditions
-              medicalConditions={formData.medicalConditions}
-              onMedicalConditionsChange={(conditions) =>
-                updateFormData({ medicalConditions: conditions })
-              }
-              onNext={handleNext}
-              onBack={handleBack}
-            />
-          )}
+            {/* Step 10: Medical Conditions */}
+            {step === 10 && (
+              <Step10MedicalConditions
+                medicalConditions={formData.medicalConditions}
+                onMedicalConditionsChange={(conditions) =>
+                  updateFormData({ medicalConditions: conditions })
+                }
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
         </div>
       </div>
 
@@ -279,20 +319,22 @@ export function MultiStepForm() {
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-20">
         <div className="max-w-md mx-auto">
           <div className="flex justify-between gap-4">
-            <Button
-              onClick={handleBack}
-              variant="outline"
-              className="h-12 px-6 flex-1"
-              size="lg"
-              disabled={step === 1}
-            >
-              <ArrowLeft className="mr-2 h-5 w-5" />
-              Back
-            </Button>
+            {step !== 9 && (
+              <Button
+                onClick={handleBack}
+                variant="outline"
+                className="h-12 px-6 flex-1"
+                size="lg"
+                disabled={step === 1}
+              >
+                <ArrowLeft className="mr-2 h-5 w-5" />
+                Back
+              </Button>
+            )}
             <Button
               onClick={handleNext}
-              disabled={!canProceed()}
-              className="h-12 px-8 flex-1"
+              disabled={!canProceed() || (step === 1 && fetchingUser)}
+              className={`h-12 px-8 ${step === 9 ? 'flex-1' : 'flex-1'}`}
               size="lg"
             >
               Next

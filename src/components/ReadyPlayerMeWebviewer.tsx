@@ -75,7 +75,8 @@ export default function ReadyPlayerMeWebviewer({
 
   if (!visible) return null;
 
-  const webviewerUrl = `${SUBDOMAIN}?appId=${APP_ID}&frameApi=true&gender=${gender}`;
+  // Enable photo upload in webviewer (requires photo option enabled in subdomain settings)
+  const webviewerUrl = `${SUBDOMAIN}?appId=${APP_ID}&frameApi=true&gender=${gender}&photo=true`;
 
   return (
     <div className="webviewer-overlay" onClick={onClose}>

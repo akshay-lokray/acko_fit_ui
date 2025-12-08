@@ -77,7 +77,7 @@ function AutoZoomCamera({ target = [0, 2.6, 0], isFullScreen = false }: { target
   const fullBodyY = 1.4; // Camera height for intro
   
   const startDistance = isFullScreen ? 2.2 : fullBodyDistance; // Intro stays close
-  const targetDistance = isFullScreen ? 2.2 : 1.8; // Intro stays close; inner pages zoom to face
+  const targetDistance = isFullScreen ? 2.2 : 3.2; // Intro stays close; inner pages zoom to show full face
   const startY = isFullScreen ? 1.4 : fullBodyY;
   const targetY = isFullScreen ? 1.4 : 8.1; // Inner pages face level
   
@@ -376,8 +376,8 @@ export default function AvatarScene({
       
       <Canvas
         camera={{ 
-          position: isFullScreen ? [0, 1.6, 2.2] : [0, 2.8, 0.9], 
-          fov: isFullScreen ? 35 : 50 
+          position: isFullScreen ? [0, 1.6, 2.2] : [0, 2.8, 1.8], 
+          fov: isFullScreen ? 35 : 45 
         }}
         shadows
         gl={{ antialias: true, alpha: true }}

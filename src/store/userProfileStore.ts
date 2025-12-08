@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { devtools } from "zustand/middleware"
+import { devtools, persist } from "zustand/middleware"
 import type { FormData } from "@/types/form"
 
 const initialFormData = (): FormData => ({
@@ -17,6 +17,8 @@ const initialFormData = (): FormData => ({
   targetWeight: 60,
   autoTrackEnabled: false,
   medicalConditions: ["None"],
+  xp: 0,
+  streak: 0,
 })
 
 interface UserProfileStore {
@@ -31,24 +33,30 @@ interface UserProfileStore {
 
 export const useUserProfileStore = create<UserProfileStore>()(
   devtools(
-    (set) => ({
-      step: 1,
-      formData: initialFormData(),
-      setStep: (step) => set({ step }),
-      nextStep: () => set((state) => ({ step: state.step + 1 })),
-      prevStep: () => set((state) => ({ step: Math.max(1, state.step - 1) })),
-      updateFormData: (updates) =>
-        set((state) => {
-          const nextFormData = { ...state.formData, ...updates }
-          console.log("[userProfileStore] updateFormData", { updates, nextFormData })
-          return { formData: nextFormData }
-        }),
-      resetForm: () =>
-        set({
-          step: 1,
-          formData: initialFormData(),
-        }),
-    }),
+    persist(
+      (set) => ({
+        step: 1,
+        formData: initialFormData(),
+        setStep: (step) => set({ step }),
+        nextStep: () => set((state) => ({ step: state.step + 1 })),
+        prevStep: () => set((state) => ({ step: Math.max(1, state.step - 1) })),
+        updateFormData: (updates) =>
+          set((state) => {
+            const nextFormData = { ...state.formData, ...updates }
+            console.log("[userProfileStore] updateFormData", { updates, nextFormData })
+            return { formData: nextFormData }
+          }),
+        resetForm: () =>
+          set({
+            step: 1,
+            formData: initialFormData(),
+          }),
+      }),
+      {
+        name: "userProfileStore-storage",
+        version: 1,
+      }
+    ),
     { name: "userProfileStore" }
   )
 )
