@@ -8,7 +8,7 @@ import type { VoiceType } from "@/types/voice";
 export function CoachIntroPage() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { gender, coachName } = location.state || { gender: "female", coachName: "Aria" };
+    const { gender, coachName } = location.state || { gender: "female", coachName: "Disha" };
     const [showButton, setShowButton] = useState(false);
     const [isButtonVisible, setIsButtonVisible] = useState(false);
     const [isClicked, setIsClicked] = useState(false);

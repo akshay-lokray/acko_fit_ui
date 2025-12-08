@@ -135,7 +135,7 @@ export function HomePage() {
   // Safe access to formData with defaults
   const gender = profile.gender || routeFormData.gender || "female";
   const name = profile.name || routeFormData.name || "Traveller";
-  const coachName = gender === "male" ? "Atlas" : "Aria";
+  const coachName = gender === "male" ? "Dhoni" : "Disha";
 
   // State
   // Changed "community" to "leaderboard"
@@ -814,7 +814,7 @@ export function HomePage() {
 
     // Send the transcribed text if available
     if (recognitionResultRef.current.trim() && socket && socket.connected) {
-      const avatar = isMale ? "atlas" : "aria";
+      const avatar = isMale ? "Dhoni" : "Disha";
       const payload = {
         event: "process_audio",
         data: {
@@ -1097,7 +1097,7 @@ export function HomePage() {
     }, 100); // Small delay to ensure previous recognition is fully stopped
   }, [isListening, stopListeningAndSend, playStartSound]);
 
-  // Wake word listener - listens for "okay atlas" or "ok aria"
+  // Wake word listener - listens for "okay Dhoni" or "ok Disha"
   useEffect(() => {
     const SpeechRecognition =
       (
@@ -1135,8 +1135,8 @@ export function HomePage() {
 
         // Define wake words based on coach gender
         const wakeWords = isMale
-          ? ["okay atlas", "ok atlas", "hey atlas", "atlas"]
-          : ["okay aria", "ok aria", "hey aria", "aria"];
+          ? ["okay Dhoni", "ok Dhoni", "hey Dhoni", "Dhoni"]
+          : ["okay Disha", "ok Disha", "hey Disha", "Disha"];
 
         wakeWordRecognition.onresult = (event: SpeechRecognitionEvent) => {
           // Don't process if already listening
@@ -1273,7 +1273,7 @@ export function HomePage() {
 
     const socket = socketRef.current;
     if (socket && socket.connected) {
-      const avatar = isMale ? "atlas" : "aria";
+      const avatar = isMale ? "Dhoni" : "Disha";
       const payload = {
         event: "process_audio",
         data: {

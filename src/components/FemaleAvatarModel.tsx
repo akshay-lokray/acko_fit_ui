@@ -1,10 +1,11 @@
 import { useRef, useEffect } from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import { FEMALE_DEFAULT_AVATAR_URL } from '@/constants/avatarUrls';
 
 export function FemaleAvatarModel(props: any) {
   try {
-    const gltf = useGLTF('/female.glb') as any;
+    const gltf = useGLTF(FEMALE_DEFAULT_AVATAR_URL) as any;
     const { nodes, materials } = gltf || {};
     const groupRef = useRef<THREE.Group>(null);
     const lastFullScreenRef = useRef<boolean | undefined>(undefined);
@@ -116,7 +117,10 @@ export function FemaleAvatarModel(props: any) {
         {nodes?.Wolf3D_Outfit_Footwear && (
           <skinnedMesh
             geometry={nodes.Wolf3D_Outfit_Footwear.geometry}
-            material={materials?.['aleksandr@readyplayer'] || materials?.Wolf3D_Outfit_Footwear}
+            material={
+              materials?.['aleksandr@readyplayer'] ||
+              materials?.Wolf3D_Outfit_Footwear
+            }
             skeleton={nodes.Wolf3D_Outfit_Footwear.skeleton}
           />
         )}
@@ -135,5 +139,5 @@ export function FemaleAvatarModel(props: any) {
   }
 }
 
-useGLTF.preload('/female.glb');
+useGLTF.preload(FEMALE_DEFAULT_AVATAR_URL);
 

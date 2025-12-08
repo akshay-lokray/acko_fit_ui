@@ -78,7 +78,7 @@ export function UserLockerPage() {
     const pinchStartRef = useRef<{ distance: number; scale: number } | null>(null);
     
     const gender = profile.gender || "female";
-    const avatarName = gender === "male" ? "Dhoni" : "Aria";
+    const avatarName = gender === "male" ? "Dhoni" : "Disha";
     const fallbackAvatarUrl =
         profile.avatarUrl || (gender === "male" ? MALE_DHONI_AVATAR_URL : FEMALE_DEFAULT_AVATAR_URL);
 

@@ -55,9 +55,9 @@ interface Message {
 export function SetupPage() {
   const location = useLocation();
   const gender = location.state?.gender || "female";
-  const coachName = gender === "male" ? "Atlas" : "Aria";
+  const coachName = gender === "male" ? "Dhoni" : "Disha";
   const isMale = gender === "male";
-  const avatar = isMale ? "atlas" : "aria";
+  const avatar = isMale ? "Dhoni" : "Disha";
 
   // State
   const [messages, setMessages] = useState<Message[]>([
