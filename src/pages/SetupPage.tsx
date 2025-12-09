@@ -95,6 +95,7 @@ export function SetupPage() {
     status?: string;
     keys?: Record<string, unknown>;
   } | null>(null); // Store context from server responses (new structure: {status, keys})
+  const [isJourneyCompleted, setIsJourneyCompleted] = useState(false); // Track if journey is completed
 
   // Socket from context
   const { socket: contextSocket } = useSocket();
@@ -206,85 +207,87 @@ export function SetupPage() {
   const speakText = useCallback(
     (text: string) => {
       if (!text || !text.trim()) {
-      return Promise.resolve();
+        return Promise.resolve();
       }
 
       if (!("speechSynthesis" in window)) {
         console.warn("Speech synthesis not supported");
-      return Promise.resolve();
+        return Promise.resolve();
       }
 
       if (speechSynthesisRef.current) {
         window.speechSynthesis.cancel();
       }
 
-    return new Promise<void>((resolve) => {
-      try {
-        const utterance = new SpeechSynthesisUtterance(text);
-        speechSynthesisRef.current = utterance;
+      return new Promise<void>((resolve) => {
+        try {
+          const utterance = new SpeechSynthesisUtterance(text);
+          speechSynthesisRef.current = utterance;
 
-        utterance.lang = "en-US";
-        utterance.rate = 1.0;
-        utterance.pitch = isMale ? 0.8 : 1.2;
-        utterance.volume = 1.0;
+          utterance.lang = "en-US";
+          utterance.rate = 1.0;
+          utterance.pitch = isMale ? 0.8 : 1.2;
+          utterance.volume = 1.0;
 
-        const voices = window.speechSynthesis.getVoices();
-        if (voices.length > 0) {
-          const preferredVoices = voices.filter((voice) => {
-            const voiceName = voice.name.toLowerCase();
-            if (isMale) {
-              return (
-                voiceName.includes("male") ||
-                voiceName.includes("david") ||
-                voiceName.includes("daniel") ||
-                voiceName.includes("alex") ||
-                voice.lang.startsWith("en")
+          const voices = window.speechSynthesis.getVoices();
+          if (voices.length > 0) {
+            const preferredVoices = voices.filter((voice) => {
+              const voiceName = voice.name.toLowerCase();
+              if (isMale) {
+                return (
+                  voiceName.includes("male") ||
+                  voiceName.includes("david") ||
+                  voiceName.includes("daniel") ||
+                  voiceName.includes("alex") ||
+                  voice.lang.startsWith("en")
+                );
+              } else {
+                return (
+                  voiceName.includes("female") ||
+                  voiceName.includes("samantha") ||
+                  voiceName.includes("susan") ||
+                  voiceName.includes("karen") ||
+                  voiceName.includes("victoria") ||
+                  voice.lang.startsWith("en")
+                );
+              }
+            });
+
+            if (preferredVoices.length > 0) {
+              utterance.voice = preferredVoices[0];
+            } else if (voices.length > 0) {
+              const englishVoices = voices.filter((v) =>
+                v.lang.startsWith("en")
               );
-            } else {
-              return (
-                voiceName.includes("female") ||
-                voiceName.includes("samantha") ||
-                voiceName.includes("susan") ||
-                voiceName.includes("karen") ||
-                voiceName.includes("victoria") ||
-                voice.lang.startsWith("en")
-              );
-            }
-          });
-
-          if (preferredVoices.length > 0) {
-            utterance.voice = preferredVoices[0];
-          } else if (voices.length > 0) {
-            const englishVoices = voices.filter((v) => v.lang.startsWith("en"));
-            if (englishVoices.length > 0) {
-              utterance.voice = englishVoices[0];
+              if (englishVoices.length > 0) {
+                utterance.voice = englishVoices[0];
+              }
             }
           }
+
+          utterance.onstart = () => {
+            console.log("🔊 Started speaking response");
+          };
+
+          utterance.onend = () => {
+            console.log("🔊 Finished speaking response");
+            speechSynthesisRef.current = null;
+            resolve();
+          };
+
+          utterance.onerror = (event) => {
+            console.error("❌ Speech synthesis error:", event.error);
+            speechSynthesisRef.current = null;
+            resolve();
+          };
+
+          window.speechSynthesis.speak(utterance);
+          console.log("🔊 Speaking response:", text.substring(0, 50) + "...");
+        } catch (error) {
+          console.error("Failed to speak text:", error);
+          resolve();
         }
-
-        utterance.onstart = () => {
-          console.log("🔊 Started speaking response");
-        };
-
-        utterance.onend = () => {
-          console.log("🔊 Finished speaking response");
-          speechSynthesisRef.current = null;
-          resolve();
-        };
-
-        utterance.onerror = (event) => {
-          console.error("❌ Speech synthesis error:", event.error);
-          speechSynthesisRef.current = null;
-          resolve();
-        };
-
-        window.speechSynthesis.speak(utterance);
-        console.log("🔊 Speaking response:", text.substring(0, 50) + "...");
-      } catch (error) {
-        console.error("Failed to speak text:", error);
-        resolve();
-      }
-    });
+      });
     },
     [isMale]
   );
@@ -737,13 +740,11 @@ export function SetupPage() {
           setIsWaitingForResponse(false); // Hide loading indicator
           setIsWaitingForInitialResponse(false); // Hide initial loading indicator
 
-          const speechPromise = speakText(cleanedText);
+          // Speak the cleaned response using text-to-speech
+          speakText(cleanedText);
 
           // Extract and save phone number to localStorage
-          if (
-            journeyContext?.keys &&
-            typeof journeyContext.keys === "object"
-          ) {
+          if (journeyContext?.keys && typeof journeyContext.keys === "object") {
             const phoneKey = journeyContext.keys.phone;
             if (
               phoneKey &&
@@ -753,35 +754,58 @@ export function SetupPage() {
               typeof phoneKey.value === "string"
             ) {
               try {
-                localStorage.setItem("userPhone", HARD_CODED_USER_ID);
+                localStorage.setItem("userPhone", phoneKey.value);
                 console.log(
                   "📱 Saved phone number to localStorage:",
-                  HARD_CODED_USER_ID
+                  phoneKey.value
                 );
-                updateFormData({ mobile: HARD_CODED_USER_ID });
+                updateFormData({ mobile: phoneKey.value });
               } catch (error) {
                 console.error(
                   "❌ Failed to save phone number to localStorage:",
                   error
                 );
               }
+            } else {
+              // Fallback to hardcoded user ID if phone number is not available
+              try {
+                localStorage.setItem("userPhone", HARD_CODED_USER_ID);
+                console.log(
+                  "📱 Saved hardcoded phone number to localStorage:",
+                  HARD_CODED_USER_ID
+                );
+                updateFormData({ mobile: HARD_CODED_USER_ID });
+              } catch (error) {
+                console.error(
+                  "❌ Failed to save hardcoded phone number to localStorage:",
+                  error
+                );
+              }
+            }
+          } else {
+            // Fallback to hardcoded user ID if context is not available
+            try {
+              localStorage.setItem("userPhone", HARD_CODED_USER_ID);
+              console.log(
+                "📱 Saved hardcoded phone number to localStorage:",
+                HARD_CODED_USER_ID
+              );
+              updateFormData({ mobile: HARD_CODED_USER_ID });
+            } catch (error) {
+              console.error(
+                "❌ Failed to save hardcoded phone number to localStorage:",
+                error
+              );
             }
           }
 
+          // Check if status is completed - wait for plan_creation_response
           if (isCompleted) {
-            console.log("✅ Setup completed! Redirecting to /home...");
-            speechPromise.finally(() => {
-              setTimeout(() => {
-                if (navigateRef.current) {
-                  navigateRef.current("/premium", {
-                    state: {
-                      gender: genderRef.current,
-                      formData: contextState?.keys || {},
-                    },
-                  });
-                }
-              }, 2000);
-            });
+            console.log(
+              "✅ Setup completed! Waiting for plan_creation_response..."
+            );
+            setIsJourneyCompleted(true);
+            // Don't redirect here - wait for plan_creation_response event
           }
         } else {
           console.warn(
@@ -842,8 +866,8 @@ export function SetupPage() {
             (trimmedData.startsWith("{") && trimmedData.endsWith("}")) ||
             (trimmedData.startsWith("[") && trimmedData.endsWith("]"))
           ) {
-          try {
-            const parsed = JSON.parse(data);
+            try {
+              const parsed = JSON.parse(data);
               // Check if it's the new format with data.data
               if (parsed.data && typeof parsed.data === "object") {
                 responseText = String(parsed.data.text || "");
@@ -1057,59 +1081,26 @@ export function SetupPage() {
 
         processedMessageIdsRef.current.add(cleanedText);
 
-      const coachMsg: Message = {
+        const coachMsg: Message = {
           id: `${cleanedText.substring(0, 50)}-${Date.now()}`,
-        sender: "coach",
+          sender: "coach",
           text: cleanedText,
-      };
-      setMessages((prev) => [...prev, coachMsg]);
-      setShowTextInput(false);
+        };
+        setMessages((prev) => [...prev, coachMsg]);
+        setShowTextInput(false);
         setIsWaitingForResponse(false); // Hide loading indicator
         setIsWaitingForInitialResponse(false); // Hide initial loading indicator
 
         // Speak the cleaned response using text-to-speech
         speakText(cleanedText);
 
-        // Check if status is completed and redirect to /home
+        // Check if status is completed - wait for plan_creation_response
         if (isCompleted) {
-          console.log("✅ Setup completed! Redirecting to /home...");
-
-          // Extract and save phone number to localStorage
-          if (
-            responseContext?.keys &&
-            typeof responseContext.keys === "object"
-          ) {
-            const phoneKey = responseContext.keys.phone;
-            if (
-              phoneKey &&
-              typeof phoneKey === "object" &&
-              "value" in phoneKey &&
-              phoneKey.value &&
-              typeof phoneKey.value === "string"
-            ) {
-              try {
-                localStorage.setItem("userPhone", phoneKey.value);
-                console.log(
-                  "📱 Saved phone number to localStorage:",
-                  phoneKey.value
-                );
-              } catch (error) {
-                console.error(
-                  "❌ Failed to save phone number to localStorage:",
-                  error
-                );
-              }
-            }
-          }
-
-          setTimeout(() => {
-            navigate("/premium", {
-              state: {
-                gender,
-                formData: contextState?.keys || {},
-              },
-            });
-          }, 2000); // Small delay to let user see the completion message
+          console.log(
+            "✅ Setup completed! Waiting for plan_creation_response..."
+          );
+          setIsJourneyCompleted(true);
+          // Don't redirect here - wait for plan_creation_response event
         }
       } else {
         console.warn(
@@ -1273,48 +1264,13 @@ export function SetupPage() {
           setIsWaitingForInitialResponse(false); // Hide initial loading indicator
           speakText(cleanedText);
 
-          // Check if status is completed and redirect to /home
+          // Check if status is completed - wait for plan_creation_response
           if (isCompleted) {
-            console.log("✅ Setup completed! Redirecting to /home...");
-
-            // Extract and save phone number to localStorage
-            if (
-              journeyContext?.keys &&
-              typeof journeyContext.keys === "object"
-            ) {
-              const phoneKey = journeyContext.keys.phone;
-              if (
-                phoneKey &&
-                typeof phoneKey === "object" &&
-                "value" in phoneKey &&
-                phoneKey.value &&
-                typeof phoneKey.value === "string"
-              ) {
-                try {
-                  localStorage.setItem("userPhone", phoneKey.value);
-                  console.log(
-                    "📱 Saved phone number to localStorage:",
-                    phoneKey.value
-                  );
-                } catch (error) {
-                  console.error(
-                    "❌ Failed to save phone number to localStorage:",
-                    error
-                  );
-                }
-              }
-            }
-
-            setTimeout(() => {
-              if (navigateRef.current) {
-                navigateRef.current("/premium", {
-                  state: {
-                    gender: genderRef.current,
-                    formData: contextState?.keys || {},
-                  },
-                });
-              }
-            }, 2000); // Small delay to let user see the completion message
+            console.log(
+              "✅ Setup completed! Waiting for plan_creation_response..."
+            );
+            setIsJourneyCompleted(true);
+            // Don't redirect here - wait for plan_creation_response event
           }
         } else {
           console.warn(
@@ -1327,11 +1283,171 @@ export function SetupPage() {
       }
     };
 
+    // Listen for 'plan_creation_response' event - received when journey is completed
+    const handlePlanCreationResponse = (data: unknown) => {
+      console.log("📥 Received plan_creation_response event:", data);
+
+      try {
+        let planText = "";
+
+        // Parse the response - could be string, object, or array
+        if (typeof data === "string") {
+          // Check if it's JSON
+          const trimmedData = data.trim();
+          if (
+            (trimmedData.startsWith("{") && trimmedData.endsWith("}")) ||
+            (trimmedData.startsWith("[") && trimmedData.endsWith("]"))
+          ) {
+            try {
+              const parsed = JSON.parse(data);
+              // Extract text from various possible structures
+              if (
+                parsed.data &&
+                typeof parsed.data === "object" &&
+                parsed.data.text
+              ) {
+                planText = String(parsed.data.text);
+              } else if (parsed.text) {
+                planText = String(parsed.text);
+              } else if (Array.isArray(parsed) && parsed.length > 0) {
+                // Handle array format: ["plan_creation_response", "{\"text\": \"...\"}"]
+                const secondElement = parsed[1];
+                if (typeof secondElement === "string") {
+                  try {
+                    const innerParsed = JSON.parse(secondElement);
+                    planText = String(
+                      innerParsed.data?.text || innerParsed.text || ""
+                    );
+                  } catch {
+                    planText = secondElement;
+                  }
+                }
+              } else {
+                planText = String(data);
+              }
+            } catch {
+              planText = String(data);
+            }
+          } else {
+            planText = String(data);
+          }
+        } else if (typeof data === "object" && data !== null) {
+          const dataObj = data as {
+            data?: { text?: string };
+            text?: string;
+          };
+          if (dataObj.data?.text) {
+            planText = String(dataObj.data.text);
+          } else if (dataObj.text) {
+            planText = String(dataObj.text);
+          } else {
+            planText = JSON.stringify(data);
+          }
+        } else {
+          planText = String(data);
+        }
+
+        // Ensure we have valid text
+        if (
+          !planText ||
+          planText.trim() === "" ||
+          planText === "[object Object]"
+        ) {
+          console.warn("⚠️ Invalid plan text, using default message");
+          planText = "Your plan has been created successfully!";
+        }
+
+        console.log("📋 Plan creation text:", planText);
+
+        // Display the plan message in chat
+        const planMsg: Message = {
+          id: `plan-${Date.now()}`,
+          sender: "coach",
+          text: planText.trim(),
+        };
+        setMessages((prev) => [...prev, planMsg]);
+        setIsWaitingForResponse(false);
+        setIsWaitingForInitialResponse(false);
+
+        // Speak the plan text entirely
+        speakText(planText.trim());
+
+        // Extract and save phone number to localStorage if not already saved
+        if (contextState?.keys && typeof contextState.keys === "object") {
+          const phoneKey = contextState.keys.phone;
+          if (
+            phoneKey &&
+            typeof phoneKey === "object" &&
+            "value" in phoneKey &&
+            phoneKey.value &&
+            typeof phoneKey.value === "string"
+          ) {
+            try {
+              const phoneValue = String(phoneKey.value);
+              if (!localStorage.getItem("userPhone")) {
+                localStorage.setItem("userPhone", phoneValue);
+                console.log(
+                  "📱 Saved phone number to localStorage:",
+                  phoneValue
+                );
+                updateFormData({ mobile: phoneValue });
+              }
+            } catch (error) {
+              console.error(
+                "❌ Failed to save phone number to localStorage:",
+                error
+              );
+            }
+          } else {
+            // Fallback to hardcoded user ID if phone number is not available
+            try {
+              if (!localStorage.getItem("userPhone")) {
+                localStorage.setItem("userPhone", HARD_CODED_USER_ID);
+                console.log(
+                  "📱 Saved hardcoded phone number to localStorage:",
+                  HARD_CODED_USER_ID
+                );
+                updateFormData({ mobile: HARD_CODED_USER_ID });
+              }
+            } catch (error) {
+              console.error(
+                "❌ Failed to save hardcoded phone number to localStorage:",
+                error
+              );
+            }
+          }
+        } else {
+          // Fallback to hardcoded user ID if context is not available
+          try {
+            if (!localStorage.getItem("userPhone")) {
+              localStorage.setItem("userPhone", HARD_CODED_USER_ID);
+              console.log(
+                "📱 Saved hardcoded phone number to localStorage:",
+                HARD_CODED_USER_ID
+              );
+              updateFormData({ mobile: HARD_CODED_USER_ID });
+            }
+          } catch (error) {
+            console.error(
+              "❌ Failed to save hardcoded phone number to localStorage:",
+              error
+            );
+          }
+        }
+
+        // Mark journey as completed to show Done button
+        setIsJourneyCompleted(true);
+      } catch (error) {
+        console.error("❌ Error processing plan_creation_response:", error);
+      }
+    };
+
     // Set up all event listeners
     contextSocket.on("connect_error", handleConnectError);
     contextSocket.on("error", handleError);
     contextSocket.on("response", handleResponse);
     contextSocket.on("process_journey", handleProcessJourney);
+    contextSocket.on("plan_creation_response", handlePlanCreationResponse);
 
     return () => {
       // Clean up event listeners when component unmounts
@@ -1340,6 +1456,7 @@ export function SetupPage() {
       contextSocket.off("error", handleError);
       contextSocket.off("response", handleResponse);
       contextSocket.off("process_journey", handleProcessJourney);
+      contextSocket.off("plan_creation_response", handlePlanCreationResponse);
     };
   }, [
     contextSocket,
@@ -1782,6 +1899,37 @@ export function SetupPage() {
     setSelectedOptions([]);
   };
 
+  // Handle Done button click - redirect to premium page
+  const handleDoneClick = () => {
+    // Stop any ongoing speech
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      if (speechSynthesisRef.current) {
+        speechSynthesisRef.current.onend = null;
+        speechSynthesisRef.current.onerror = null;
+        speechSynthesisRef.current.onstart = null;
+        speechSynthesisRef.current = null;
+      }
+    }
+
+    // Redirect to premium page
+    if (navigateRef.current) {
+      navigateRef.current("/premium", {
+        state: {
+          gender: genderRef.current,
+          formData: contextState?.keys || {},
+        },
+      });
+    } else {
+      navigate("/premium", {
+        state: {
+          gender,
+          formData: contextState?.keys || {},
+        },
+      });
+    }
+  };
+
   return (
     <div className="setup-page-root h-screen bg-white font-sans flex flex-col overflow-hidden">
       {/* Header */}
@@ -1800,25 +1948,25 @@ export function SetupPage() {
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto p-4 pb-24"
         >
-        <div className="max-w-2xl mx-auto space-y-4">
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${
-                msg.sender === "user" ? "justify-end" : "justify-start"
-              }`}
-            >
+          <div className="max-w-2xl mx-auto space-y-4">
+            {messages.map((msg) => (
               <div
-                className={`max-w-[80%] rounded-2xl p-4 text-sm ${
-                  msg.sender === "user"
-                    ? "bg-gray-900 text-white rounded-br-none"
-                    : "bg-white border border-gray-100 shadow-sm text-gray-800 rounded-bl-none"
+                key={msg.id}
+                className={`flex ${
+                  msg.sender === "user" ? "justify-end" : "justify-start"
                 }`}
               >
-                {msg.text}
+                <div
+                  className={`max-w-[80%] rounded-2xl p-4 text-sm ${
+                    msg.sender === "user"
+                      ? "bg-gray-900 text-white rounded-br-none"
+                      : "bg-white border border-gray-100 shadow-sm text-gray-800 rounded-bl-none"
+                  }`}
+                >
+                  {msg.text}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
 
             {/* Loading indicator when waiting for response (including initial) */}
             {(isWaitingForResponse || isWaitingForInitialResponse) && (
@@ -1845,25 +1993,25 @@ export function SetupPage() {
             )}
 
             {/* Listening Indicator - Explicit Listening */}
-          {isListening && (
-            <div className="flex justify-center py-4">
-              <div
-                className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                  isMale ? "bg-emerald-500" : "bg-purple-500"
-                } animate-pulse shadow-lg`}
-              >
-                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center animate-ping ${
-                      isMale ? "bg-emerald-100" : "bg-purple-100"
-                    }`}
-                  >
-                    <Zap className={`w-6 h-6 ${themeColor}`} />
+            {isListening && (
+              <div className="flex justify-center py-4">
+                <div
+                  className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                    isMale ? "bg-emerald-500" : "bg-purple-500"
+                  } animate-pulse shadow-lg`}
+                >
+                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center animate-ping ${
+                        isMale ? "bg-emerald-100" : "bg-purple-100"
+                      }`}
+                    >
+                      <Zap className={`w-6 h-6 ${themeColor}`} />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
             {/* Selection Options UI - Only show when keyboard input is active */}
             {selectionConfig && showTextInput && (
@@ -1929,7 +2077,7 @@ export function SetupPage() {
           </div>
         </div>
       </main>
-      
+
       {/* Avatar Zone - Fixed at bottom */}
       <div className="setup-page-avatar-zone flex-shrink-0">
         <div className="setup-avatar-panel">
@@ -1951,86 +2099,104 @@ export function SetupPage() {
       {/* Input Area - Fixed at bottom */}
       <div className="bg-white border-t border-gray-100 p-4 flex-shrink-0 z-50">
         <div className="max-w-2xl mx-auto">
-          {/* Text Input (shown when user clicks keyboard icon) */}
-          {showTextInput && (
-            <div className="mb-3 animate-in slide-in-from-bottom-2">
-              <div className="relative flex items-center gap-2">
-                <Input
-                  ref={inputRef}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleSendMessage();
-                    } else if (e.key === "Escape") {
-                      setShowTextInput(false);
-                      setInputValue("");
-                    }
-                  }}
-                  placeholder="Type your answer here..."
-                  className="flex-1 py-4 rounded-full border-2 border-gray-300 shadow-sm focus-visible:ring-offset-0 focus-visible:ring-2 focus-visible:border-transparent pr-12"
-                  autoFocus
-                />
-                {inputValue && (
-                  <Button
-                    size="icon"
-                    onClick={() => handleSendMessage()}
-                    className={`absolute right-2 rounded-full w-9 h-9 ${buttonBg}`}
-                  >
-                    <Send className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-              <p className="text-xs text-gray-400 mt-1 ml-2">
-                Press Enter to send, Esc to cancel
+          {/* Done Button - Show when journey is completed */}
+          {isJourneyCompleted ? (
+            <div className="flex flex-col items-center gap-3">
+              <Button
+                size="lg"
+                onClick={handleDoneClick}
+                className={`w-full max-w-xs py-6 text-lg font-semibold rounded-full shadow-lg ${buttonBg}`}
+              >
+                Done
+              </Button>
+              <p className="text-center text-xs text-gray-500">
+                Click Done to continue to your premium plan
               </p>
             </div>
-          )}
-
-          {/* Primary Input Controls */}
-          <div className="flex items-center justify-center gap-3">
-            {/* Voice Input Button (Primary) */}
-            <Button
-              size="lg"
-              onClick={handleVoiceInput}
-              className={`w-16 h-16 rounded-full shadow-lg transition-all ${
-                isListening
-                  ? "bg-red-500 hover:bg-red-600 animate-pulse scale-110"
-                  : buttonBg
-              }`}
-            >
-              {isListening ? (
-                <Mic className="w-6 h-6 fill-white text-white" />
-              ) : (
-                <Mic className="w-6 h-6 fill-white text-white" />
+          ) : (
+            <>
+              {/* Text Input (shown when user clicks keyboard icon) */}
+              {showTextInput && (
+                <div className="mb-3 animate-in slide-in-from-bottom-2">
+                  <div className="relative flex items-center gap-2">
+                    <Input
+                      ref={inputRef}
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleSendMessage();
+                        } else if (e.key === "Escape") {
+                          setShowTextInput(false);
+                          setInputValue("");
+                        }
+                      }}
+                      placeholder="Type your answer here..."
+                      className="flex-1 py-4 rounded-full border-2 border-gray-300 shadow-sm focus-visible:ring-offset-0 focus-visible:ring-2 focus-visible:border-transparent pr-12"
+                      autoFocus
+                    />
+                    {inputValue && (
+                      <Button
+                        size="icon"
+                        onClick={() => handleSendMessage()}
+                        className={`absolute right-2 rounded-full w-9 h-9 ${buttonBg}`}
+                      >
+                        <Send className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1 ml-2">
+                    Press Enter to send, Esc to cancel
+                  </p>
+                </div>
               )}
-            </Button>
 
-            {/* Text Input Toggle Button (Fallback) */}
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={handleTextInputToggle}
-              className={`w-16 h-16 rounded-full shadow-md border-2 ${
-                showTextInput
-                  ? "border-gray-400 bg-gray-50"
-                  : "border-gray-200 hover:border-gray-300"
-              }`}
-            >
-              <Keyboard className="w-6 h-6 text-gray-600" />
-            </Button>
-          </div>
+              {/* Primary Input Controls */}
+              <div className="flex items-center justify-center gap-3">
+                {/* Voice Input Button (Primary) */}
+                <Button
+                  size="lg"
+                  onClick={handleVoiceInput}
+                  className={`w-16 h-16 rounded-full shadow-lg transition-all ${
+                    isListening
+                      ? "bg-red-500 hover:bg-red-600 animate-pulse scale-110"
+                      : buttonBg
+                  }`}
+                >
+                  {isListening ? (
+                    <Mic className="w-6 h-6 fill-white text-white" />
+                  ) : (
+                    <Mic className="w-6 h-6 fill-white text-white" />
+                  )}
+                </Button>
 
-          {/* Helper Text */}
-          {!showTextInput && !isListening && (
-            <p className="text-center text-xs text-gray-400 mt-2">
-              Tap the microphone to speak, or tap the keyboard to type
-            </p>
-          )}
-          {isListening && (
-            <p className="text-center text-xs text-gray-500 mt-2 font-medium">
-              🎤 Listening... Speak now or tap again to stop
-            </p>
+                {/* Text Input Toggle Button (Fallback) */}
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={handleTextInputToggle}
+                  className={`w-16 h-16 rounded-full shadow-md border-2 ${
+                    showTextInput
+                      ? "border-gray-400 bg-gray-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <Keyboard className="w-6 h-6 text-gray-600" />
+                </Button>
+              </div>
+
+              {/* Helper Text */}
+              {!showTextInput && !isListening && (
+                <p className="text-center text-xs text-gray-400 mt-2">
+                  Tap the microphone to speak, or tap the keyboard to type
+                </p>
+              )}
+              {isListening && (
+                <p className="text-center text-xs text-gray-500 mt-2 font-medium">
+                  🎤 Listening... Speak now or tap again to stop
+                </p>
+              )}
+            </>
           )}
         </div>
       </div>
