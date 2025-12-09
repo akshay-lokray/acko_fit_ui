@@ -730,6 +730,26 @@ export function SetupPage() {
           // Check if status is completed and redirect to /home
           if (isCompleted) {
             console.log("✅ Setup completed! Redirecting to /home...");
+            
+            // Extract and save phone number to localStorage
+            if (journeyContext?.keys && typeof journeyContext.keys === "object") {
+              const phoneKey = journeyContext.keys.phone;
+              if (
+                phoneKey &&
+                typeof phoneKey === "object" &&
+                "value" in phoneKey &&
+                phoneKey.value &&
+                typeof phoneKey.value === "string"
+              ) {
+                try {
+                  localStorage.setItem("userPhone", phoneKey.value);
+                  console.log("📱 Saved phone number to localStorage:", phoneKey.value);
+                } catch (error) {
+                  console.error("❌ Failed to save phone number to localStorage:", error);
+                }
+              }
+            }
+            
             setTimeout(() => {
               if (navigateRef.current) {
                 navigateRef.current("/home", {
@@ -1006,6 +1026,26 @@ export function SetupPage() {
         // Check if status is completed and redirect to /home
         if (isCompleted) {
           console.log("✅ Setup completed! Redirecting to /home...");
+          
+          // Extract and save phone number to localStorage
+          if (responseContext?.keys && typeof responseContext.keys === "object") {
+            const phoneKey = responseContext.keys.phone;
+            if (
+              phoneKey &&
+              typeof phoneKey === "object" &&
+              "value" in phoneKey &&
+              phoneKey.value &&
+              typeof phoneKey.value === "string"
+            ) {
+              try {
+                localStorage.setItem("userPhone", phoneKey.value);
+                console.log("📱 Saved phone number to localStorage:", phoneKey.value);
+              } catch (error) {
+                console.error("❌ Failed to save phone number to localStorage:", error);
+              }
+            }
+          }
+          
           setTimeout(() => {
             navigate("/home", {
               state: {
@@ -1158,6 +1198,26 @@ export function SetupPage() {
           // Check if status is completed and redirect to /home
           if (isCompleted) {
             console.log("✅ Setup completed! Redirecting to /home...");
+            
+            // Extract and save phone number to localStorage
+            if (journeyContext?.keys && typeof journeyContext.keys === "object") {
+              const phoneKey = journeyContext.keys.phone;
+              if (
+                phoneKey &&
+                typeof phoneKey === "object" &&
+                "value" in phoneKey &&
+                phoneKey.value &&
+                typeof phoneKey.value === "string"
+              ) {
+                try {
+                  localStorage.setItem("userPhone", phoneKey.value);
+                  console.log("📱 Saved phone number to localStorage:", phoneKey.value);
+                } catch (error) {
+                  console.error("❌ Failed to save phone number to localStorage:", error);
+                }
+              }
+            }
+            
             setTimeout(() => {
               if (navigateRef.current) {
                 navigateRef.current("/home", {
