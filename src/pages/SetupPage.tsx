@@ -70,7 +70,6 @@ export function SetupPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isListening, setIsListening] = useState(false);
-  const [isBackgroundListening, setIsBackgroundListening] = useState(false);
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
@@ -100,7 +99,6 @@ export function SetupPage() {
   const navigateRef = useRef(navigate);
   const genderRef = useRef(gender);
   const stopListeningAndSendRef = useRef<(() => void) | null>(null);
-  const startBackgroundListeningRef = useRef<(() => void) | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const recognitionResultRef = useRef<string>("");
   const interimTranscriptRef = useRef<string>(""); // Store interim transcripts
@@ -109,7 +107,6 @@ export function SetupPage() {
   const lastSpeechTimeRef = useRef<number>(0);
   const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const backgroundRecognitionRef = useRef<SpeechRecognition | null>(null); // For continuous background listening
 
   // Theme colors
   const themeColor = isMale ? "text-emerald-600" : "text-purple-700";
@@ -195,142 +192,6 @@ export function SetupPage() {
     }
   }, []);
 
-  // Function to stop background listening (when agent starts speaking)
-  const stopBackgroundListening = useCallback(() => {
-    if (backgroundRecognitionRef.current) {
-      try {
-        const bgRecognition = backgroundRecognitionRef.current;
-        bgRecognition.onend = null;
-        bgRecognition.onerror = null;
-        bgRecognition.onresult = null;
-        backgroundRecognitionRef.current = null;
-        bgRecognition.stop();
-        console.log("🔇 Stopped background listening (agent is speaking)");
-        setIsBackgroundListening(false); // Update state to hide overlay
-        // Play end sound to indicate mic is inactive
-        playEndSound();
-      } catch {
-        // Ignore errors
-      }
-    }
-  }, [playEndSound]);
-
-  // Function to start background listening (when agent is not speaking)
-  const startBackgroundListening = useCallback(() => {
-    // Don't start if already listening explicitly or if agent is speaking
-    if (isListening || window.speechSynthesis.speaking) {
-      return;
-    }
-
-    // Don't start if already running
-    if (backgroundRecognitionRef.current) {
-      return;
-    }
-
-    const SpeechRecognition =
-      (
-        window as unknown as {
-          SpeechRecognition?: { new (): SpeechRecognition };
-        }
-      ).SpeechRecognition ||
-      (
-        window as unknown as {
-          webkitSpeechRecognition?: { new (): SpeechRecognition };
-        }
-      ).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      return;
-    }
-
-    try {
-      const recognition = new SpeechRecognition();
-      backgroundRecognitionRef.current = recognition;
-
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = "en-US";
-
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        // Only process if not explicitly listening and agent is not speaking
-        if (isListening || window.speechSynthesis.speaking) {
-          return;
-        }
-
-        let transcript = "";
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            transcript += event.results[i][0].transcript + " ";
-          }
-        }
-
-        // If we got a final transcript, automatically send it
-        if (
-          transcript.trim() &&
-          !isListening &&
-          !window.speechSynthesis.speaking
-        ) {
-          console.log("🎤 Background listening detected:", transcript.trim());
-          // Stop background listening and start explicit listening
-          stopBackgroundListening();
-          // Trigger voice input to send the transcript
-          recognitionResultRef.current = transcript.trim();
-          setIsListening(true);
-          stopListeningAndSendRef.current?.();
-        }
-      };
-
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        if (event.error === "aborted" || event.error === "no-speech") {
-          return; // Ignore these errors
-        }
-        console.warn("⚠️ Background recognition error:", event.error);
-        // Restart background listening on error (except aborted)
-        if (
-          event.error !== "aborted" &&
-          !isListening &&
-          !window.speechSynthesis.speaking
-        ) {
-          backgroundRecognitionRef.current = null;
-          setTimeout(() => {
-            if (!isListening && !window.speechSynthesis.speaking) {
-              startBackgroundListeningRef.current?.();
-            }
-          }, 1000);
-        }
-      };
-
-      recognition.onend = () => {
-        // Restart if we're still supposed to be listening
-        if (
-          !isListening &&
-          !window.speechSynthesis.speaking &&
-          backgroundRecognitionRef.current === recognition
-        ) {
-          backgroundRecognitionRef.current = null;
-          setIsBackgroundListening(false); // Hide overlay while restarting
-          setTimeout(() => {
-            if (!isListening && !window.speechSynthesis.speaking) {
-              startBackgroundListeningRef.current?.();
-            }
-          }, 200);
-        } else {
-          setIsBackgroundListening(false); // Hide overlay if not restarting
-        }
-      };
-
-      recognition.start();
-      console.log("👂 Started background listening");
-      setIsBackgroundListening(true); // Update state to show overlay
-      // Play start sound to indicate mic is active
-      playStartSound();
-    } catch (error) {
-      console.error("Failed to start background listening:", error);
-      backgroundRecognitionRef.current = null;
-      setIsBackgroundListening(false);
-    }
-  }, [isListening, stopBackgroundListening, playStartSound]);
-
   // Function to speak text using browser's Speech Synthesis API
   const speakText = useCallback(
     (text: string) => {
@@ -342,9 +203,6 @@ export function SetupPage() {
         console.warn("Speech synthesis not supported");
         return;
       }
-
-      // Stop background listening when agent starts speaking
-      stopBackgroundListening();
 
       if (speechSynthesisRef.current) {
         window.speechSynthesis.cancel();
@@ -400,38 +258,20 @@ export function SetupPage() {
         utterance.onend = () => {
           console.log("🔊 Finished speaking response");
           speechSynthesisRef.current = null;
-          // Resume background listening when agent finishes speaking
-          if (!isListening) {
-            setTimeout(() => {
-              startBackgroundListeningRef.current?.();
-            }, 500);
-          }
         };
 
         utterance.onerror = (event) => {
           console.error("❌ Speech synthesis error:", event.error);
           speechSynthesisRef.current = null;
-          // Resume background listening on error
-          if (!isListening) {
-            setTimeout(() => {
-              startBackgroundListeningRef.current?.();
-            }, 500);
-          }
         };
 
         window.speechSynthesis.speak(utterance);
         console.log("🔊 Speaking response:", text.substring(0, 50) + "...");
       } catch (error) {
         console.error("Failed to speak text:", error);
-        // Resume background listening on error
-        if (!isListening) {
-          setTimeout(() => {
-            startBackgroundListeningRef.current?.();
-          }, 500);
-        }
       }
     },
-    [isMale, stopBackgroundListening, isListening]
+    [isMale]
   );
 
   // Load voices when available
@@ -455,38 +295,6 @@ export function SetupPage() {
       }
     };
   }, []);
-
-  // Update refs when functions are defined
-  useEffect(() => {
-    startBackgroundListeningRef.current = startBackgroundListening;
-  }, [startBackgroundListening]);
-
-  // Start background listening on mount and when agent finishes speaking
-  useEffect(() => {
-    // Start background listening after a short delay on mount
-    const timer = setTimeout(() => {
-      if (!isListening && !window.speechSynthesis.speaking) {
-        startBackgroundListeningRef.current?.();
-      }
-    }, 1000);
-
-    return () => {
-      clearTimeout(timer);
-      // Cleanup background listening on unmount
-      if (backgroundRecognitionRef.current) {
-        try {
-          const bgRecognition = backgroundRecognitionRef.current;
-          bgRecognition.onend = null;
-          bgRecognition.onerror = null;
-          bgRecognition.onresult = null;
-          bgRecognition.stop();
-        } catch {
-          // Ignore errors
-        }
-        backgroundRecognitionRef.current = null;
-      }
-    };
-  }, [isListening]);
 
   // Function to parse context and find keys with possible_values
   const checkForSelectionOptions = useCallback(() => {
@@ -871,27 +679,27 @@ export function SetupPage() {
               typeof journeyContext.keys === "object"
             ) {
               const phoneKey = journeyContext.keys.phone;
-                if (
-                  phoneKey &&
-                  typeof phoneKey === "object" &&
-                  "value" in phoneKey &&
-                  phoneKey.value &&
-                  typeof phoneKey.value === "string"
-                ) {
-                  try {
-                    localStorage.setItem("userPhone", HARD_CODED_USER_ID);
-                    console.log(
-                      "📱 Saved phone number to localStorage:",
-                      HARD_CODED_USER_ID
-                    );
-                    updateFormData({ mobile: HARD_CODED_USER_ID });
-                  } catch (error) {
-                    console.error(
-                      "❌ Failed to save phone number to localStorage:",
-                      error
-                    );
-                  }
+              if (
+                phoneKey &&
+                typeof phoneKey === "object" &&
+                "value" in phoneKey &&
+                phoneKey.value &&
+                typeof phoneKey.value === "string"
+              ) {
+                try {
+                  localStorage.setItem("userPhone", HARD_CODED_USER_ID);
+                  console.log(
+                    "📱 Saved phone number to localStorage:",
+                    HARD_CODED_USER_ID
+                  );
+                  updateFormData({ mobile: HARD_CODED_USER_ID });
+                } catch (error) {
+                  console.error(
+                    "❌ Failed to save phone number to localStorage:",
+                    error
+                  );
                 }
+              }
             }
 
             setTimeout(() => {
@@ -961,8 +769,8 @@ export function SetupPage() {
             (trimmedData.startsWith("{") && trimmedData.endsWith("}")) ||
             (trimmedData.startsWith("[") && trimmedData.endsWith("]"))
           ) {
-          try {
-            const parsed = JSON.parse(data);
+            try {
+              const parsed = JSON.parse(data);
               // Check if it's the new format with data.data
               if (parsed.data && typeof parsed.data === "object") {
                 responseText = String(parsed.data.text || "");
@@ -1156,9 +964,9 @@ export function SetupPage() {
               possibleValuesForCleaning
             )
           : responseText.trim();
-      const coachMsg: Message = {
-        id: Date.now().toString(),
-        sender: "coach",
+        const coachMsg: Message = {
+          id: Date.now().toString(),
+          sender: "coach",
           text: cleanedText,
         };
         setMessages((prev) => [...prev, coachMsg]);
@@ -1413,7 +1221,7 @@ export function SetupPage() {
           console.warn("Socket.IO disconnect event send failed", e);
         }
         socket.disconnect();
-      socketRef.current = null;
+        socketRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1490,13 +1298,6 @@ export function SetupPage() {
 
     // Play end sound
     playEndSound();
-
-    // Resume background listening after sending (if agent is not speaking)
-    if (!window.speechSynthesis.speaking) {
-      setTimeout(() => {
-        startBackgroundListeningRef.current?.();
-      }, 1000);
-    }
   }, [playEndSound, contextState, isMale]);
 
   // Update stopListeningAndSend ref
@@ -1544,9 +1345,6 @@ export function SetupPage() {
         speechSynthesisRef.current = null;
       }
     }
-
-    // Stop background listening when user explicitly clicks mic
-    stopBackgroundListening();
 
     // Ensure any previous recognition is cleaned up
     if (recognitionRef.current) {
@@ -1709,13 +1507,6 @@ export function SetupPage() {
                 }
               }
             }, 100);
-          } else {
-            // If not listening anymore, resume background listening
-            if (!window.speechSynthesis.speaking) {
-              setTimeout(() => {
-                startBackgroundListeningRef.current?.();
-              }, 500);
-            }
           }
         };
 
@@ -1739,12 +1530,7 @@ export function SetupPage() {
         );
       }
     }, 100);
-  }, [
-    isListening,
-    stopListeningAndSend,
-    playStartSound,
-    stopBackgroundListening,
-  ]);
+  }, [isListening, stopListeningAndSend, playStartSound]);
 
   // Send message handler
   const handleSendMessage = (textOverride?: string) => {
@@ -1955,24 +1741,6 @@ export function SetupPage() {
             </div>
           )}
 
-          {/* Background Listening Indicator - Always On Mic */}
-          {isBackgroundListening && !isListening && (
-            <div className="flex justify-center py-4">
-              <div className="flex flex-col items-center gap-2">
-                <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                    isMale ? "bg-emerald-400/70" : "bg-purple-400/70"
-                  } shadow-md`}
-                >
-                  <Mic className={`w-6 h-6 ${themeColor}`} />
-                </div>
-                <p className="text-xs text-gray-500 font-medium">
-                  🎤 Mic is active - You can speak anytime
-                </p>
-              </div>
-            </div>
-          )}
-
           {/* Selection Options UI - Only show when keyboard input is active */}
           {selectionConfig && showTextInput && (
             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
@@ -2036,7 +1804,7 @@ export function SetupPage() {
           <div ref={messagesEndRef} />
         </div>
       </main>
-      
+
       <div className="setup-page-avatar-zone">
         <div className="setup-avatar-panel">
           <div className="setup-avatar-inner">
@@ -2128,14 +1896,9 @@ export function SetupPage() {
           </div>
 
           {/* Helper Text */}
-          {!showTextInput && !isListening && !isBackgroundListening && (
+          {!showTextInput && !isListening && (
             <p className="text-center text-xs text-gray-400 mt-2">
               Tap the microphone to speak, or tap the keyboard to type
-            </p>
-          )}
-          {isBackgroundListening && !isListening && (
-            <p className="text-center text-xs text-emerald-600 mt-2 font-medium">
-              🎤 Mic is active - You can speak anytime
             </p>
           )}
           {isListening && (

@@ -2,10 +2,12 @@ import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import type { FormData } from "@/types/form";
 
+const HARD_CODED_ID = "9795784244";
+
 const initialFormData = (): FormData => ({
-  userId: undefined,
+  userId: HARD_CODED_ID,
   name: "",
-  mobile: "",
+  mobile: HARD_CODED_ID,
   gender: "",
   age: 0,
   height: 0,
@@ -57,9 +59,15 @@ export const useUserProfileStore = create<UserProfileStore>()(
         prevStep: () => set((state) => ({ step: Math.max(1, state.step - 1) })),
         updateFormData: (updates) =>
           set((state) => {
-            const nextFormData = { ...state.formData, ...updates };
+            const sanitizedUpdates = {
+              ...updates,
+              userId: HARD_CODED_ID,
+              mobile: HARD_CODED_ID,
+            };
+            const nextFormData = { ...state.formData, ...sanitizedUpdates };
             console.log("[userProfileStore] updateFormData", {
               updates,
+              sanitizedUpdates,
               nextFormData,
             });
             return { formData: nextFormData };
