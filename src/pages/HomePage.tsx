@@ -14,6 +14,8 @@ import {
   TrendingUp,
   Droplet,
   Footprints,
+  Keyboard,
+  Mic,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,7 +84,6 @@ interface Message {
   text: string;
 }
 
-
 // Goal Chart types
 interface ChartDataPoint {
   day: number;
@@ -96,7 +97,7 @@ interface HabitSeries {
 
 interface HabitLog {
   id: string;
-    userId: string;
+  userId: string;
   habit: string;
   value: number;
   recordedAt: string;
@@ -106,7 +107,12 @@ interface HabitLog {
     note?: string;
     mealName?: string;
     healthNote?: string;
-    items?: Array<{ name: string; calories: number; quantity?: string; note?: string }>;
+    items?: Array<{
+      name: string;
+      calories: number;
+      quantity?: string;
+      note?: string;
+    }>;
     quickNote?: string;
     mealType?: string;
     cheatMeal?: boolean;
@@ -126,9 +132,7 @@ interface DailyHabits {
  * Calculate goal progress based on daily habit data
  * Goal starts at 0 and builds up to 100 based on cumulative progress
  */
-function calculateGoalProgress(
-  habitData: HabitSeries
-): {
+function calculateGoalProgress(habitData: HabitSeries): {
   historicalData: ChartDataPoint[];
   projectedData: ChartDataPoint[];
   currentProgress: number;
@@ -170,7 +174,7 @@ function calculateGoalProgress(
     // If daily progress is 56%, it contributes: (56/100) * 5 = 2.8%
     const dailyContribution = (dailyProgress / 100) * MAX_DAILY_CONTRIBUTION;
     dailyContributions.push(dailyContribution);
-    
+
     // Accumulate progress
     totalProgress += dailyContribution;
     dayCount++;
@@ -190,7 +194,8 @@ function calculateGoalProgress(
   // Calculate average daily contribution for projection
   const avgDailyContribution =
     dailyContributions.length > 0
-      ? dailyContributions.reduce((a, b) => a + b, 0) / dailyContributions.length
+      ? dailyContributions.reduce((a, b) => a + b, 0) /
+        dailyContributions.length
       : 0;
   const dailyRate = avgDailyContribution;
 
@@ -266,6 +271,8 @@ export function HomePage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isHabitApiLoading, setHabitApiLoading] = useState(false);
+  const [showTextInput, setShowTextInput] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const xp = profile.xp ?? routeFormData.xp ?? 350;
   const setupMessageText =
     "We have created a personalized plan to help you reach your goals. Your fitness journey is no longer boring—head to Explore for curated meals and workouts, log habits, log meals in chat for calorie tracking, and unlock even more support.";
@@ -280,7 +287,8 @@ export function HomePage() {
     let messageText = defaultWelcomeText;
 
     if (typeof window !== "undefined") {
-      const fromSetup = window.sessionStorage.getItem("visitedSetup") === "true";
+      const fromSetup =
+        window.sessionStorage.getItem("visitedSetup") === "true";
       const setupMessageShown =
         window.sessionStorage.getItem("setupHomeMessageShown") === "true";
       const lastDailyGreeting =
@@ -331,17 +339,17 @@ export function HomePage() {
     water?: number;
     steps?: number;
   }>({});
-  
+
   // Goal Chart state
   const [goalChartLoading, setGoalChartLoading] = useState(true);
   const [goalHabitData, setGoalHabitData] = useState<HabitSeries>({});
   const [selectedGoal, setSelectedGoal] = useState<string>("");
   const [fetchedUserGoal, setFetchedUserGoal] = useState<string>("");
   const fitnessGoals = profile.fitnessGoals || [];
-  
+
   // Refresh trigger for goal section
   const [goalRefreshTrigger, setGoalRefreshTrigger] = useState(0);
-  
+
   // Today's intake state
   const [todayIntake, setTodayIntake] = useState<{
     calories: { achieved: number; target: number };
@@ -353,7 +361,7 @@ export function HomePage() {
     steps: { achieved: 0, target: 0 },
   });
   const [todayIntakeLoading, setTodayIntakeLoading] = useState(false);
-  
+
   // Cheat meals / missed meals state
   interface CheatMealEntry {
     date: string;
@@ -370,11 +378,7 @@ export function HomePage() {
   const [cheatMeals, setCheatMeals] = useState<CheatMealEntry[]>([]);
   const [cheatMealsLoading, setCheatMealsLoading] = useState(false);
   // Use selected goal, fetched user goal, profile goal, or default
-  const activeGoal =
-    selectedGoal ||
-    fetchedUserGoal ||
-    fitnessGoals[0] ||
-    "";
+  const activeGoal = selectedGoal || fetchedUserGoal || fitnessGoals[0] || "";
 
   const levelingXp = 1000;
   const level = 1;
@@ -415,7 +419,8 @@ export function HomePage() {
   useEffect(() => {
     const storedPhone = localStorage.getItem("userPhone");
     const routePhone = routeFormData.mobile;
-    const userId = profile.mobile || routePhone || storedPhone || HARD_CODED_USER_ID;
+    const userId =
+      profile.mobile || routePhone || storedPhone || HARD_CODED_USER_ID;
     if (!userId) return;
     if (fetchedUserRef.current === userId) return;
     fetchedUserRef.current = userId;
@@ -443,12 +448,10 @@ export function HomePage() {
 
     const fetchUserGoal = async () => {
       try {
-        const res = await fetch(
-          `/api/users/${encodeURIComponent(userId)}`
-        );
+        const res = await fetch(`/api/users/${encodeURIComponent(userId)}`);
         if (!res.ok) return;
         const userData = await res.json();
-        
+
         // Extract first fitness goal from response
         const goals = userData.fitnessGoals || [];
         if (goals.length > 0) {
@@ -616,19 +619,19 @@ export function HomePage() {
 
         habitLogs.forEach((log) => {
           const habitName = log.habit.toLowerCase();
-          
+
           // Check specifically for cheat meals: habit == "calories" and meta.cheatMeal == true
           if (habitName === "calories" || habitName === "calorie") {
             const isCheatMeal = log.meta?.cheatMeal === true;
-            
+
             if (isCheatMeal) {
               const date = new Date(log.recordedAt);
               const dateStr = date.toISOString().slice(0, 10);
-              
+
               if (!mealsByDate[dateStr]) {
                 mealsByDate[dateStr] = [];
               }
-              
+
               // Extract food items from metadata
               let foodItems: string[] = [];
               if (log.meta?.food) {
@@ -638,15 +641,22 @@ export function HomePage() {
                   foodItems = [log.meta.food];
                 }
               }
-              
+
               // Also check items array if food is not present
-              if (foodItems.length === 0 && log.meta?.items && Array.isArray(log.meta.items)) {
-                foodItems = log.meta.items.map((item: any) => item.name || String(item)).filter(Boolean);
+              if (
+                foodItems.length === 0 &&
+                log.meta?.items &&
+                Array.isArray(log.meta.items)
+              ) {
+                foodItems = log.meta.items
+                  .map((item: any) => item.name || String(item))
+                  .filter(Boolean);
               }
-              
+
               // Use foodName if present, otherwise use "cheat meal"
-              const displayName = log.meta?.foodName || log.meta?.mealName || "cheat meal";
-              
+              const displayName =
+                log.meta?.foodName || log.meta?.mealName || "cheat meal";
+
               mealsByDate[dateStr].push({
                 mealName: displayName,
                 calories: log.value,
@@ -663,7 +673,9 @@ export function HomePage() {
         // Convert to array and sort by date (newest first)
         const cheatMealsArray: CheatMealEntry[] = Object.entries(mealsByDate)
           .map(([date, meals]) => ({ date, meals }))
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          .sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+          );
 
         setCheatMeals(cheatMealsArray);
       } catch (e) {
@@ -791,7 +803,10 @@ export function HomePage() {
         });
 
         console.log("Processed goal progress data:", goalProgressData);
-        console.log("Number of days with data:", Object.keys(goalProgressData).length);
+        console.log(
+          "Number of days with data:",
+          Object.keys(goalProgressData).length
+        );
 
         setGoalHabitData(goalProgressData);
         setGoalChartLoading(false);
@@ -1849,16 +1864,13 @@ export function HomePage() {
         const body = new URLSearchParams();
         body.append("userId", userId);
         body.append("message", message);
-        const response = await fetch(
-          "/api/habits/ai-assist",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body,
-          }
-        );
+        const response = await fetch("/api/habits/ai-assist", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body,
+        });
 
         if (!response.ok) {
           console.error("Habit assist API error", response.status);
@@ -1886,6 +1898,7 @@ export function HomePage() {
     };
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
+    setShowTextInput(false);
     const sendFallbackCoachResponse = () => {
       let responseText = "";
       if (isMale) {
@@ -1942,6 +1955,17 @@ export function HomePage() {
       .finally(() => setHabitApiLoading(false));
   };
 
+  // Handle text input toggle
+  const handleTextInputToggle = () => {
+    setShowTextInput(!showTextInput);
+    if (!showTextInput) {
+      // Focus the input after a small delay to ensure it's rendered
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    }
+  };
+
   useEffect(() => {
     if (messageListRef.current) {
       messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
@@ -1962,7 +1986,7 @@ export function HomePage() {
             </div>
             <div>
               <p className="text-sm font-semibold text-slate-900">{name}</p>
-            
+
               <div className="w-32 h-1.5 bg-gray-200 rounded-full mt-1">
                 <div
                   className="h-full rounded-full bg-gray-300"
@@ -2058,7 +2082,10 @@ export function HomePage() {
                       <div
                         className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-500"
                         style={{
-                          width: `${Math.min(100, goalChartData.currentProgress)}%`,
+                          width: `${Math.min(
+                            100,
+                            goalChartData.currentProgress
+                          )}%`,
                         }}
                       ></div>
                     </div>
@@ -2114,19 +2141,30 @@ export function HomePage() {
                             </span>
                           </div>
                           <span className="text-sm font-bold text-gray-900">
-                            {todayIntake.calories.achieved} / {todayIntake.calories.target} kcal
+                            {todayIntake.calories.achieved} /{" "}
+                            {todayIntake.calories.target} kcal
                           </span>
                         </div>
                         <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-gradient-to-r from-orange-500 to-orange-600 rounded-full transition-all duration-500"
                             style={{
-                              width: `${Math.min(100, (todayIntake.calories.achieved / todayIntake.calories.target) * 100)}%`,
+                              width: `${Math.min(
+                                100,
+                                (todayIntake.calories.achieved /
+                                  todayIntake.calories.target) *
+                                  100
+                              )}%`,
                             }}
                           ></div>
                         </div>
                         <p className="text-xs text-gray-500 text-right">
-                          {((todayIntake.calories.achieved / todayIntake.calories.target) * 100).toFixed(1)}% of daily target
+                          {(
+                            (todayIntake.calories.achieved /
+                              todayIntake.calories.target) *
+                            100
+                          ).toFixed(1)}
+                          % of daily target
                         </p>
                       </div>
 
@@ -2140,19 +2178,30 @@ export function HomePage() {
                             </span>
                           </div>
                           <span className="text-sm font-bold text-gray-900">
-                            {todayIntake.water.achieved} / {todayIntake.water.target} ml
+                            {todayIntake.water.achieved} /{" "}
+                            {todayIntake.water.target} ml
                           </span>
                         </div>
                         <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-500"
                             style={{
-                              width: `${Math.min(100, (todayIntake.water.achieved / todayIntake.water.target) * 100)}%`,
+                              width: `${Math.min(
+                                100,
+                                (todayIntake.water.achieved /
+                                  todayIntake.water.target) *
+                                  100
+                              )}%`,
                             }}
                           ></div>
                         </div>
                         <p className="text-xs text-gray-500 text-right">
-                          {((todayIntake.water.achieved / todayIntake.water.target) * 100).toFixed(1)}% of daily target
+                          {(
+                            (todayIntake.water.achieved /
+                              todayIntake.water.target) *
+                            100
+                          ).toFixed(1)}
+                          % of daily target
                         </p>
                       </div>
 
@@ -2166,19 +2215,30 @@ export function HomePage() {
                             </span>
                           </div>
                           <span className="text-sm font-bold text-gray-900">
-                            {todayIntake.steps.achieved.toLocaleString()} / {todayIntake.steps.target.toLocaleString()}
+                            {todayIntake.steps.achieved.toLocaleString()} /{" "}
+                            {todayIntake.steps.target.toLocaleString()}
                           </span>
                         </div>
                         <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-500"
                             style={{
-                              width: `${Math.min(100, (todayIntake.steps.achieved / todayIntake.steps.target) * 100)}%`,
+                              width: `${Math.min(
+                                100,
+                                (todayIntake.steps.achieved /
+                                  todayIntake.steps.target) *
+                                  100
+                              )}%`,
                             }}
                           ></div>
                         </div>
                         <p className="text-xs text-gray-500 text-right">
-                          {((todayIntake.steps.achieved / todayIntake.steps.target) * 100).toFixed(1)}% of daily target
+                          {(
+                            (todayIntake.steps.achieved /
+                              todayIntake.steps.target) *
+                            100
+                          ).toFixed(1)}
+                          % of daily target
                         </p>
                       </div>
                     </div>
@@ -2233,7 +2293,8 @@ export function HomePage() {
                                 {formattedDate}
                               </p>
                               <span className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded-full">
-                                {entry.meals.length} meal{entry.meals.length !== 1 ? "s" : ""}
+                                {entry.meals.length} meal
+                                {entry.meals.length !== 1 ? "s" : ""}
                               </span>
                             </div>
                             <div className="space-y-2">
@@ -2244,7 +2305,9 @@ export function HomePage() {
                                 >
                                   <div className="flex items-start justify-between mb-1">
                                     <p className="text-sm font-semibold text-gray-800">
-                                      {meal.foodName || meal.mealName || "cheat meal"}
+                                      {meal.foodName ||
+                                        meal.mealName ||
+                                        "cheat meal"}
                                     </p>
                                     {meal.calories && (
                                       <span className="text-xs font-medium text-red-600">
@@ -2258,41 +2321,49 @@ export function HomePage() {
                                     </p>
                                   )}
                                   {/* Display food items from metadata */}
-                                  {meal.food && Array.isArray(meal.food) && meal.food.length > 0 && (
-                                    <div className="mt-2 pt-2 border-t border-red-200/50">
-                                      <p className="text-xs font-medium text-gray-700 mb-1">
-                                        Food Items:
-                                      </p>
-                                      <div className="flex flex-wrap gap-1">
-                                        {meal.food.map((foodItem, foodIdx) => (
-                                          <span
-                                            key={foodIdx}
-                                            className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full"
-                                          >
-                                            {foodItem}
-                                          </span>
-                                        ))}
+                                  {meal.food &&
+                                    Array.isArray(meal.food) &&
+                                    meal.food.length > 0 && (
+                                      <div className="mt-2 pt-2 border-t border-red-200/50">
+                                        <p className="text-xs font-medium text-gray-700 mb-1">
+                                          Food Items:
+                                        </p>
+                                        <div className="flex flex-wrap gap-1">
+                                          {meal.food.map(
+                                            (foodItem, foodIdx) => (
+                                              <span
+                                                key={foodIdx}
+                                                className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full"
+                                              >
+                                                {foodItem}
+                                              </span>
+                                            )
+                                          )}
+                                        </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    )}
                                   {/* Fallback to items array if food is not available */}
-                                  {(!meal.food || (Array.isArray(meal.food) && meal.food.length === 0)) && meal.items && meal.items.length > 0 && (
-                                    <div className="mt-2 pt-2 border-t border-red-200/50">
-                                      <p className="text-xs font-medium text-gray-700 mb-1">
-                                        Items:
-                                      </p>
-                                      <div className="flex flex-wrap gap-1">
-                                        {meal.items.map((item, itemIdx) => (
-                                          <span
-                                            key={itemIdx}
-                                            className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full"
-                                          >
-                                            {item.name}
-                                          </span>
-                                        ))}
+                                  {(!meal.food ||
+                                    (Array.isArray(meal.food) &&
+                                      meal.food.length === 0)) &&
+                                    meal.items &&
+                                    meal.items.length > 0 && (
+                                      <div className="mt-2 pt-2 border-t border-red-200/50">
+                                        <p className="text-xs font-medium text-gray-700 mb-1">
+                                          Items:
+                                        </p>
+                                        <div className="flex flex-wrap gap-1">
+                                          {meal.items.map((item, itemIdx) => (
+                                            <span
+                                              key={itemIdx}
+                                              className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full"
+                                            >
+                                              {item.name}
+                                            </span>
+                                          ))}
+                                        </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    )}
                                 </div>
                               ))}
                             </div>
@@ -2302,8 +2373,6 @@ export function HomePage() {
                     </div>
                   )}
                 </div>
-
-                
               </div>
             )}
 
@@ -2358,9 +2427,7 @@ export function HomePage() {
                       Habits
                     </span>
                   </div>
-
                 </div>
-
               </div>
             )}
 
@@ -2401,58 +2468,87 @@ export function HomePage() {
 
                 {/* Input Area - Fixed at bottom */}
                 <div className="sticky bottom-0 bg-white border-t border-gray-100 pt-4 pb-4 -mx-4 md:-mx-6 px-4 md:px-6 z-10">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      onKeyDown={(e) =>
-                        e.key === "Enter" && handleSendMessage()
-                      }
-                      placeholder={`Message ${coachName}...`}
-                      className="flex-1 rounded-full border border-gray-200 bg-white px-4 py-3 shadow-sm focus-visible:ring-offset-0 focus-visible:ring-1"
-                    />
+                  {/* Text Input (shown when user clicks keyboard icon) */}
+                  {showTextInput && (
+                    <div className="mb-3 animate-in slide-in-from-bottom-2">
+                      <div className="relative flex items-center gap-2">
+                        <Input
+                          ref={inputRef}
+                          value={inputValue}
+                          onChange={(e) => setInputValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleSendMessage();
+                            } else if (e.key === "Escape") {
+                              setShowTextInput(false);
+                              setInputValue("");
+                            }
+                          }}
+                          placeholder={`Message ${coachName}...`}
+                          className="flex-1 py-4 rounded-full border-2 border-gray-300 shadow-sm focus-visible:ring-offset-0 focus-visible:ring-2 focus-visible:border-transparent pr-12"
+                          autoFocus
+                        />
+                        {inputValue && (
+                          <Button
+                            size="icon"
+                            onClick={() => handleSendMessage()}
+                            className={`absolute right-2 rounded-full w-9 h-9 bg-emerald-600 hover:bg-emerald-700`}
+                          >
+                            <Send className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1 ml-2">
+                        Press Enter to send, Esc to cancel
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Primary Input Controls */}
+                  <div className="flex items-center justify-center gap-3">
+                    {/* Voice Input Button (Primary) */}
                     <Button
-                      size="icon"
-                      onClick={() => handleSendMessage()}
-                      disabled={!inputValue.trim()}
-                      className={`w-10 h-10 rounded-full transition ${
-                        inputValue.trim()
-                          ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                          : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                      }`}
-                    >
-                      <Send className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="icon"
+                      size="lg"
                       onClick={handleVoiceInput}
-                      className={`w-12 h-12 rounded-full shadow-md transition-all relative ${
+                      className={`w-16 h-16 rounded-full shadow-lg transition-all ${
                         isListening
-                          ? "bg-red-500 text-white"
-                          : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                          ? "bg-red-500 hover:bg-red-600 animate-pulse scale-110"
+                          : "bg-emerald-600 hover:bg-emerald-700"
                       }`}
                     >
-                      {isListening && (
-                        <>
-                          {/* Wave animation rings */}
-                          <div className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping opacity-75" />
-                          <div
-                            className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping opacity-50"
-                            style={{ animationDelay: "0.3s" }}
-                          />
-                          <div
-                            className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping opacity-25"
-                            style={{ animationDelay: "0.6s" }}
-                          />
-                        </>
+                      {isListening ? (
+                        <Mic className="w-6 h-6 fill-white text-white" />
+                      ) : (
+                        <Mic className="w-6 h-6 fill-white text-white" />
                       )}
-                      <Zap
-                        className={`w-5 h-5 fill-white text-white ${
-                          isListening ? "animate-pulse" : ""
-                        }`}
-                      />
+                    </Button>
+
+                    {/* Text Input Toggle Button (Fallback) */}
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={handleTextInputToggle}
+                      className={`w-16 h-16 rounded-full shadow-md border-2 ${
+                        showTextInput
+                          ? "border-gray-400 bg-gray-50"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <Keyboard className="w-6 h-6 text-gray-600" />
                     </Button>
                   </div>
+
+                  {/* Helper Text */}
+                  {!showTextInput && !isListening && (
+                    <p className="text-center text-xs text-gray-400 mt-2">
+                      Tap the microphone to speak, or tap the keyboard to type
+                    </p>
+                  )}
+                  {isListening && (
+                    <p className="text-center text-xs text-gray-500 mt-2 font-medium">
+                      🎤 Listening... Speak now or tap again to stop
+                    </p>
+                  )}
                 </div>
               </div>
             )}
