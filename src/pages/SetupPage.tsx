@@ -104,9 +104,6 @@ export function SetupPage() {
   // Refs for functions used in socket event handlers to avoid stale closures
   // Initialize as null, will be set after functions are defined
   const speakTextRef = useRef<((text: string) => void) | null>(null);
-  const cleanMessageTextRef = useRef<
-    ((text: string, possibleValues?: string[]) => string) | null
-  >(null);
   const navigateRef = useRef(navigate);
   const genderRef = useRef(gender);
   const stopListeningAndSendRef = useRef<(() => void) | null>(null);
@@ -318,34 +315,6 @@ export function SetupPage() {
   useEffect(() => {
     speakTextRef.current = speakText;
   }, [speakText]);
-
-  // Update cleanMessageTextRef
-  useEffect(() => {
-    cleanMessageTextRef.current = (text: string, possibleValues?: string[]) => {
-      if (!possibleValues || possibleValues.length === 0) {
-        return text;
-      }
-      // Remove options list from message text
-      let cleaned = text;
-      possibleValues.forEach((option) => {
-        // Remove the option text and any leading/trailing punctuation
-        const regex = new RegExp(
-          `[\\s\\-•]?${option.replace(
-            /[.*+?^${}()|[\]\\]/g,
-            "\\$&"
-          )}[\\s\\-•]?`,
-          "gi"
-        );
-        cleaned = cleaned.replace(regex, "");
-      });
-      // Clean up multiple spaces and periods
-      cleaned = cleaned
-        .replace(/\s+/g, " ")
-        .replace(/\.\s*\./g, ".")
-        .trim();
-      return cleaned;
-    };
-  }, []);
 
   // Function to parse context and find keys with possible_values
   const checkForSelectionOptions = useCallback(() => {
@@ -685,33 +654,6 @@ export function SetupPage() {
           // checkForSelectionOptions will be called automatically via useEffect when contextState changes
         }
 
-        // Extract possible values synchronously from context for message cleaning
-        let possibleValuesForCleaning: string[] = [];
-        if (
-          journeyContext &&
-          typeof journeyContext === "object" &&
-          "keys" in journeyContext
-        ) {
-          const keys = journeyContext.keys;
-          if (keys && typeof keys === "object") {
-            for (const keyData of Object.values(keys)) {
-              if (
-                keyData &&
-                typeof keyData === "object" &&
-                "possible_values" in keyData &&
-                Array.isArray(
-                  (keyData as { possible_values?: unknown[] }).possible_values
-                )
-              ) {
-                possibleValuesForCleaning = (
-                  keyData as { possible_values: string[] }
-                ).possible_values;
-                break;
-              }
-            }
-          }
-        }
-
         // Check if status is completed
         const isCompleted =
           journeyContext &&
@@ -724,24 +666,20 @@ export function SetupPage() {
           journeyText.trim() &&
           journeyText !== "[object Object]"
         ) {
-          // Clean the message text to remove options list if selection UI is available
-          const cleanedText =
-            cleanMessageTextRef.current?.(
-              journeyText.trim(),
-              possibleValuesForCleaning
-            ) || journeyText.trim();
+          // Use the text exactly as received without any processing
+          const rawText = journeyText;
           const journeyMsg: Message = {
             id: Date.now().toString(),
             sender: "coach",
-            text: cleanedText,
+            text: rawText,
           };
           setMessages((prev) => [...prev, journeyMsg]);
           setShowTextInput(false);
           setIsWaitingForResponse(false); // Hide loading indicator
           setIsWaitingForInitialResponse(false); // Hide initial loading indicator
 
-          // Speak the cleaned response using text-to-speech
-          speakText(cleanedText);
+          // Speak the text exactly as received
+          speakText(rawText);
 
           // Extract and save phone number to localStorage
           if (journeyContext?.keys && typeof journeyContext.keys === "object") {
@@ -995,33 +933,6 @@ export function SetupPage() {
         // checkForSelectionOptions will be called automatically via useEffect when contextState changes
       }
 
-      // Extract possible values synchronously from context for message cleaning
-      let possibleValuesForCleaning: string[] = [];
-      if (
-        responseContext &&
-        typeof responseContext === "object" &&
-        "keys" in responseContext
-      ) {
-        const keys = responseContext.keys;
-        if (keys && typeof keys === "object") {
-          for (const keyData of Object.values(keys)) {
-            if (
-              keyData &&
-              typeof keyData === "object" &&
-              "possible_values" in keyData &&
-              Array.isArray(
-                (keyData as { possible_values?: unknown[] }).possible_values
-              )
-            ) {
-              possibleValuesForCleaning = (
-                keyData as { possible_values: string[] }
-              ).possible_values;
-              break;
-            }
-          }
-        }
-      }
-
       // Check if status is completed
       const isCompleted =
         responseContext &&
@@ -1060,39 +971,34 @@ export function SetupPage() {
         responseText.trim() &&
         responseText !== "[object Object]"
       ) {
-        // Clean the message text to remove options list if selection UI is available
-        const cleanedText = cleanMessageTextRef.current
-          ? cleanMessageTextRef.current(
-              responseText.trim(),
-              possibleValuesForCleaning
-            )
-          : responseText.trim();
+        // Use the text exactly as received without any processing
+        const rawText = responseText;
 
         // Check if we've already processed this message
-        if (processedMessageIdsRef.current.has(cleanedText)) {
+        if (processedMessageIdsRef.current.has(rawText)) {
           console.log(
             "⚠️ Duplicate message detected, skipping:",
-            cleanedText.substring(0, 50)
+            rawText.substring(0, 50)
           );
           setIsWaitingForInitialResponse(false);
           setIsWaitingForResponse(false);
           return;
         }
 
-        processedMessageIdsRef.current.add(cleanedText);
+        processedMessageIdsRef.current.add(rawText);
 
         const coachMsg: Message = {
-          id: `${cleanedText.substring(0, 50)}-${Date.now()}`,
+          id: `${rawText.substring(0, 50)}-${Date.now()}`,
           sender: "coach",
-          text: cleanedText,
+          text: rawText,
         };
         setMessages((prev) => [...prev, coachMsg]);
         setShowTextInput(false);
         setIsWaitingForResponse(false); // Hide loading indicator
         setIsWaitingForInitialResponse(false); // Hide initial loading indicator
 
-        // Speak the cleaned response using text-to-speech
-        speakText(cleanedText);
+        // Speak the text exactly as received
+        speakText(rawText);
 
         // Check if status is completed - wait for plan_creation_response
         if (isCompleted) {
@@ -1195,33 +1101,6 @@ export function SetupPage() {
           // checkForSelectionOptions will be called automatically via useEffect when contextState changes
         }
 
-        // Extract possible values synchronously from context for message cleaning
-        let possibleValuesForCleaning: string[] = [];
-        if (
-          journeyContext &&
-          typeof journeyContext === "object" &&
-          "keys" in journeyContext
-        ) {
-          const keys = journeyContext.keys;
-          if (keys && typeof keys === "object") {
-            for (const keyData of Object.values(keys)) {
-              if (
-                keyData &&
-                typeof keyData === "object" &&
-                "possible_values" in keyData &&
-                Array.isArray(
-                  (keyData as { possible_values?: unknown[] }).possible_values
-                )
-              ) {
-                possibleValuesForCleaning = (
-                  keyData as { possible_values: string[] }
-                ).possible_values;
-                break;
-              }
-            }
-          }
-        }
-
         // Check if status is completed
         const isCompleted =
           journeyContext &&
@@ -1234,35 +1113,31 @@ export function SetupPage() {
           journeyText.trim() &&
           journeyText !== "[object Object]"
         ) {
-          // Clean the message text to remove options list if selection UI is available
-          const cleanedText =
-            cleanMessageTextRef.current?.(
-              journeyText.trim(),
-              possibleValuesForCleaning
-            ) || journeyText.trim();
+          // Use the text exactly as received without any processing
+          const rawText = journeyText;
 
           // Check if we've already processed this message
-          if (processedMessageIdsRef.current.has(cleanedText)) {
+          if (processedMessageIdsRef.current.has(rawText)) {
             console.log(
               "⚠️ Duplicate message detected, skipping:",
-              cleanedText.substring(0, 50)
+              rawText.substring(0, 50)
             );
             setIsWaitingForInitialResponse(false);
             setIsWaitingForResponse(false);
             return;
           }
 
-          processedMessageIdsRef.current.add(cleanedText);
+          processedMessageIdsRef.current.add(rawText);
 
           const journeyMsg: Message = {
-            id: `${cleanedText.substring(0, 50)}-${Date.now()}`,
+            id: `${rawText.substring(0, 50)}-${Date.now()}`,
             sender: "coach",
-            text: cleanedText,
+            text: rawText,
           };
           setMessages((prev) => [...prev, journeyMsg]);
           setIsWaitingForResponse(false); // Hide loading indicator
           setIsWaitingForInitialResponse(false); // Hide initial loading indicator
-          speakText(cleanedText);
+          speakText(rawText);
 
           // Check if status is completed - wait for plan_creation_response
           if (isCompleted) {
@@ -1359,18 +1234,18 @@ export function SetupPage() {
 
         console.log("📋 Plan creation text:", planText);
 
-        // Display the plan message in chat
+        // Display the plan message in chat - use text exactly as received
         const planMsg: Message = {
           id: `plan-${Date.now()}`,
           sender: "coach",
-          text: planText.trim(),
+          text: planText,
         };
         setMessages((prev) => [...prev, planMsg]);
         setIsWaitingForResponse(false);
         setIsWaitingForInitialResponse(false);
 
-        // Speak the plan text entirely
-        speakText(planText.trim());
+        // Speak the plan text exactly as received
+        speakText(planText);
 
         // Extract and save phone number to localStorage if not already saved
         if (contextState?.keys && typeof contextState.keys === "object") {
