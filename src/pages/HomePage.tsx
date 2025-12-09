@@ -251,7 +251,7 @@ export function HomePage() {
   const coachName = gender === "male" ? "Dhoni" : "Disha";
 
   // State
-  const [activeTab, setActiveTab] = useState<"goals" | "Your Plans" | "Chat">(
+  const [activeTab, setActiveTab] = useState<"goals" | "Your Plans" | "Talk to Dhoni">(
     "goals"
   );
   const [messages, setMessages] = useState<Message[]>([]);
@@ -1656,7 +1656,7 @@ export function HomePage() {
 
   const initialAssistSentRef = useRef(false);
   useEffect(() => {
-    if (activeTab !== "Chat") return;
+    if (activeTab !== "Talk to Dhoni") return;
     if (initialAssistSentRef.current) return;
     const userId = profile.mobile?.trim();
     if (!userId) return;
@@ -1802,13 +1802,13 @@ export function HomePage() {
               )}
             </button>
             <button
-              onClick={() => setActiveTab("Chat")}
+              onClick={() => setActiveTab("Talk to Dhoni")}
               className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
-                activeTab === "Chat" ? "text-emerald-600" : "text-gray-400"
+                activeTab === "Talk to Dhoni" ? "text-emerald-600" : "text-gray-400"
               }`}
             >
-              <MessageSquare className="w-4 h-4" /> Chat
-              {activeTab === "Chat" && (
+              <MessageSquare className="w-4 h-4" /> Talk to Dhoni
+              {activeTab === "Talk to Dhoni" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600" />
               )}
             </button>
@@ -2190,7 +2190,7 @@ export function HomePage() {
             )}
 
             {/* Chat Tab */}
-            {activeTab === "Chat" && (
+            {activeTab === "Talk to Dhoni" && (
               <div className="flex-1 flex flex-col max-w-2xl mx-auto min-h-0 w-full">
                 <div
                   ref={messageListRef}
