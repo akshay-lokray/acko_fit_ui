@@ -48,6 +48,9 @@ export function PremiumPlanPage() {
                             <span className="text-5xl font-bold bg-gradient-to-r from-purple-700 to-emerald-600 bg-clip-text text-transparent">
                                 ₹{BASE_PRICE}
                             </span>
+                            <span className="text-2xl font-medium text-gray-400">
+                                per goal
+                            </span>
                         </div>
                         <p className="text-sm text-gray-500 mt-2">Pay once, lifetime access</p>
                     </div>
@@ -122,7 +125,7 @@ export function PremiumPlanPage() {
                         }
                         className="w-full py-6 text-base font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all"
                     >
-                        START 7 Days FREE TRIAL
+                        START FREE TRIAL
                     </Button>
                     <p className="text-xs text-center text-gray-400">
                         One-time payment. Lifetime access. Get refunds based on goal achievement.

@@ -78,7 +78,7 @@ export function CoachIntroPage() {
                                 : 'opacity-0 pointer-events-none'
                         }`}
                     >
-                        Start Assessment
+                        Let's start
                         <ArrowRight className="ml-3 h-6 w-6" />
                     </Button>
                 </div>
