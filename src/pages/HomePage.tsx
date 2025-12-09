@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { io, Socket } from "socket.io-client";
 import {
   MessageSquare,
   Zap,
@@ -392,7 +391,7 @@ export function HomePage() {
       const res = await fetch(
         `/api/users/${encodeURIComponent(phoneNumber)}/xp?delta=${delta}`,
         {
-          method: "POST",
+        method: "POST",
         }
       );
       if (!res.ok) return;
@@ -859,8 +858,6 @@ export function HomePage() {
   const isMale = gender === "male";
 
   const [isListening, setIsListening] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
-  const SOCKET_URL = "http://192.168.233.159:5000";
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const recognitionResultRef = useRef<string>("");
   const wakeWordRecognitionRef = useRef<SpeechRecognition | null>(null);
@@ -1148,174 +1145,7 @@ export function HomePage() {
     }
   };
 
-  useEffect(() => {
-    const socket = io(SOCKET_URL, {
-      transports: ["websocket", "polling"], // Prefer websocket, fallback to polling
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: Infinity,
-      timeout: 20000,
-      forceNew: false,
-      withCredentials: false,
-    });
-
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      console.log("✅ Socket.IO connected:", SOCKET_URL);
-      console.log("Transport:", socket.io.engine.transport.name);
-      // Send connection message if needed
-      try {
-        socket.emit("connect", { type: "connect" });
-      } catch (e) {
-        console.warn("Socket.IO connect event send failed", e);
-      }
-    });
-
-    socket.on("connect_error", (error) => {
-      console.error("❌ Socket.IO connection error:", {
-        error: error.message,
-        description: error.toString(),
-        url: SOCKET_URL,
-        connected: socket.connected,
-      });
-    });
-
-    socket.on("error", (error) => {
-      console.error("❌ Socket.IO error:", {
-        error,
-        url: SOCKET_URL,
-        connected: socket.connected,
-      });
-    });
-
-    socket.on("message", (data) => {
-      let text = "";
-      try {
-        if (typeof data === "string") {
-          const parsed = JSON.parse(data);
-          text = parsed.text ?? String(data);
-        } else if (typeof data === "object" && data !== null) {
-          text = data.text ?? JSON.stringify(data);
-        } else {
-          text = String(data);
-        }
-      } catch {
-        text = String(data);
-      }
-      const coachMsg: Message = {
-        id: Date.now().toString(),
-        sender: "coach",
-        text,
-      };
-      setMessages((prev) => [...prev, coachMsg]);
-      setIsListening(false);
-    });
-
-    // Listen for 'response' event from server
-    socket.on("response", (data) => {
-      console.log("📥 Received response event:", data);
-
-      // Check if it's audio/media data
-      if (
-        data instanceof Blob ||
-        data instanceof ArrayBuffer ||
-        (typeof data === "object" && data !== null && data?.type === "audio")
-      ) {
-        console.log("🎵 Received audio data:", data);
-        handleAudioResponse(data);
-        return;
-      }
-
-      // Handle text response - format: {'text': response_text}
-      let responseText = "";
-      try {
-        if (typeof data === "string") {
-          // Try to parse as JSON first
-          try {
-            const parsed = JSON.parse(data);
-            responseText = parsed.text || String(data);
-          } catch {
-            // If not JSON, use as plain text
-            responseText = data;
-          }
-        } else if (typeof data === "object" && data !== null) {
-          // Extract text from response object - format: {'text': response_text}
-          responseText = data.text || String(data);
-        } else {
-          responseText = String(data);
-        }
-      } catch (error) {
-        console.error("Error parsing response:", error);
-        responseText = String(data);
-      }
-
-      // Print the response text
-      console.log("📝 Response text:", responseText);
-
-      // Add message to chat
-      const coachMsg: Message = {
-        id: Date.now().toString(),
-        sender: "coach",
-        text: responseText,
-      };
-      setMessages((prev) => [...prev, coachMsg]);
-      setIsListening(false);
-
-      // Speak the response using text-to-speech
-      speakText(responseText);
-    });
-
-    // Listen for audio data specifically
-    socket.on("audio", (data) => {
-      console.log("🎵 Received audio event:", data);
-      handleAudioResponse(data);
-    });
-
-    // Listen for binary audio data
-    socket.on("audio_chunk", (data) => {
-      console.log("🎵 Received audio chunk:", data);
-      handleAudioResponse(data);
-    });
-
-    socket.on("disconnect", (reason) => {
-      console.log("🔌 Socket.IO disconnected:", {
-        reason,
-        connected: socket.connected,
-      });
-      if (reason === "io server disconnect") {
-        // Server disconnected the socket, need to manually reconnect
-        socket.connect();
-      }
-    });
-
-    // Log reconnection attempts
-    socket.on("reconnect_attempt", (attemptNumber) => {
-      console.log("🔄 Socket.IO reconnection attempt:", attemptNumber);
-    });
-
-    socket.on("reconnect", (attemptNumber) => {
-      console.log("✅ Socket.IO reconnected after", attemptNumber, "attempts");
-    });
-
-    socket.on("reconnect_failed", () => {
-      console.error("❌ Socket.IO reconnection failed");
-    });
-
-    return () => {
-      if (socket) {
-        try {
-          socket.emit("disconnect", { type: "disconnect" });
-        } catch (e) {
-          console.warn("Socket.IO disconnect event send failed", e);
-        }
-        socket.disconnect();
-      }
-      socketRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [SOCKET_URL]);
+ 
 
   // Helper function to stop listening and send the result
   const clearSilenceMonitor = useCallback(() => {
@@ -1326,7 +1156,6 @@ export function HomePage() {
   }, []);
 
   const stopListeningAndSend = useCallback(() => {
-    const socket = socketRef.current;
     setIsListening(false);
 
     clearSilenceMonitor();
@@ -1358,7 +1187,7 @@ export function HomePage() {
       try {
         // Use stop() for graceful stop (abort() triggers error events)
         recognition.stop();
-      } catch {
+        } catch {
         // If stop fails, try abort
         try {
           recognition.abort();
@@ -1369,22 +1198,6 @@ export function HomePage() {
     }
 
     // Send the transcribed text if available
-    if (recognitionResultRef.current.trim() && socket && socket.connected) {
-      const avatar = isMale ? "Dhoni" : "Disha";
-      const payload = {
-        event: "process_audio",
-        data: {
-          text: recognitionResultRef.current.trim(),
-          user_id: "user123", // You can change this to use actual user ID
-          avatar: avatar,
-        },
-      };
-
-      console.log("📤 Sending transcribed text:", payload);
-
-      socket.emit("process_audio", payload);
-      recognitionResultRef.current = "";
-    }
   }, [isMale, playEndSound, clearSilenceMonitor]);
 
   const startSilenceMonitor = useCallback(() => {
@@ -1853,6 +1666,7 @@ export function HomePage() {
     };
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
+<<<<<<< Updated upstream
     setShowTextInput(false);
     const sendFallbackCoachResponse = () => {
       let responseText = "";
@@ -1892,16 +1706,18 @@ export function HomePage() {
       sendFallbackCoachResponse();
     }
 
+=======
+>>>>>>> Stashed changes
     setHabitApiLoading(true);
     sendHabitAssistMessage(textToSend)
       .then((reply) => {
         if (reply) {
-          const coachMsg: Message = {
+        const coachMsg: Message = {
             id: (Date.now() + 2).toString(),
-            sender: "coach",
+          sender: "coach",
             text: reply,
-          };
-          setMessages((prev) => [...prev, coachMsg]);
+        };
+        setMessages((prev) => [...prev, coachMsg]);
           speakText(reply);
         }
         // Refresh goal section after chat message
@@ -1976,7 +1792,7 @@ export function HomePage() {
             voiceType={gender as VoiceType}
             isFullScreen={false}
           />
-        </div>
+              </div>
 
         {/* 2. Interface Tabs (Chat / Explore / Chat) - Fills remaining space and scrolls */}
         <div className="flex-1 bg-white rounded-t-[2rem] relative z-20 flex flex-col min-h-0 overflow-hidden">
@@ -2070,7 +1886,7 @@ export function HomePage() {
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
                       <Utensils className="w-5 h-5 text-white" />
-                    </div>
+                      </div>
                     <div>
                       <h2 className="text-lg font-bold text-gray-900">
                         Today's Intake
@@ -2121,7 +1937,7 @@ export function HomePage() {
                           ).toFixed(1)}
                           % of daily target
                         </p>
-                      </div>
+                </div>
 
                       {/* Water */}
                       <div className="space-y-2">
@@ -2268,14 +2084,15 @@ export function HomePage() {
                                       <span className="text-xs font-medium text-red-600">
                                         {meal.calories} kcal
                                       </span>
-                                    )}
-                                  </div>
+                          )}
+                        </div>
                                   {meal.healthNote && (
                                     <p className="text-xs text-gray-600 mt-1">
                                       {meal.healthNote}
                                     </p>
                                   )}
                                   {/* Display food items from metadata */}
+<<<<<<< Updated upstream
                                   {meal.food &&
                                     Array.isArray(meal.food) &&
                                     meal.food.length > 0 && (
@@ -2320,6 +2137,44 @@ export function HomePage() {
                                       </div>
                                     )}
                                 </div>
+=======
+                                  {meal.food && Array.isArray(meal.food) && meal.food.length > 0 && (
+                                    <div className="mt-2 pt-2 border-t border-red-200/50">
+                                      <p className="text-xs font-medium text-gray-700 mb-1">
+                                        Food Items:
+                                      </p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {meal.food.map((foodItem, foodIdx) => (
+                                          <span
+                                            key={foodIdx}
+                                            className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full"
+                                          >
+                                            {foodItem}
+                            </span>
+                                        ))}
+                        </div>
+                      </div>
+                                  )}
+                                  {/* Fallback to items array if food is not available */}
+                                  {(!meal.food || (Array.isArray(meal.food) && meal.food.length === 0)) && meal.items && meal.items.length > 0 && (
+                                    <div className="mt-2 pt-2 border-t border-red-200/50">
+                                      <p className="text-xs font-medium text-gray-700 mb-1">
+                                        Items:
+                                      </p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {meal.items.map((item, itemIdx) => (
+                        <span
+                                            key={itemIdx}
+                                            className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full"
+                        >
+                                            {item.name}
+                        </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                      )}
+                    </div>
+>>>>>>> Stashed changes
                               ))}
                             </div>
                           </div>
@@ -2422,7 +2277,7 @@ export function HomePage() {
                         }`}
                       >
                         {msg.text}
-                      </div>
+                </div>
                     </div>
                   ))}
                   {isHabitApiLoading && (
@@ -2430,10 +2285,10 @@ export function HomePage() {
                       <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-500">
                         <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                         thinking...
-                      </div>
+                  </div>
                     </div>
                   )}
-                </div>
+                  </div>
 
                 {/* Input Area - Fixed at bottom */}
                 <div className="sticky bottom-0 bg-white border-t border-gray-100 pt-4 pb-4 -mx-4 md:-mx-6 px-4 md:px-6 z-10">
@@ -2505,6 +2360,7 @@ export function HomePage() {
                     >
                       <Keyboard className="w-6 h-6 text-gray-600" />
                     </Button>
+<<<<<<< Updated upstream
                   </div>
 
                   {/* Helper Text */}
@@ -2518,6 +2374,9 @@ export function HomePage() {
                       🎤 Listening... Speak now or tap again to stop
                     </p>
                   )}
+=======
+                    </div>
+>>>>>>> Stashed changes
                 </div>
               </div>
             )}
