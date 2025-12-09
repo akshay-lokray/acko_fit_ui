@@ -11,6 +11,8 @@ import {
   Dumbbell,
   Camera,
   Shield,
+  Target,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -18,6 +20,17 @@ import { Input } from "@/components/ui/input";
 import { useUserProfileStore } from "@/store/userProfileStore";
 import AvatarScene from "@/components/AvatarScene";
 import type { VoiceType } from "@/types/voice";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts";
 import "@/pages/HomePage.css";
 
 // Type definitions for Speech Recognition API
@@ -76,33 +89,177 @@ interface Goal {
   xp: number;
 }
 
-const SAMPLE_GOALS: Goal[] = [
-  {
-    id: "hydration",
-    title: "Hydration streak",
-    detail: "Stay above 2.5L for 3 days",
-    progress: 72,
-    xp: 120,
-  },
-  {
-    id: "strength",
-    title: "Strength focus",
-    detail: "4 strength sessions this week",
-    progress: 45,
-    xp: 80,
-  },
-  {
-    id: "mindset",
-    title: "Mindset clarity",
-    detail: "Journal for 10 min daily",
-    progress: 30,
-    xp: 60,
-  },
-];
+interface Quest {
+  id: string;
+  title: string;
+  xp: number;
+  completed: boolean;
+  type: "daily" | "weekly";
+}
+
+// Goal Chart types
+interface ChartDataPoint {
+  day: number;
+  goalProgress: number;
+  projected?: boolean;
+}
+
+interface HabitSeries {
+  [date: string]: number;
+}
+
+interface HabitLog {
+  id: string;
+    userId: string;
+  habit: string;
+  value: number;
+  recordedAt: string;
+  meta?: {
+    unit?: string;
+    source?: string;
+    note?: string;
+  };
+}
+
+interface DailyHabits {
+  calories: number;
+  water: number;
+  steps: number;
+}
+
+/**
+ * Calculate goal progress based on daily habit data
+ * Goal starts at 0 and builds up to 100 based on cumulative progress
+ */
+function calculateGoalProgress(
+  habitData: HabitSeries
+): {
+  historicalData: ChartDataPoint[];
+  projectedData: ChartDataPoint[];
+  currentProgress: number;
+  targetProgress: number;
+  dailyRate: number;
+  daysRemaining: number;
+} {
+  const historicalData: ChartDataPoint[] = [];
+  const projectedData: ChartDataPoint[] = [];
+
+  const sortedDates = Object.keys(habitData)
+    .map((d) => new Date(d))
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  if (sortedDates.length === 0) {
+    return {
+      historicalData: [],
+      projectedData: [],
+      currentProgress: 0,
+      targetProgress: 100,
+      dailyRate: 0,
+      daysRemaining: 0,
+    };
+  }
+
+  // Calculate cumulative progress starting from 0
+  // Each day can contribute maximum 5% to the overall goal
+  // Progress accumulates: day 1 = max 5%, day 2 = max 10%, etc.
+  const MAX_DAILY_CONTRIBUTION = 5; // Maximum % contribution per day
+  let totalProgress = 0;
+  let dayCount = 0;
+  const dailyContributions: number[] = [];
+
+  sortedDates.forEach((date) => {
+    const dateStr = date.toISOString().slice(0, 10);
+    const dailyProgress = habitData[dateStr] || 0; // This is already 0-100%
+
+    // Scale daily progress to max 5% contribution per day
+    // If daily progress is 56%, it contributes: (56/100) * 5 = 2.8%
+    const dailyContribution = (dailyProgress / 100) * MAX_DAILY_CONTRIBUTION;
+    dailyContributions.push(dailyContribution);
+    
+    // Accumulate progress
+    totalProgress += dailyContribution;
+    dayCount++;
+
+    // Cap at 100%
+    const goalProgress = Math.min(100, totalProgress);
+
+    historicalData.push({
+      day: dayCount,
+      goalProgress: goalProgress,
+    });
+  });
+
+  const currentProgress =
+    historicalData[historicalData.length - 1]?.goalProgress || 0;
+
+  // Calculate average daily contribution for projection
+  const avgDailyContribution =
+    dailyContributions.length > 0
+      ? dailyContributions.reduce((a, b) => a + b, 0) / dailyContributions.length
+      : 0;
+  const dailyRate = avgDailyContribution;
+
+  // Project future data - show projection until goal is reached or 60 days max
+  let projectedProgress = totalProgress;
+  let projectionDay = dayCount;
+  const maxProjectionDays = 60;
+  let goalReachedDay = 0;
+
+  for (let i = 1; i <= maxProjectionDays; i++) {
+    projectedProgress += avgDailyContribution;
+    projectionDay++;
+
+    if (projectedProgress >= 100 && goalReachedDay === 0) {
+      goalReachedDay = projectionDay;
+    }
+
+    const projectedGoalProgress = Math.min(100, projectedProgress);
+
+    projectedData.push({
+      day: dayCount + i,
+      goalProgress: projectedGoalProgress,
+      projected: true,
+    });
+
+    // Stop projecting once we've reached 100% and shown a bit beyond
+    if (projectedProgress >= 100 && i > 5) {
+      break;
+    }
+  }
+
+  // Calculate days remaining to reach 100
+  let daysRemaining = 0;
+  if (currentProgress < 100 && avgDailyContribution > 0) {
+    const remainingProgress = 100 - currentProgress;
+    daysRemaining = Math.ceil(remainingProgress / avgDailyContribution);
+  } else if (goalReachedDay > 0) {
+    daysRemaining = goalReachedDay - dayCount;
+  }
+
+  return {
+    historicalData,
+    projectedData,
+    currentProgress,
+    targetProgress: 100,
+    dailyRate,
+    daysRemaining,
+  };
+}
 
 const HARD_CODED_USER_ID = "9795784244";
 
 // --- Mock Data ---
+const DAILY_QUESTS: Quest[] = [
+  { id: "1", title: "Log Meal", xp: 50, completed: false, type: "daily" },
+  {
+    id: "2",
+    title: "Walk 5,000 Steps",
+    xp: 100,
+    completed: false,
+    type: "daily",
+  },
+  { id: "3", title: "Drink 2L Water", xp: 50, completed: true, type: "daily" },
+];
 
 export function HomePage() {
   const location = useLocation();
@@ -138,14 +295,22 @@ export function HomePage() {
     water?: number;
     steps?: number;
   }>({});
+  
+  // Goal Chart state
+  const [goalChartLoading, setGoalChartLoading] = useState(true);
+  const [goalHabitData, setGoalHabitData] = useState<HabitSeries>({});
+  const [selectedGoal, setSelectedGoal] = useState<string>("");
+  const [fetchedUserGoal, setFetchedUserGoal] = useState<string>("");
+  const fitnessGoals = profile.fitnessGoals || [];
+  // Use selected goal, fetched user goal, profile goal, or default
+  const activeGoal =
+    selectedGoal ||
+    fetchedUserGoal ||
+    fitnessGoals[0] ||
+    "";
 
   const levelingXp = 1000;
   const level = 1;
-  const stageProgress = {
-    currentStage: "Novice",
-    targetStage: "Warrior",
-    progress: 58,
-  };
 
   const fetchUserProfile = async (userId: string) => {
     try {
@@ -173,7 +338,7 @@ export function HomePage() {
         }
       );
       if (!res.ok) return;
-      await fetchUserProfile(); // refresh xp
+      await fetchUserProfile(phoneNumber); // refresh xp
     } catch (e) {
       console.error("Failed to award XP", e);
     }
@@ -181,42 +346,93 @@ export function HomePage() {
 
   // Fetch user profile on mount
   useEffect(() => {
-    if (fetchedUserRef.current === HARD_CODED_USER_ID) return;
-    fetchedUserRef.current = HARD_CODED_USER_ID;
-    fetchUserProfile(HARD_CODED_USER_ID);
-  }, [fetchUserProfile]);
+    const storedPhone = localStorage.getItem("userPhone");
+    const routePhone = routeFormData.mobile;
+    const userId = profile.mobile || routePhone || storedPhone || HARD_CODED_USER_ID;
+    if (!userId) return;
+    if (fetchedUserRef.current === userId) return;
+    fetchedUserRef.current = userId;
+    fetchUserProfile(userId);
+  }, [profile.mobile, routeFormData.mobile, fetchUserProfile]);
+
+  // Fetch user goal from API
+  useEffect(() => {
+    const userId = "783482642";
+
+    const fetchUserGoal = async () => {
+      try {
+        const res = await fetch(
+          `/api/users/${encodeURIComponent(userId)}`
+        );
+        if (!res.ok) return;
+        const userData = await res.json();
+        
+        // Extract first fitness goal from response
+        const goals = userData.fitnessGoals || [];
+        if (goals.length > 0) {
+          setFetchedUserGoal(goals[0]);
+        } else {
+          setFetchedUserGoal("");
+        }
+      } catch (e) {
+        console.error("Failed to fetch user goal", e);
+        setFetchedUserGoal("");
+      }
+    };
+
+    fetchUserGoal();
+  }, []);
 
   // Fetch daily habit stats on mount
   useEffect(() => {
-    const userId = profile.mobile || routeFormData.mobile || "";
-    if (!userId) return;
+    const userId = "783482642";
 
     const fetchHabits = async () => {
       try {
         const res = await fetch(
-          `/api/habits/daily/batch?userId=${encodeURIComponent(
-            userId
-          )}&habits=water,calorie,steps`
+          `/api/habits/user?userId=${encodeURIComponent(userId)}`
         );
         if (!res.ok) return;
-        const data = await res.json();
-        const calorie = data?.calorie ?? {};
-        const water = data?.water ?? {};
-        const steps = data?.steps ?? {};
+        const habitLogs: HabitLog[] = await res.json();
 
-        const parseTotals = (
-          totals: Record<string, unknown> | null | undefined
-        ) => {
-          if (!totals || typeof totals !== "object") return undefined;
-          const firstKey = Object.keys(totals)[0];
-          const val = totals[firstKey];
-          return Number(val ?? 0) || 0;
+        // Group habits by date and calculate daily totals
+        const dailyHabitsMap: Record<string, DailyHabits> = {};
+
+        habitLogs.forEach((log) => {
+          const date = new Date(log.recordedAt);
+          const dateStr = date.toISOString().slice(0, 10);
+
+          if (!dailyHabitsMap[dateStr]) {
+            dailyHabitsMap[dateStr] = {
+              calories: 0,
+              water: 0,
+              steps: 0,
+            };
+          }
+
+          const habitName = log.habit.toLowerCase();
+          if (habitName === "calories" || habitName === "calorie") {
+            dailyHabitsMap[dateStr].calories += log.value;
+          } else if (habitName === "water") {
+            dailyHabitsMap[dateStr].water += log.value;
+          } else if (habitName === "steps" || habitName === "step") {
+            dailyHabitsMap[dateStr].steps += log.value;
+          }
+        });
+
+        // Get today's date
+        const today = new Date();
+        const todayStr = today.toISOString().slice(0, 10);
+        const todayHabits = dailyHabitsMap[todayStr] || {
+          calories: 0,
+          water: 0,
+          steps: 0,
         };
 
         setHabitStats({
-          calorie: parseTotals(calorie.totals),
-          water: parseTotals(water.totals),
-          steps: parseTotals(steps.totals),
+          calorie: todayHabits.calories,
+          water: todayHabits.water,
+          steps: todayHabits.steps,
         });
       } catch (e) {
         console.error("Failed to fetch habit stats", e);
@@ -224,8 +440,171 @@ export function HomePage() {
     };
 
     fetchHabits();
-  }, [profile.mobile, routeFormData.mobile]);
+  }, []);
 
+  // Removed leaderboard fetching - using Goal Chart instead
+
+  // Calculate goal chart data
+  const goalChartData = useMemo(() => {
+    console.log("Calculating goal chart data:", {
+      activeGoal,
+      goalHabitDataKeys: Object.keys(goalHabitData).length,
+      goalHabitData,
+    });
+
+    if (!activeGoal || Object.keys(goalHabitData).length === 0) {
+      console.log("No active goal or no habit data");
+      return {
+        historicalData: [],
+        projectedData: [],
+        currentProgress: 0,
+        targetProgress: 100,
+        dailyRate: 0,
+        daysRemaining: 0,
+      };
+    }
+    const result = calculateGoalProgress(goalHabitData);
+    console.log("Calculated goal chart data:", result);
+    return result;
+  }, [activeGoal, goalHabitData]);
+
+  // Fetch habit data from API and calculate daily goal progress
+  useEffect(() => {
+    const userId = "783482642";
+
+    if (!activeGoal) return;
+
+    setGoalChartLoading(true);
+
+    const fetchHabitData = async () => {
+      try {
+        console.log("Fetching habit data for userId:", userId);
+        const res = await fetch(
+          `/api/habits/user?userId=${encodeURIComponent(userId)}`
+        );
+        if (!res.ok) {
+          throw new Error(`Failed to fetch habit data: ${res.status}`);
+        }
+        const habitLogs: HabitLog[] = await res.json();
+        console.log("Fetched habit logs:", habitLogs);
+
+        if (!habitLogs || habitLogs.length === 0) {
+          console.warn("No habit logs found");
+          setGoalHabitData({});
+          setGoalChartLoading(false);
+          return;
+        }
+
+        // Group habits by date
+        const dailyHabitsMap: Record<string, DailyHabits> = {};
+
+        habitLogs.forEach((log) => {
+          const date = new Date(log.recordedAt);
+          const dateStr = date.toISOString().slice(0, 10);
+
+          if (!dailyHabitsMap[dateStr]) {
+            dailyHabitsMap[dateStr] = {
+              calories: 0,
+              water: 0,
+              steps: 0,
+            };
+          }
+
+          const habitName = log.habit.toLowerCase();
+          if (habitName === "calories" || habitName === "calorie") {
+            dailyHabitsMap[dateStr].calories += log.value;
+          } else if (habitName === "water") {
+            dailyHabitsMap[dateStr].water += log.value;
+          } else if (habitName === "steps" || habitName === "step") {
+            dailyHabitsMap[dateStr].steps += log.value;
+          }
+        });
+
+        // Calculate daily goal progress
+        // Target values for each habit (can be adjusted based on user profile)
+        const targetCalories = activeGoal.toLowerCase().includes("lose weight")
+          ? 1500
+          : 2500;
+        const targetWater = 2000; // ml
+        const targetSteps = 10000;
+
+        // Convert daily habits to goal progress values
+        const goalProgressData: HabitSeries = {};
+        const sortedDates = Object.keys(dailyHabitsMap).sort();
+
+        sortedDates.forEach((dateStr) => {
+          const dayHabits = dailyHabitsMap[dateStr];
+
+          // Calculate progress for each habit (0-100% each)
+          const caloriesProgress = Math.min(
+            100,
+            (dayHabits.calories / targetCalories) * 100
+          );
+          const waterProgress = Math.min(
+            100,
+            (dayHabits.water / targetWater) * 100
+          );
+          const stepsProgress = Math.min(
+            100,
+            (dayHabits.steps / targetSteps) * 100
+          );
+
+          // Weighted average: calories 40%, water 30%, steps 30%
+          const dailyGoalProgress =
+            caloriesProgress * 0.4 + waterProgress * 0.3 + stepsProgress * 0.3;
+
+          goalProgressData[dateStr] = dailyGoalProgress;
+        });
+
+        console.log("Processed goal progress data:", goalProgressData);
+        console.log("Number of days with data:", Object.keys(goalProgressData).length);
+
+        setGoalHabitData(goalProgressData);
+        setGoalChartLoading(false);
+      } catch (e) {
+        console.error("Failed to fetch habit data", e);
+        setGoalChartLoading(false);
+        // Fallback to empty data
+        setGoalHabitData({});
+      }
+    };
+
+    fetchHabitData();
+  }, [activeGoal]);
+
+  // Combine historical and projected data for chart
+  const combinedGoalChartData = useMemo(() => {
+    const historical = goalChartData.historicalData.map((d) => ({
+      day: d.day,
+      actual: d.goalProgress,
+      projected: null as number | null,
+    }));
+
+    const lastHistorical = historical[historical.length - 1];
+    const firstProjected = goalChartData.projectedData[0];
+
+    const projected = goalChartData.projectedData.map((d) => ({
+      day: d.day,
+      actual: null as number | null,
+      projected: d.goalProgress,
+    }));
+
+    // If there's a gap, add a connecting point
+    if (
+      lastHistorical &&
+      firstProjected &&
+      lastHistorical.day < firstProjected.day - 1
+    ) {
+      const connectingPoint = {
+        day: lastHistorical.day + 1,
+        actual: lastHistorical.actual,
+        projected: lastHistorical.actual,
+      };
+      return [...historical, connectingPoint, ...projected];
+    }
+
+    return [...historical, ...projected];
+  }, [goalChartData]);
   // Award XP when goals are reached (once per goal per user)
   useEffect(() => {
     const phoneNumber = localStorage.getItem("userPhone");
@@ -1443,80 +1822,211 @@ export function HomePage() {
           {/* Tab Content */}
           <div className="flex-1 flex flex-col overflow-y-auto bg-white px-4 md:px-6 pt-4 pb-0 min-h-0">
             {activeTab === "goals" && (
-              <div className="flex-1 flex flex-col max-w-2xl mx-auto space-y-4 overflow-y-auto">
-                <div className="bg-white rounded-2xl shadow-sm p-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs uppercase tracking-wider text-gray-500">
-                        Current stage
-                      </p>
-                      <p className="text-lg font-bold text-gray-900">
-                        {stageProgress.currentStage}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs uppercase tracking-wider text-gray-500">
-                        Target
-                      </p>
-                      <p className="text-lg font-bold text-gray-900">
-                        {stageProgress.targetStage}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 relative h-2 rounded-full bg-gray-200">
-                    <div
-                      className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-500 to-green-400"
-                      style={{ width: `${stageProgress.progress}%` }}
-                    />
-                  </div>
-                  <div className="mt-2 flex justify-between text-xs text-gray-500">
-                    <span>{stageProgress.progress}% progress</span>
-                    <span>Next milestone ahead</span>
-                  </div>
-                  <div className="mt-4 text-xs text-gray-500">
-                    <p>
-                      Keep the streak going—Dhoni is watching the plan and
-                      upgrading you soon.
+              <div className="h-full space-y-6 max-w-2xl mx-auto px-4 pb-6">
+                {/* Goal Selector */}
+                {fitnessGoals.length > 1 && (
+                  <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm">
+                    <p className="text-sm font-semibold text-gray-700 mb-3">
+                      Select Goal:
                     </p>
+                    <div className="flex flex-wrap gap-3">
+                      {fitnessGoals.map((goal) => (
+                        <button
+                          key={goal}
+                          onClick={() => setSelectedGoal(goal)}
+                          className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                            activeGoal === goal
+                              ? "bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-md shadow-purple-200"
+                              : "bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200"
+                          }`}
+                        >
+                          {goal}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Progress Stats */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-3xl p-5 border border-emerald-200 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                      <p className="text-xs text-emerald-700 font-semibold uppercase tracking-wide">
+                        Current Progress
+                      </p>
+                    </div>
+                    <p className="text-3xl font-bold text-emerald-600">
+                      {goalChartData.currentProgress.toFixed(1)}%
+                    </p>
+                    <div className="mt-3 w-full h-2 bg-emerald-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.min(100, goalChartData.currentProgress)}%`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-3xl p-5 border border-purple-200 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                      <p className="text-xs text-purple-700 font-semibold uppercase tracking-wide">
+                        Days Remaining
+                      </p>
+                    </div>
+                    <p className="text-3xl font-bold text-purple-600">
+                      {goalChartData.daysRemaining > 0
+                        ? goalChartData.daysRemaining
+                        : "—"}
+                    </p>
+                    {goalChartData.daysRemaining > 0 && (
+                      <p className="text-xs text-purple-600 mt-2">
+                        Until goal reached
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
-                  <p className="text-sm text-gray-700">
-                    Welcome back, {name.split(" ")[0]}. Ready to conquer today's
-                    mission?
-                  </p>
-                </div>
+                {/* Chart */}
+                <div className="bg-white rounded-3xl p-6 border border-gray-200 shadow-sm">
+                  <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
+                      <Target className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900">
+                        {activeGoal || "Your Goal"}
+                      </h2>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Track your journey to success
+                      </p>
+                    </div>
+                  </div>
 
-                <div className="space-y-3">
-                  {SAMPLE_GOALS.map((goal) => (
-                    <div
-                      key={goal.id}
-                      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">
-                            {goal.title}
-                          </p>
-                          <p className="text-xs text-gray-500">{goal.detail}</p>
-                        </div>
-                        <span className="text-xs font-semibold text-emerald-600">
-                          +{goal.xp} XP
-                        </span>
+                  {goalChartLoading ? (
+                    <div className="h-80 flex flex-col items-center justify-center py-12">
+                      <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4"></div>
+                      <p className="text-sm text-gray-500 font-medium">
+                        Loading chart data...
+                      </p>
+                    </div>
+                  ) : combinedGoalChartData.length === 0 ? (
+                    <div className="h-80 flex flex-col items-center justify-center py-12">
+                      <Target className="w-16 h-16 text-gray-300 mb-4" />
+                      <p className="text-sm text-gray-500 font-medium text-center px-4">
+                        No data available. Start logging your habits to see
+                        progress!
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="px-2">
+                      <ResponsiveContainer width="100%" height={320}>
+                        <LineChart data={combinedGoalChartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis
+                            dataKey="day"
+                            label={{
+                              value: "Days",
+                              position: "insideBottom",
+                              offset: -5,
+                            }}
+                            stroke="#6b7280"
+                          />
+                          <YAxis
+                            label={{
+                              value: "Goal Progress (%)",
+                              angle: -90,
+                              position: "insideLeft",
+                            }}
+                            domain={[0, 100]}
+                            stroke="#6b7280"
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: "white",
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "12px",
+                              padding: "12px",
+                              boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                            }}
+                            formatter={(value: any, name: string) => {
+                              if (value === null || value === undefined)
+                                return null;
+                              const numValue =
+                                typeof value === "number" ? value : Number(value);
+                              if (isNaN(numValue)) return null;
+                              return [`${numValue.toFixed(1)}%`, name];
+                            }}
+                          />
+                          <Legend
+                            wrapperStyle={{ paddingTop: "20px" }}
+                            iconType="line"
+                          />
+                          <ReferenceLine
+                            y={100}
+                            stroke="#a855f7"
+                            strokeDasharray="3 3"
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="actual"
+                            stroke="#10b981"
+                            strokeWidth={3}
+                            dot={{ fill: "#10b981", r: 4, strokeWidth: 2, stroke: "#fff" }}
+                            activeDot={{ r: 6 }}
+                            name="Actual Progress"
+                            connectNulls={false}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="projected"
+                            stroke="#a855f7"
+                            strokeWidth={2.5}
+                            strokeDasharray="6 4"
+                            dot={{ fill: "#a855f7", r: 3, strokeWidth: 2, stroke: "#fff" }}
+                            activeDot={{ r: 5 }}
+                            name="Projected Progress"
+                            connectNulls={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+
+                  {/* Info Box */}
+                  <div className="mt-6 p-5 bg-gradient-to-br from-purple-50 via-purple-50/50 to-emerald-50/30 rounded-2xl border border-purple-200/50 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md flex-shrink-0">
+                        <TrendingUp className="w-5 h-5 text-white" />
                       </div>
-                      <div className="mt-3 h-2 rounded-full bg-gray-200">
-                        <div
-                          className="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-green-400"
-                          style={{ width: `${goal.progress}%` }}
-                        />
-                      </div>
-                      <div className="mt-2 text-[10px] uppercase tracking-wider text-gray-500 flex justify-between">
-                        <span>{goal.progress}% complete</span>
-                        <span>{goal.detail}</span>
+                      <div className="flex-1">
+                        <p className="font-bold text-purple-900 mb-2 text-sm">
+                          How it works
+                        </p>
+                        <p className="text-xs text-purple-800 leading-relaxed mb-3">
+                          The chart shows your progress toward your goal. The
+                          solid green line represents actual progress based on
+                          your habit data (each day contributes up to 5%),
+                          while the dashed purple line projects future progress
+                          based on your current trend.
+                        </p>
+                        {goalChartData.daysRemaining > 0 && (
+                          <div className="bg-white/60 rounded-xl p-3 border border-purple-200/50">
+                            <p className="font-semibold text-purple-900 text-xs">
+                              🎯 If you continue at this rate, you'll reach your
+                              goal in{" "}
+                              <span className="text-purple-600">
+                                {goalChartData.daysRemaining} day
+                                {goalChartData.daysRemaining !== 1 ? "s" : ""}
+                              </span>
+                              .
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
               </div>
             )}
