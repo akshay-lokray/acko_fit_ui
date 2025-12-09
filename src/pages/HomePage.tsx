@@ -1666,48 +1666,6 @@ export function HomePage() {
     };
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
-<<<<<<< Updated upstream
-    setShowTextInput(false);
-    const sendFallbackCoachResponse = () => {
-      let responseText = "";
-      if (isMale) {
-        responseText =
-          "Copy that. Stay focused on the objective. We don't stop when we're tired, we stop when we're done.";
-      } else {
-        responseText =
-          "Interesting data point. My analysis suggests keeping your hydration up will optimize your recovery today.";
-      }
-      const coachMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: "coach",
-        text: responseText,
-      };
-      setMessages((prev) => [...prev, coachMsg]);
-    };
-
-    const socket = socketRef.current;
-    if (socket && socket.connected) {
-      const avatar = isMale ? "Dhoni" : "Disha";
-      const payload = {
-        event: "process_audio",
-        data: {
-          text: textToSend,
-          user_id: "user123", // You can change this to use actual user ID
-          avatar: avatar,
-        },
-      };
-      try {
-        console.log("📤 Sending chat message:", payload);
-        socket.emit("process_audio", payload);
-      } catch {
-        sendFallbackCoachResponse();
-      }
-    } else {
-      sendFallbackCoachResponse();
-    }
-
-=======
->>>>>>> Stashed changes
     setHabitApiLoading(true);
     sendHabitAssistMessage(textToSend)
       .then((reply) => {
@@ -2092,52 +2050,6 @@ export function HomePage() {
                                     </p>
                                   )}
                                   {/* Display food items from metadata */}
-<<<<<<< Updated upstream
-                                  {meal.food &&
-                                    Array.isArray(meal.food) &&
-                                    meal.food.length > 0 && (
-                                      <div className="mt-2 pt-2 border-t border-red-200/50">
-                                        <p className="text-xs font-medium text-gray-700 mb-1">
-                                          Food Items:
-                                        </p>
-                                        <div className="flex flex-wrap gap-1">
-                                          {meal.food.map(
-                                            (foodItem, foodIdx) => (
-                                              <span
-                                                key={foodIdx}
-                                                className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full"
-                                              >
-                                                {foodItem}
-                                              </span>
-                                            )
-                                          )}
-                                        </div>
-                                      </div>
-                                    )}
-                                  {/* Fallback to items array if food is not available */}
-                                  {(!meal.food ||
-                                    (Array.isArray(meal.food) &&
-                                      meal.food.length === 0)) &&
-                                    meal.items &&
-                                    meal.items.length > 0 && (
-                                      <div className="mt-2 pt-2 border-t border-red-200/50">
-                                        <p className="text-xs font-medium text-gray-700 mb-1">
-                                          Items:
-                                        </p>
-                                        <div className="flex flex-wrap gap-1">
-                                          {meal.items.map((item, itemIdx) => (
-                                            <span
-                                              key={itemIdx}
-                                              className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full"
-                                            >
-                                              {item.name}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                </div>
-=======
                                   {meal.food && Array.isArray(meal.food) && meal.food.length > 0 && (
                                     <div className="mt-2 pt-2 border-t border-red-200/50">
                                       <p className="text-xs font-medium text-gray-700 mb-1">
@@ -2174,7 +2086,6 @@ export function HomePage() {
                                     </div>
                       )}
                     </div>
->>>>>>> Stashed changes
                               ))}
                             </div>
                           </div>
@@ -2360,23 +2271,7 @@ export function HomePage() {
                     >
                       <Keyboard className="w-6 h-6 text-gray-600" />
                     </Button>
-<<<<<<< Updated upstream
-                  </div>
-
-                  {/* Helper Text */}
-                  {!showTextInput && !isListening && (
-                    <p className="text-center text-xs text-gray-400 mt-2">
-                      Tap the microphone to speak, or tap the keyboard to type
-                    </p>
-                  )}
-                  {isListening && (
-                    <p className="text-center text-xs text-gray-500 mt-2 font-medium">
-                      🎤 Listening... Speak now or tap again to stop
-                    </p>
-                  )}
-=======
                     </div>
->>>>>>> Stashed changes
                 </div>
               </div>
             )}
