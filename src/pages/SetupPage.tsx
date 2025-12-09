@@ -761,7 +761,7 @@ export function SetupPage() {
 
             setTimeout(() => {
               if (navigateRef.current) {
-                navigateRef.current("/home", {
+                navigateRef.current("/premium", {
                   state: {
                     gender: genderRef.current,
                     formData: contextState?.keys || {},
@@ -1065,7 +1065,7 @@ export function SetupPage() {
           }
 
           setTimeout(() => {
-            navigate("/home", {
+            navigate("/premium", {
               state: {
                 gender,
                 formData: contextState?.keys || {},
@@ -1247,7 +1247,7 @@ export function SetupPage() {
 
             setTimeout(() => {
               if (navigateRef.current) {
-                navigateRef.current("/home", {
+                navigateRef.current("/premium", {
                   state: {
                     gender: genderRef.current,
                     formData: contextState?.keys || {},
