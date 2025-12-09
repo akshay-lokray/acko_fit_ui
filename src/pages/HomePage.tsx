@@ -1798,22 +1798,19 @@ export function HomePage() {
   const messageListRef = useRef<HTMLDivElement | null>(null);
 
   const sendHabitAssistMessage = useCallback(
-    async (message: string) => {
-      const userId = HARD_CODED_USER_ID;
+    async (message: string, userIdOverride?: string) => {
+      const userId = userIdOverride || HARD_CODED_USER_ID;
       try {
-        const body = new URLSearchParams();
-        body.append("userId", userId);
-        body.append("message", message);
-        const response = await fetch(
-          "/api/habits/ai-assist",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body,
-          }
-        );
+        const params = new URLSearchParams();
+        params.append("userId", userId);
+        params.append("message", message);
+        const response = await fetch("/api/habits/ai-assist", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: params.toString(),
+        });
 
         if (!response.ok) {
           console.error("Habit assist API error", response.status);
@@ -1828,6 +1825,28 @@ export function HomePage() {
     },
     [profile, routeFormData]
   );
+
+  const initialAssistSentRef = useRef(false);
+  useEffect(() => {
+    if (activeTab !== "Chat") return;
+    if (initialAssistSentRef.current) return;
+    const userId = profile.mobile?.trim();
+    if (!userId) return;
+    initialAssistSentRef.current = true;
+    setHabitApiLoading(true);
+    sendHabitAssistMessage("", userId)
+      .then((reply) => {
+        if (!reply) return;
+        const coachMsg: Message = {
+          id: (Date.now() + 3).toString(),
+          sender: "coach",
+          text: reply,
+        };
+        setMessages((prev) => [...prev, coachMsg]);
+        speakText(reply);
+      })
+      .finally(() => setHabitApiLoading(false));
+  }, [activeTab, profile.mobile, sendHabitAssistMessage, speakText]);
 
   const handleSendMessage = (textOverride?: string) => {
     const textToSend = textOverride || inputValue;
@@ -1880,7 +1899,8 @@ export function HomePage() {
     }
 
     setHabitApiLoading(true);
-    sendHabitAssistMessage(textToSend)
+    const userId = profile.mobile || HARD_CODED_USER_ID;
+    sendHabitAssistMessage(textToSend, userId)
       .then((reply) => {
         if (reply) {
           const coachMsg: Message = {
