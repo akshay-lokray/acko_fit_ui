@@ -56,6 +56,8 @@ interface Message {
   text: string;
 }
 
+const HARD_CODED_USER_ID = "9795784244";
+
 export function SetupPage() {
   const { updateFormData } = useUserProfileStore();
   const location = useLocation();
@@ -71,14 +73,6 @@ export function SetupPage() {
   const [isBackgroundListening, setIsBackgroundListening] = useState(false);
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
-  const lastCoachMessage = (() => {
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-      if (messages[i].sender === "coach") {
-        return messages[i].text;
-      }
-    }
-    return "";
-  })();
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [selectionConfig, setSelectionConfig] = useState<{
     possibleValues: string[];
@@ -885,12 +879,12 @@ export function SetupPage() {
                   typeof phoneKey.value === "string"
                 ) {
                   try {
-                    localStorage.setItem("userPhone", phoneKey.value);
+                    localStorage.setItem("userPhone", HARD_CODED_USER_ID);
                     console.log(
                       "📱 Saved phone number to localStorage:",
-                      phoneKey.value
+                      HARD_CODED_USER_ID
                     );
-                    updateFormData({ mobile: phoneKey.value });
+                    updateFormData({ mobile: HARD_CODED_USER_ID });
                   } catch (error) {
                     console.error(
                       "❌ Failed to save phone number to localStorage:",

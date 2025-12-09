@@ -100,6 +100,8 @@ const SAMPLE_GOALS: Goal[] = [
   },
 ];
 
+const HARD_CODED_USER_ID = "9795784244";
+
 // --- Mock Data ---
 
 export function HomePage() {
@@ -179,14 +181,10 @@ export function HomePage() {
 
   // Fetch user profile on mount
   useEffect(() => {
-    const storedPhone = localStorage.getItem("userPhone");
-    const routePhone = routeFormData.mobile;
-    const userId = profile.mobile || routePhone || storedPhone;
-    if (!userId) return;
-    if (fetchedUserRef.current === userId) return;
-    fetchedUserRef.current = userId;
-    fetchUserProfile(userId);
-  }, [profile.mobile, routeFormData.mobile, updateFormData]);
+    if (fetchedUserRef.current === HARD_CODED_USER_ID) return;
+    fetchedUserRef.current = HARD_CODED_USER_ID;
+    fetchUserProfile(HARD_CODED_USER_ID);
+  }, [fetchUserProfile]);
 
   // Fetch daily habit stats on mount
   useEffect(() => {
