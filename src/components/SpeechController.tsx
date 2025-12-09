@@ -64,7 +64,7 @@ export default function SpeechController({
     utteranceRef.current = utterance;
 
     // Configure voice settings
-    utterance.rate = voiceType === 'male' ? 0.9 : 1.05;
+    utterance.rate = voiceType === 'male' ? 1.18 : 1.05;
     utterance.pitch = voiceType === 'male' ? 0.85 : 1.1;
     utterance.volume = 1.0;
 
