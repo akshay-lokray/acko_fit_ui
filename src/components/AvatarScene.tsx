@@ -255,9 +255,21 @@ function AvatarWithVisemes({
 
   useEffect(() => {
     if (groupRef.current) {
-      // Find the head mesh
+      headRef.current = null;
+      // Prefer meshes that already expose morph targets
       groupRef.current.traverse((child) => {
-        if (child instanceof THREE.SkinnedMesh && child.name === 'Wolf3D_Head') {
+        if (headRef.current || !(child instanceof THREE.SkinnedMesh)) {
+          return;
+        }
+        const isHeadName =
+          child.name === "Wolf3D_Head" ||
+          child.name === "Head_Mesh" ||
+          child.name.toLowerCase().includes("head");
+        if (
+          isHeadName &&
+          child.morphTargetInfluences &&
+          child.morphTargetInfluences.length > 0
+        ) {
           headRef.current = child;
         }
       });

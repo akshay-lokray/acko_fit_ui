@@ -3,7 +3,8 @@ import AvatarPage from "./pages/AvatarPage";
 import { SetupPage } from "./pages/SetupPage";
 import "./App.css";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useGLTF } from "@react-three/drei";
 
 import { CoachSelectionPage } from "./pages/CoachSelectionPage";
 import { CoachIntroPage } from "./pages/CoachIntroPage";
@@ -21,9 +22,15 @@ import { LogLunchPage } from "./pages/LogLunchPage";
 import { LogStepsPage } from "./pages/LogStepsPage";
 import { LogWaterPage } from "./pages/LogWaterPage";
 import { HabitDetailPage } from "./pages/HabitDetailPage";
+import { MALE_DHONI_AVATAR_URL, FEMALE_DEFAULT_AVATAR_URL } from "./constants/avatarUrls";
 
 function App() {
   const [showIntro, setShowIntro] = useState(false);
+
+  useEffect(() => {
+    useGLTF.preload(MALE_DHONI_AVATAR_URL);
+    useGLTF.preload(FEMALE_DEFAULT_AVATAR_URL);
+  }, []);
 
   if (showIntro) {
     return (

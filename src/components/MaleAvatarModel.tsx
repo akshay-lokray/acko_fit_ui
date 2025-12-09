@@ -87,7 +87,7 @@ export function MaleAvatarModel(props: any) {
     }, [nodes, scene]);
 
     useFrame(({ clock }) => {
-      const baseElbowX = 1.3;
+      const baseElbowX = 1.4;
       const baseElbowZ = -0.1;
 
       if (!isFullScreen || !isSpeaking) {
@@ -105,8 +105,8 @@ export function MaleAvatarModel(props: any) {
       }
 
       const t = clock.getElapsedTime();
-      const explainingX = 0.9 + Math.sin(t * 1.7) * 0.2;
-      const explainingZ = -1.9 + Math.cos(t * 1.4) * 0.08;
+      const explainingX =4.2 + Math.sin(t * 1.7) * 0.3;
+      const explainingZ = 0.15 + Math.cos(t * 1.8) * 0.08;
       const leftMotion = Math.sin(t * 1.7) * 0.01;
       const leftTilt = Math.cos(t * 1.5) * 0.1;
 
@@ -120,6 +120,7 @@ export function MaleAvatarModel(props: any) {
 
       if (rightForearmBoneRef.current) {
         rightForearmBoneRef.current.rotation.x = explainingX;
+        rightForearmBoneRef.current.rotation.y = 2.2;
         rightForearmBoneRef.current.rotation.z = explainingZ;
       }
     });
@@ -131,79 +132,78 @@ export function MaleAvatarModel(props: any) {
     return (
       <group ref={groupRef} {...props} dispose={null}>
         {nodes?.Hips && <primitive object={nodes.Hips} />}
-        {nodes?.EyeLeft && (
+        <skinnedMesh
+          geometry={nodes.Body_Mesh.geometry}
+          material={materials.Body}
+          skeleton={nodes.Body_Mesh.skeleton}
+        />
+        <skinnedMesh
+          name="Eye_Mesh"
+          geometry={nodes.Eye_Mesh.geometry}
+          material={materials.Eyes}
+          skeleton={nodes.Eye_Mesh.skeleton}
+          morphTargetDictionary={nodes.Eye_Mesh.morphTargetDictionary}
+          morphTargetInfluences={nodes.Eye_Mesh.morphTargetInfluences}
+        />
+        <skinnedMesh
+          name="EyeAO_Mesh"
+          geometry={nodes.EyeAO_Mesh.geometry}
+          material={materials.EyeAO}
+          skeleton={nodes.EyeAO_Mesh.skeleton}
+          morphTargetDictionary={nodes.EyeAO_Mesh.morphTargetDictionary}
+          morphTargetInfluences={nodes.EyeAO_Mesh.morphTargetInfluences}
+        />
+        <skinnedMesh
+          name="Eyelash_Mesh"
+          geometry={nodes.Eyelash_Mesh.geometry}
+          material={materials.Eyelash}
+          skeleton={nodes.Eyelash_Mesh.skeleton}
+          morphTargetDictionary={nodes.Eyelash_Mesh.morphTargetDictionary}
+          morphTargetInfluences={nodes.Eyelash_Mesh.morphTargetInfluences}
+        />
+        <skinnedMesh
+          name="Head_Mesh"
+          geometry={nodes.Head_Mesh.geometry}
+          material={materials.Head}
+          skeleton={nodes.Head_Mesh.skeleton}
+          morphTargetDictionary={nodes.Head_Mesh.morphTargetDictionary}
+          morphTargetInfluences={nodes.Head_Mesh.morphTargetInfluences}
+        />
+        <skinnedMesh
+          name="Teeth_Mesh"
+          geometry={nodes.Teeth_Mesh.geometry}
+          material={materials.Teeth}
+          skeleton={nodes.Teeth_Mesh.skeleton}
+          morphTargetDictionary={nodes.Teeth_Mesh.morphTargetDictionary}
+          morphTargetInfluences={nodes.Teeth_Mesh.morphTargetInfluences}
+        />
+        <skinnedMesh
+          name="Tongue_Mesh"
+          geometry={nodes.Tongue_Mesh.geometry}
+          material={materials.Teeth}
+          skeleton={nodes.Tongue_Mesh.skeleton}
+          morphTargetDictionary={nodes.Tongue_Mesh.morphTargetDictionary}
+          morphTargetInfluences={nodes.Tongue_Mesh.morphTargetInfluences}
+        />
+        {nodes?.avaturn_hair_0 && (
           <skinnedMesh
-            name="EyeLeft"
-            geometry={nodes.EyeLeft.geometry}
-            material={materials?.Wolf3D_Eye}
-            skeleton={nodes.EyeLeft.skeleton}
-            morphTargetDictionary={nodes.EyeLeft.morphTargetDictionary}
-            morphTargetInfluences={nodes.EyeLeft.morphTargetInfluences}
+            geometry={nodes.avaturn_hair_0.geometry}
+            material={materials.avaturn_hair_0_material}
+            skeleton={nodes.avaturn_hair_0.skeleton}
           />
         )}
-        {nodes?.EyeRight && (
+        {nodes?.avaturn_shoes_0 && (
           <skinnedMesh
-            name="EyeRight"
-            geometry={nodes.EyeRight.geometry}
-            material={materials?.Wolf3D_Eye}
-            skeleton={nodes.EyeRight.skeleton}
-            morphTargetDictionary={nodes.EyeRight.morphTargetDictionary}
-            morphTargetInfluences={nodes.EyeRight.morphTargetInfluences}
+            geometry={nodes.avaturn_shoes_0.geometry}
+            material={materials.avaturn_shoes_0_material}
+            skeleton={nodes.avaturn_shoes_0.skeleton}
           />
         )}
-        {nodes?.Wolf3D_Head && (
+        {nodes?.avaturn_look_0 && (
           <skinnedMesh
-            name="Wolf3D_Head"
-            geometry={nodes.Wolf3D_Head.geometry}
-            material={materials?.Wolf3D_Skin}
-            skeleton={nodes.Wolf3D_Head.skeleton}
-            morphTargetDictionary={nodes.Wolf3D_Head.morphTargetDictionary}
-            morphTargetInfluences={nodes.Wolf3D_Head.morphTargetInfluences}
-          />
-        )}
-        {nodes?.Wolf3D_Teeth && (
-          <skinnedMesh
-            name="Wolf3D_Teeth"
-            geometry={nodes.Wolf3D_Teeth.geometry}
-            material={materials?.Wolf3D_Teeth}
-            skeleton={nodes.Wolf3D_Teeth.skeleton}
-            morphTargetDictionary={nodes.Wolf3D_Teeth.morphTargetDictionary}
-            morphTargetInfluences={nodes.Wolf3D_Teeth.morphTargetInfluences}
-          />
-        )}
-        {nodes?.Wolf3D_Hair && (
-          <skinnedMesh
-            geometry={nodes.Wolf3D_Hair.geometry}
-            material={materials?.Wolf3D_Hair}
-            skeleton={nodes.Wolf3D_Hair.skeleton}
-          />
-        )}
-        {nodes?.Wolf3D_Body && (
-          <skinnedMesh
-            geometry={nodes.Wolf3D_Body.geometry}
-            material={materials?.Wolf3D_Body}
-            skeleton={nodes.Wolf3D_Body.skeleton}
-          />
-        )}
-        {nodes?.Wolf3D_Outfit_Bottom && (
-          <skinnedMesh
-            geometry={nodes.Wolf3D_Outfit_Bottom.geometry}
-            material={materials?.Wolf3D_Outfit_Bottom}
-            skeleton={nodes.Wolf3D_Outfit_Bottom.skeleton}
-          />
-        )}
-        {nodes?.Wolf3D_Outfit_Footwear && (
-          <skinnedMesh
-            geometry={nodes.Wolf3D_Outfit_Footwear.geometry}
-            material={materials?.Wolf3D_Outfit_Footwear}
-            skeleton={nodes.Wolf3D_Outfit_Footwear.skeleton}
-          />
-        )}
-        {nodes?.Wolf3D_Outfit_Top && (
-          <skinnedMesh
-            geometry={nodes.Wolf3D_Outfit_Top.geometry}
-            material={materials?.Wolf3D_Outfit_Top}
-            skeleton={nodes.Wolf3D_Outfit_Top.skeleton}
+            geometry={nodes.avaturn_look_0.geometry}
+            material={materials.avaturn_look_0_material}
+            skeleton={nodes.avaturn_look_0.skeleton}
           />
         )}
       </group>
