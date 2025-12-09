@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
 import {
@@ -100,6 +100,8 @@ const SAMPLE_GOALS: Goal[] = [
   },
 ];
 
+const HARD_CODED_USER_ID = "9795784244";
+
 // --- Mock Data ---
 
 export function HomePage() {
@@ -145,15 +147,9 @@ export function HomePage() {
     progress: 58,
   };
 
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = async (userId: string) => {
     try {
-      // Get phone number from localStorage
-      const phoneNumber = localStorage.getItem("userPhone");
-      if (!phoneNumber) {
-        console.warn("No phone number found in localStorage");
-        return;
-      }
-      const res = await fetch(`/api/users/${encodeURIComponent(phoneNumber)}`);
+      const res = await fetch(`/api/users/${encodeURIComponent(userId)}`);
       if (!res.ok) return;
       const data = await res.json();
       updateFormData(data);
@@ -185,14 +181,10 @@ export function HomePage() {
 
   // Fetch user profile on mount
   useEffect(() => {
-    const phoneNumber = localStorage.getItem("userPhone");
-    if (!phoneNumber) return;
-    if (fetchedUserRef.current === phoneNumber) return;
-    fetchedUserRef.current = phoneNumber;
-
-    fetchUserProfile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (fetchedUserRef.current === HARD_CODED_USER_ID) return;
+    fetchedUserRef.current = HARD_CODED_USER_ID;
+    fetchUserProfile(HARD_CODED_USER_ID);
+  }, [fetchUserProfile]);
 
   // Fetch daily habit stats on mount
   useEffect(() => {
