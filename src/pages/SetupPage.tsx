@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import AvatarScene from "@/components/AvatarScene";
 import type { VoiceType } from "@/types/voice";
+import { useUserProfileStore } from "@/store/userProfileStore";
 import "./SetupPage.css";
 
 // Type definitions for Speech Recognition API
@@ -56,6 +57,7 @@ interface Message {
 }
 
 export function SetupPage() {
+  const { updateFormData } = useUserProfileStore();
   const location = useLocation();
   const navigate = useNavigate();
   const gender = location.state?.gender || "female";
@@ -577,79 +579,6 @@ export function SetupPage() {
     setSelectedOptions([]);
   }, [contextState]);
 
-  // Function to clean message text by removing options list when selection UI is available
-  // Used via ref in socket event handlers to avoid stale closures
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const cleanMessageText = useCallback(
-    (text: string, possibleValues?: string[]): string => {
-      const optionsToRemove =
-        possibleValues || selectionConfig?.possibleValues || [];
-
-      if (!optionsToRemove.length) {
-        return text;
-      }
-
-      // Remove the options list from the text
-      // Look for patterns like "Here are some options" or "Feel free to select"
-      let cleanedText = text;
-
-      // Remove text after common phrases that introduce options
-      const optionIntroPatterns = [
-        /Here are some options.*$/i,
-        /Here are the options.*$/i,
-        /Here are.*options.*$/i,
-        /Feel free to select.*$/i,
-        /You can choose.*$/i,
-        /Select.*from.*$/i,
-        /Options.*$/i,
-      ];
-
-      for (const pattern of optionIntroPatterns) {
-        cleanedText = cleanedText.replace(pattern, "").trim();
-      }
-
-      // Also remove any quoted options that match our possible values
-      optionsToRemove.forEach((option) => {
-        // Remove quoted option (e.g., "'Lose weight'")
-        const quotedOption = `'${option}'`;
-        const doubleQuotedOption = `"${option}"`;
-        cleanedText = cleanedText
-          .replace(
-            new RegExp(
-              quotedOption.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-              "g"
-            ),
-            ""
-          )
-          .replace(
-            new RegExp(
-              doubleQuotedOption.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-              "g"
-            ),
-            ""
-          )
-          .replace(
-            new RegExp(option.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"),
-            ""
-          );
-      });
-
-      // Clean up extra commas, periods, and whitespace
-      cleanedText = cleanedText
-        .replace(/,\s*,/g, ",") // Remove double commas
-        .replace(/,\s*\./g, ".") // Remove comma before period
-        .replace(/\s+/g, " ") // Multiple spaces to single space
-        .replace(/\.\s*\./g, ".") // Double periods
-        .trim();
-
-      // Remove trailing commas and periods
-      cleanedText = cleanedText.replace(/[,.]+$/, "").trim();
-
-      return cleanedText || text; // Return original if cleaned text is empty
-    },
-    [selectionConfig]
-  );
-
   // Socket connection - only create once, don't recreate on dependency changes
   useEffect(() => {
     // Check if socket already exists to prevent multiple connections
@@ -932,26 +861,27 @@ export function SetupPage() {
               typeof journeyContext.keys === "object"
             ) {
               const phoneKey = journeyContext.keys.phone;
-              if (
-                phoneKey &&
-                typeof phoneKey === "object" &&
-                "value" in phoneKey &&
-                phoneKey.value &&
-                typeof phoneKey.value === "string"
-              ) {
-                try {
-                  localStorage.setItem("userPhone", phoneKey.value);
-                  console.log(
-                    "📱 Saved phone number to localStorage:",
-                    phoneKey.value
-                  );
-                } catch (error) {
-                  console.error(
-                    "❌ Failed to save phone number to localStorage:",
-                    error
-                  );
+                if (
+                  phoneKey &&
+                  typeof phoneKey === "object" &&
+                  "value" in phoneKey &&
+                  phoneKey.value &&
+                  typeof phoneKey.value === "string"
+                ) {
+                  try {
+                    localStorage.setItem("userPhone", phoneKey.value);
+                    console.log(
+                      "📱 Saved phone number to localStorage:",
+                      phoneKey.value
+                    );
+                    updateFormData({ mobile: phoneKey.value });
+                  } catch (error) {
+                    console.error(
+                      "❌ Failed to save phone number to localStorage:",
+                      error
+                    );
+                  }
                 }
-              }
             }
 
             setTimeout(() => {
