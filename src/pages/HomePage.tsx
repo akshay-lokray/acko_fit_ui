@@ -109,6 +109,9 @@ interface HabitLog {
     items?: Array<{ name: string; calories: number; quantity?: string; note?: string }>;
     quickNote?: string;
     mealType?: string;
+    cheatMeal?: boolean;
+    food?: string | Array<string>; // Food items from metadata
+    foodName?: string; // Food name for cheat meal
     [key: string]: any; // Allow additional properties
   };
 }
@@ -346,7 +349,10 @@ export function HomePage() {
       mealName?: string;
       calories?: number;
       healthNote?: string;
+      note?: string;
       items?: Array<{ name: string; calories: number }>;
+      food?: string | Array<string>; // Food items from metadata
+      foodName?: string; // Food name for cheat meal
     }>;
   }
   const [cheatMeals, setCheatMeals] = useState<CheatMealEntry[]>([]);
@@ -383,7 +389,7 @@ export function HomePage() {
       const res = await fetch(
         `/api/users/${encodeURIComponent(phoneNumber)}/xp?delta=${delta}`,
         {
-        method: "POST",
+          method: "POST",
         }
       );
       if (!res.ok) return;
@@ -598,28 +604,45 @@ export function HomePage() {
 
         habitLogs.forEach((log) => {
           const habitName = log.habit.toLowerCase();
-          // Check for meal habit or calorie logs with meta indicating cheat meals
-          if (habitName === "meal" || (habitName === "calories" || habitName === "calorie")) {
-            const date = new Date(log.recordedAt);
-            const dateStr = date.toISOString().slice(0, 10);
+          
+          // Check specifically for cheat meals: habit == "calories" and meta.cheatMeal == true
+          if (habitName === "calories" || habitName === "calorie") {
+            const isCheatMeal = log.meta?.cheatMeal === true;
             
-            // Check if it's a cheat meal (high calories or has healthNote indicating cheat)
-            const isCheatMeal = 
-              (log.meta?.healthNote && 
-               (log.meta.healthNote.toLowerCase().includes("cheat") || 
-                log.meta.healthNote.toLowerCase().includes("indulge"))) ||
-              (habitName === "calories" && log.value > 800); // High calorie meal
-
-            if (isCheatMeal || habitName === "meal") {
+            if (isCheatMeal) {
+              const date = new Date(log.recordedAt);
+              const dateStr = date.toISOString().slice(0, 10);
+              
               if (!mealsByDate[dateStr]) {
                 mealsByDate[dateStr] = [];
               }
               
+              // Extract food items from metadata
+              let foodItems: string[] = [];
+              if (log.meta?.food) {
+                if (Array.isArray(log.meta.food)) {
+                  foodItems = log.meta.food;
+                } else if (typeof log.meta.food === "string") {
+                  foodItems = [log.meta.food];
+                }
+              }
+              
+              // Also check items array if food is not present
+              if (foodItems.length === 0 && log.meta?.items && Array.isArray(log.meta.items)) {
+                foodItems = log.meta.items.map((item: any) => item.name || String(item)).filter(Boolean);
+              }
+              
+              // Use foodName if present, otherwise use "cheat meal"
+              const displayName = log.meta?.foodName || log.meta?.mealName || "cheat meal";
+              
               mealsByDate[dateStr].push({
-                mealName: log.meta?.mealName || "Meal",
-                calories: habitName === "calories" ? log.value : log.meta?.items?.reduce((sum: number, item: any) => sum + (item.calories || 0), 0) || 0,
+                mealName: displayName,
+                calories: log.value,
                 healthNote: log.meta?.healthNote,
+                note: log.meta?.note,
                 items: log.meta?.items,
+                food: foodItems.length > 0 ? foodItems : undefined,
+                foodName: log.meta?.foodName,
               });
             }
           }
@@ -1186,8 +1209,8 @@ export function HomePage() {
     });
 
     socket.on("message", (data) => {
-        let text = "";
-        try {
+      let text = "";
+      try {
         if (typeof data === "string") {
           const parsed = JSON.parse(data);
           text = parsed.text ?? String(data);
@@ -1196,16 +1219,16 @@ export function HomePage() {
         } else {
           text = String(data);
         }
-        } catch {
+      } catch {
         text = String(data);
-        }
-        const coachMsg: Message = {
-          id: Date.now().toString(),
-          sender: "coach",
-          text,
-        };
-        setMessages((prev) => [...prev, coachMsg]);
-        setIsListening(false);
+      }
+      const coachMsg: Message = {
+        id: Date.now().toString(),
+        sender: "coach",
+        text,
+      };
+      setMessages((prev) => [...prev, coachMsg]);
+      setIsListening(false);
     });
 
     // Listen for 'response' event from server
@@ -1893,12 +1916,12 @@ export function HomePage() {
     sendHabitAssistMessage(textToSend)
       .then((reply) => {
         if (reply) {
-        const coachMsg: Message = {
+          const coachMsg: Message = {
             id: (Date.now() + 2).toString(),
-          sender: "coach",
+            sender: "coach",
             text: reply,
-        };
-        setMessages((prev) => [...prev, coachMsg]);
+          };
+          setMessages((prev) => [...prev, coachMsg]);
           speakText(reply);
         }
         // Refresh goal section after chat message
@@ -1963,7 +1986,7 @@ export function HomePage() {
             voiceType={gender as VoiceType}
             isFullScreen={false}
           />
-              </div>
+        </div>
 
         {/* 2. Interface Tabs (Chat / Explore / Chat) - Fills remaining space and scrolls */}
         <div className="flex-1 bg-white rounded-t-[2rem] relative z-20 flex flex-col min-h-0 overflow-hidden">
@@ -2027,8 +2050,8 @@ export function HomePage() {
                         >
                           {goal}
                         </button>
-                  ))}
-                </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -2051,15 +2074,15 @@ export function HomePage() {
                           width: `${Math.min(100, goalChartData.currentProgress)}%`,
                         }}
                       ></div>
-                        </div>
-                        </div>
+                    </div>
+                  </div>
                   <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-3xl p-5 border border-purple-200 shadow-sm">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-2 h-2 rounded-full bg-purple-500"></div>
                       <p className="text-xs text-purple-700 font-semibold uppercase tracking-wide">
                         Weeks Remaining
                       </p>
-                      </div>
+                    </div>
                     <p className="text-3xl font-bold text-purple-600">
                       {goalChartData.daysRemaining > 0
                         ? Math.ceil(goalChartData.daysRemaining / 7)
@@ -2069,8 +2092,8 @@ export function HomePage() {
                       <p className="text-xs text-purple-600 mt-2">
                         Until goal reached
                       </p>
-                      )}
-                    </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Section 1: Today's Intake */}
@@ -2183,7 +2206,7 @@ export function HomePage() {
                     </div>
                     <div>
                       <h2 className="text-lg font-bold text-gray-900">
-                        Cheat Meals & Missed Meals
+                        Cheat Meals you took
                       </h2>
                       <p className="text-xs text-gray-500 mt-0.5">
                         Impact on your goal timeline
@@ -2234,7 +2257,7 @@ export function HomePage() {
                                 >
                                   <div className="flex items-start justify-between mb-1">
                                     <p className="text-sm font-semibold text-gray-800">
-                                      {meal.mealName || "Meal"}
+                                      {meal.foodName || meal.mealName || "cheat meal"}
                                     </p>
                                     {meal.calories && (
                                       <span className="text-xs font-medium text-red-600">
@@ -2247,7 +2270,26 @@ export function HomePage() {
                                       {meal.healthNote}
                                     </p>
                                   )}
-                                  {meal.items && meal.items.length > 0 && (
+                                  {/* Display food items from metadata */}
+                                  {meal.food && Array.isArray(meal.food) && meal.food.length > 0 && (
+                                    <div className="mt-2 pt-2 border-t border-red-200/50">
+                                      <p className="text-xs font-medium text-gray-700 mb-1">
+                                        Food Items:
+                                      </p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {meal.food.map((foodItem, foodIdx) => (
+                                          <span
+                                            key={foodIdx}
+                                            className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full"
+                                          >
+                                            {foodItem}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {/* Fallback to items array if food is not available */}
+                                  {(!meal.food || (Array.isArray(meal.food) && meal.food.length === 0)) && meal.items && meal.items.length > 0 && (
                                     <div className="mt-2 pt-2 border-t border-red-200/50">
                                       <p className="text-xs font-medium text-gray-700 mb-1">
                                         Items:
@@ -2274,146 +2316,7 @@ export function HomePage() {
                   )}
                 </div>
 
-                {/* Chart */}
-                <div className="bg-white rounded-3xl p-6 border border-gray-200 shadow-sm">
-                  <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
-                      <Target className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-gray-900">
-                        {activeGoal || "Your Goal"}
-                      </h2>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Track your journey to success
-                      </p>
-                    </div>
-                  </div>
-
-                  {goalChartLoading ? (
-                    <div className="h-80 flex flex-col items-center justify-center py-12">
-                      <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4"></div>
-                      <p className="text-sm text-gray-500 font-medium">
-                        Loading chart data...
-                      </p>
-                    </div>
-                  ) : combinedGoalChartData.length === 0 ? (
-                    <div className="h-80 flex flex-col items-center justify-center py-12">
-                      <Target className="w-16 h-16 text-gray-300 mb-4" />
-                      <p className="text-sm text-gray-500 font-medium text-center px-4">
-                        No data available. Start logging your habits to see
-                        progress!
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="px-2">
-                      <ResponsiveContainer width="100%" height={320}>
-                        <LineChart data={combinedGoalChartData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis
-                            dataKey="day"
-                            label={{
-                              value: "Days",
-                              position: "insideBottom",
-                              offset: -5,
-                            }}
-                            stroke="#6b7280"
-                          />
-                          <YAxis
-                            label={{
-                              value: "Goal Progress (%)",
-                              angle: -90,
-                              position: "insideLeft",
-                            }}
-                            domain={[0, 100]}
-                            stroke="#6b7280"
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "white",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "12px",
-                              padding: "12px",
-                              boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                            }}
-                            formatter={(value: any, name: string) => {
-                              if (value === null || value === undefined)
-                                return null;
-                              const numValue =
-                                typeof value === "number" ? value : Number(value);
-                              if (isNaN(numValue)) return null;
-                              return [`${numValue.toFixed(1)}%`, name];
-                            }}
-                          />
-                          <Legend
-                            wrapperStyle={{ paddingTop: "20px" }}
-                            iconType="line"
-                          />
-                          <ReferenceLine
-                            y={100}
-                            stroke="#a855f7"
-                            strokeDasharray="3 3"
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="actual"
-                            stroke="#10b981"
-                            strokeWidth={3}
-                            dot={{ fill: "#10b981", r: 4, strokeWidth: 2, stroke: "#fff" }}
-                            activeDot={{ r: 6 }}
-                            name="Actual Progress"
-                            connectNulls={false}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="projected"
-                            stroke="#a855f7"
-                            strokeWidth={2.5}
-                            strokeDasharray="6 4"
-                            dot={{ fill: "#a855f7", r: 3, strokeWidth: 2, stroke: "#fff" }}
-                            activeDot={{ r: 5 }}
-                            name="Projected Progress"
-                            connectNulls={false}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-
-                  {/* Info Box */}
-                  <div className="mt-6 p-5 bg-gradient-to-br from-purple-50 via-purple-50/50 to-emerald-50/30 rounded-2xl border border-purple-200/50 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md flex-shrink-0">
-                        <TrendingUp className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-bold text-purple-900 mb-2 text-sm">
-                          How it works
-                        </p>
-                        <p className="text-xs text-purple-800 leading-relaxed mb-3">
-                          The chart shows your progress toward your goal. The
-                          solid green line represents actual progress based on
-                          your habit data (each day contributes up to 5%),
-                          while the dashed purple line projects future progress
-                          based on your current trend.
-                        </p>
-                        {goalChartData.daysRemaining > 0 && (
-                          <div className="bg-white/60 rounded-xl p-3 border border-purple-200/50">
-                            <p className="font-semibold text-purple-900 text-xs">
-                              🎯 If you continue at this rate, you'll reach your
-                              goal in{" "}
-                              <span className="text-purple-600">
-                                {Math.ceil(goalChartData.daysRemaining / 7)} week
-                                {Math.ceil(goalChartData.daysRemaining / 7) !== 1 ? "s" : ""}
-                              </span>
-                              .
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                
               </div>
             )}
 
@@ -2441,7 +2344,7 @@ export function HomePage() {
                       <Dumbbell className="w-7 h-7" />
                     </div>
                     <span className="font-semibold text-gray-700 text-sm">
-                      Curated Workout Plans
+                      Personalized Workout Plans
                     </span>
                   </div>
 
@@ -2496,7 +2399,7 @@ export function HomePage() {
                         }`}
                       >
                         {msg.text}
-                </div>
+                      </div>
                     </div>
                   ))}
                   {isHabitApiLoading && (
@@ -2504,10 +2407,10 @@ export function HomePage() {
                       <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-500">
                         <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                         thinking...
-                  </div>
+                      </div>
                     </div>
                   )}
-                  </div>
+                </div>
 
                 {/* Input Area - Fixed at bottom */}
                 <div className="sticky bottom-0 bg-white border-t border-gray-100 pt-4 pb-4 -mx-4 md:-mx-6 px-4 md:px-6 z-10">
@@ -2562,7 +2465,7 @@ export function HomePage() {
                         }`}
                       />
                     </Button>
-                    </div>
+                  </div>
                 </div>
               </div>
             )}
