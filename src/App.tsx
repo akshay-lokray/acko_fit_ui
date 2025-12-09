@@ -5,6 +5,7 @@ import "./App.css";
 
 import { useEffect, useState } from "react";
 import { useGLTF } from "@react-three/drei";
+import { SocketProvider } from "./contexts/SocketContext";
 
 import { CoachSelectionPage } from "./pages/CoachSelectionPage";
 import { CoachIntroPage } from "./pages/CoachIntroPage";
@@ -60,29 +61,31 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<CoachSelectionPage />} />
-        <Route path="/coach-intro" element={<CoachIntroPage />} />
-        <Route path="/setup" element={<SetupPage />} />
-        <Route path="/premium" element={<PremiumPlanPage />} />
-        <Route path="/home" element={<HomePage />} />
-        <Route path="/recipes" element={<RecipesPage />} />
-        <Route path="/workouts" element={<WorkoutPlansPage />} />
-        <Route path="/tracker" element={<PhotoTrackingPage />} />
-        <Route path="/habits" element={<HabitTrackerPage />} />
-        <Route path="/profile" element={<UserLockerPage />} />
-        <Route path="/devices" element={<DevicesPage />} />
-        <Route path="/rewards" element={<RewardsPage />} />
-        <Route path="/rankings" element={<RankingsPage />} />
-        <Route path="/log-meal" element={<LogLunchPage />} />
-        <Route path="/log-steps" element={<LogStepsPage />} />
-        <Route path="/log-water" element={<LogWaterPage />} />
-        <Route path="/habit-detail" element={<HabitDetailPage />} />
-        <Route path="/avatar" element={<AvatarPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <SocketProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<CoachSelectionPage />} />
+          <Route path="/coach-intro" element={<CoachIntroPage />} />
+          <Route path="/setup" element={<SetupPage />} />
+          <Route path="/premium" element={<PremiumPlanPage />} />
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/recipes" element={<RecipesPage />} />
+          <Route path="/workouts" element={<WorkoutPlansPage />} />
+          <Route path="/tracker" element={<PhotoTrackingPage />} />
+          <Route path="/habits" element={<HabitTrackerPage />} />
+          <Route path="/profile" element={<UserLockerPage />} />
+          <Route path="/devices" element={<DevicesPage />} />
+          <Route path="/rewards" element={<RewardsPage />} />
+          <Route path="/rankings" element={<RankingsPage />} />
+          <Route path="/log-meal" element={<LogLunchPage />} />
+          <Route path="/log-steps" element={<LogStepsPage />} />
+          <Route path="/log-water" element={<LogWaterPage />} />
+          <Route path="/habit-detail" element={<HabitDetailPage />} />
+          <Route path="/avatar" element={<AvatarPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </SocketProvider>
   );
 }
 

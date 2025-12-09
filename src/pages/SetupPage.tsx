@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { io, Socket } from "socket.io-client";
+import { Socket } from "socket.io-client";
 import { Send, Zap, Mic, Keyboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import AvatarScene from "@/components/AvatarScene";
 import type { VoiceType } from "@/types/voice";
 import { useUserProfileStore } from "@/store/userProfileStore";
+import { useSocket } from "@/contexts/SocketContext";
 import "./SetupPage.css";
 
 // Type definitions for Speech Recognition API
@@ -71,7 +72,10 @@ export function SetupPage() {
   const [inputValue, setInputValue] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
+  const [isWaitingForInitialResponse, setIsWaitingForInitialResponse] =
+    useState(true);
   const [showTextInput, setShowTextInput] = useState(false);
+  const processedMessageIdsRef = useRef<Set<string>>(new Set()); // Track processed messages to prevent duplicates
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [selectionConfig, setSelectionConfig] = useState<{
     possibleValues: string[];
@@ -86,9 +90,9 @@ export function SetupPage() {
     keys?: Record<string, unknown>;
   } | null>(null); // Store context from server responses (new structure: {status, keys})
 
-  // Socket and recognition refs
-  const socketRef = useRef<Socket | null>(null);
-  const SOCKET_URL = "http://192.168.233.159:5000";
+  // Socket from context
+  const { socket: contextSocket } = useSocket();
+  const socketRef = useRef<Socket | null>(contextSocket);
 
   // Refs for functions used in socket event handlers to avoid stale closures
   // Initialize as null, will be set after functions are defined
@@ -296,6 +300,39 @@ export function SetupPage() {
     };
   }, []);
 
+  // Update refs when functions are defined
+  useEffect(() => {
+    speakTextRef.current = speakText;
+  }, [speakText]);
+
+  // Update cleanMessageTextRef
+  useEffect(() => {
+    cleanMessageTextRef.current = (text: string, possibleValues?: string[]) => {
+      if (!possibleValues || possibleValues.length === 0) {
+        return text;
+      }
+      // Remove options list from message text
+      let cleaned = text;
+      possibleValues.forEach((option) => {
+        // Remove the option text and any leading/trailing punctuation
+        const regex = new RegExp(
+          `[\\s\\-•]?${option.replace(
+            /[.*+?^${}()|[\]\\]/g,
+            "\\$&"
+          )}[\\s\\-•]?`,
+          "gi"
+        );
+        cleaned = cleaned.replace(regex, "");
+      });
+      // Clean up multiple spaces and periods
+      cleaned = cleaned
+        .replace(/\s+/g, " ")
+        .replace(/\.\s*\./g, ".")
+        .trim();
+      return cleaned;
+    };
+  }, []);
+
   // Function to parse context and find keys with possible_values
   const checkForSelectionOptions = useCallback(() => {
     const context = contextState;
@@ -391,35 +428,29 @@ export function SetupPage() {
     setSelectedOptions([]);
   }, [contextState]);
 
-  // Socket connection - only create once, don't recreate on dependency changes
+  // Update socket ref when context socket changes
   useEffect(() => {
-    // Check if socket already exists to prevent multiple connections
-    if (socketRef.current?.connected) {
-      console.log("🔌 Socket already connected, skipping reconnection");
+    socketRef.current = contextSocket;
+  }, [contextSocket]);
+
+  // Track if start message has been sent to prevent duplicates
+  const startMessageSentRef = useRef(false);
+
+  // Send start message when SetupPage mounts and socket is connected
+  useEffect(() => {
+    if (!contextSocket) {
+      console.log("⏳ Waiting for socket connection...");
       return;
     }
 
-    const avatar = isMale ? "Dhoni" : "Disha";
-    const socket = io(SOCKET_URL, {
-      transports: ["websocket", "polling"],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: Infinity,
-      timeout: 20000,
-      forceNew: false,
-      withCredentials: false,
-      auth: {
-        avatar: avatar,
-      },
-    });
+    // Function to send start message
+    const sendStartMessage = () => {
+      // Prevent sending multiple times
+      if (startMessageSentRef.current) {
+        console.log("⚠️ Start message already sent, skipping...");
+        return;
+      }
 
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      console.log("✅ Socket.IO connected:", SOCKET_URL);
-
-      // Send start message as soon as connected
       try {
         const avatar = isMale ? "Dhoni" : "Disha";
         const startPayload = {
@@ -429,17 +460,45 @@ export function SetupPage() {
             avatar: avatar,
           },
         };
-        console.log("📤 Sending start message:", startPayload);
-        socket.emit("process_journey", startPayload);
+        console.log("📤 Sending start message from SetupPage:", startPayload);
+        contextSocket.emit("process_journey", startPayload);
+        setIsWaitingForInitialResponse(true); // Show loader for initial message
+        startMessageSentRef.current = true; // Mark as sent
       } catch (e) {
         console.warn("Socket.IO start message send failed", e);
       }
-    });
+    };
+
+    // If socket is already connected, send immediately
+    if (contextSocket.connected) {
+      console.log("✅ Socket already connected, sending start message");
+      sendStartMessage();
+    } else {
+      console.log("⏳ Socket not connected yet, waiting for connection...");
+      // Socket not connected yet, wait for connection
+      const onConnect = () => {
+        console.log("✅ Socket connected, sending start message");
+        sendStartMessage();
+      };
+
+      contextSocket.on("connect", onConnect);
+
+      return () => {
+        contextSocket.off("connect", onConnect);
+      };
+    }
+  }, [contextSocket, isMale]);
+
+  // Socket event listeners - only set up once
+  useEffect(() => {
+    if (!contextSocket) {
+      return;
+    }
 
     // Listen for 'journey_response' event from server
     // Format: ["journey_response", "{\"data\": {\"text\": \"...\", \"context\": [...]}}"]
     // or just the JSON string directly
-    socket.on("journey_response", (...args: unknown[]) => {
+    const handleJourneyResponse = (...args: unknown[]) => {
       console.log("📥 Received journey_response event:", args);
 
       try {
@@ -665,6 +724,7 @@ export function SetupPage() {
           setMessages((prev) => [...prev, journeyMsg]);
           setShowTextInput(false);
           setIsWaitingForResponse(false); // Hide loading indicator
+          setIsWaitingForInitialResponse(false); // Hide initial loading indicator
 
           // Speak the cleaned response using text-to-speech
           speakTextRef.current?.(cleanedText);
@@ -722,33 +782,36 @@ export function SetupPage() {
       } catch (error) {
         console.error("Error processing journey_response:", error);
       }
-    });
+    };
 
-    socket.on("connect_error", (error) => {
+    contextSocket.on("journey_response", handleJourneyResponse);
+
+    const handleConnectError = (error: Error) => {
       console.error("❌ Socket.IO connection error:", {
         error: error.message,
-        url: SOCKET_URL,
-        connected: socket.connected,
+        connected: contextSocket.connected,
       });
-    });
+    };
 
-    socket.on("error", (error) => {
+    const handleError = (error: unknown) => {
       console.error("❌ Socket.IO error:", {
         error,
-        url: SOCKET_URL,
-        connected: socket.connected,
+        connected: contextSocket.connected,
       });
-    });
+    };
 
     // Listen for 'response' event from server
-    socket.on("response", (data) => {
+    const handleResponse = (data: unknown) => {
       console.log("📥 Received response event:", data);
 
       // Check if it's audio/media data
       if (
         data instanceof Blob ||
         data instanceof ArrayBuffer ||
-        (typeof data === "object" && data !== null && data?.type === "audio")
+        (typeof data === "object" &&
+          data !== null &&
+          "type" in data &&
+          (data as { type?: string }).type === "audio")
       ) {
         console.log("🎵 Received audio data:", data);
         return;
@@ -817,35 +880,40 @@ export function SetupPage() {
             responseText = String(data);
           }
         } else if (typeof data === "object" && data !== null) {
+          const dataObj = data as {
+            data?: { text?: string; context?: unknown };
+            text?: string;
+            context?: unknown;
+          };
           // Check if it's the new format: { data: { text: "...", context: {status, keys} } }
           if (
-            data.data &&
-            typeof data.data === "object" &&
-            data.data !== null
+            dataObj.data &&
+            typeof dataObj.data === "object" &&
+            dataObj.data !== null
           ) {
-            responseText = String(data.data.text || "");
+            responseText = String(dataObj.data.text || "");
             // Context is now an object with {status, keys}, not an array
             if (
-              data.data.context &&
-              typeof data.data.context === "object" &&
-              !Array.isArray(data.data.context) &&
-              "status" in data.data.context
+              dataObj.data.context &&
+              typeof dataObj.data.context === "object" &&
+              !Array.isArray(dataObj.data.context) &&
+              "status" in dataObj.data.context
             ) {
-              responseContext = data.data.context as {
+              responseContext = dataObj.data.context as {
                 status?: string;
                 keys?: Record<string, unknown>;
               };
             }
-          } else if (data.text !== undefined) {
+          } else if (dataObj.text !== undefined) {
             // Old format: { text: "..." }
-            responseText = String(data.text);
+            responseText = String(dataObj.text);
             if (
-              data.context &&
-              typeof data.context === "object" &&
-              !Array.isArray(data.context) &&
-              "status" in data.context
+              dataObj.context &&
+              typeof dataObj.context === "object" &&
+              !Array.isArray(dataObj.context) &&
+              "status" in dataObj.context
             ) {
-              responseContext = data.context as {
+              responseContext = dataObj.context as {
                 status?: string;
                 keys?: Record<string, unknown>;
               };
@@ -871,10 +939,11 @@ export function SetupPage() {
         );
         // Try one more time to extract text
         if (typeof data === "object" && data !== null) {
-          if (data.data?.text) {
-            responseText = String(data.data.text);
-          } else if (data.text) {
-            responseText = String(data.text);
+          const dataObj = data as { data?: { text?: string }; text?: string };
+          if (dataObj.data?.text) {
+            responseText = String(dataObj.data.text);
+          } else if (dataObj.text) {
+            responseText = String(dataObj.text);
           } else {
             responseText =
               "Received a response, but couldn't extract the text.";
@@ -964,14 +1033,29 @@ export function SetupPage() {
               possibleValuesForCleaning
             )
           : responseText.trim();
+
+        // Check if we've already processed this message
+        if (processedMessageIdsRef.current.has(cleanedText)) {
+          console.log(
+            "⚠️ Duplicate message detected, skipping:",
+            cleanedText.substring(0, 50)
+          );
+          setIsWaitingForInitialResponse(false);
+          setIsWaitingForResponse(false);
+          return;
+        }
+
+        processedMessageIdsRef.current.add(cleanedText);
+
         const coachMsg: Message = {
-          id: Date.now().toString(),
+          id: `${cleanedText.substring(0, 50)}-${Date.now()}`,
           sender: "coach",
           text: cleanedText,
         };
         setMessages((prev) => [...prev, coachMsg]);
         setShowTextInput(false);
         setIsWaitingForResponse(false); // Hide loading indicator
+        setIsWaitingForInitialResponse(false); // Hide initial loading indicator
 
         // Speak the cleaned response using text-to-speech
         speakText(cleanedText);
@@ -1023,10 +1107,10 @@ export function SetupPage() {
           responseText
         );
       }
-    });
+    };
 
     // Listen for 'process_journey' event from server
-    socket.on("process_journey", (data) => {
+    const handleProcessJourney = (data: unknown) => {
       console.log("📥 Received process_journey event:", data);
 
       // Handle the journey data
@@ -1042,33 +1126,38 @@ export function SetupPage() {
 
         // Parse the response format: { data: { text: "...", context: {status, keys} } }
         if (data && typeof data === "object" && data !== null) {
+          const dataObj = data as {
+            data?: { text?: string; context?: unknown };
+            text?: string;
+            context?: unknown;
+          };
           if (
-            data.data &&
-            typeof data.data === "object" &&
-            data.data !== null
+            dataObj.data &&
+            typeof dataObj.data === "object" &&
+            dataObj.data !== null
           ) {
-            journeyText = String(data.data.text || "");
+            journeyText = String(dataObj.data.text || "");
             // Context is now an object with {status, keys}, not an array
             if (
-              data.data.context &&
-              typeof data.data.context === "object" &&
-              !Array.isArray(data.data.context) &&
-              "status" in data.data.context
+              dataObj.data.context &&
+              typeof dataObj.data.context === "object" &&
+              !Array.isArray(dataObj.data.context) &&
+              "status" in dataObj.data.context
             ) {
-              journeyContext = data.data.context as {
+              journeyContext = dataObj.data.context as {
                 status?: string;
                 keys?: Record<string, unknown>;
               };
             }
-          } else if (data.text !== undefined) {
-            journeyText = String(data.text);
+          } else if (dataObj.text !== undefined) {
+            journeyText = String(dataObj.text);
             if (
-              data.context &&
-              typeof data.context === "object" &&
-              !Array.isArray(data.context) &&
-              "status" in data.context
+              dataObj.context &&
+              typeof dataObj.context === "object" &&
+              !Array.isArray(dataObj.context) &&
+              "status" in dataObj.context
             ) {
-              journeyContext = data.context as {
+              journeyContext = dataObj.context as {
                 status?: string;
                 keys?: Record<string, unknown>;
               };
@@ -1083,10 +1172,11 @@ export function SetupPage() {
             data
           );
           if (data && typeof data === "object" && data !== null) {
-            if (data.data?.text) {
-              journeyText = String(data.data.text);
-            } else if (data.text) {
-              journeyText = String(data.text);
+            const dataObj = data as { data?: { text?: string }; text?: string };
+            if (dataObj.data?.text) {
+              journeyText = String(dataObj.data.text);
+            } else if (dataObj.text) {
+              journeyText = String(dataObj.text);
             } else {
               journeyText =
                 "Received a response, but couldn't extract the text.";
@@ -1149,13 +1239,28 @@ export function SetupPage() {
               journeyText.trim(),
               possibleValuesForCleaning
             ) || journeyText.trim();
+
+          // Check if we've already processed this message
+          if (processedMessageIdsRef.current.has(cleanedText)) {
+            console.log(
+              "⚠️ Duplicate message detected, skipping:",
+              cleanedText.substring(0, 50)
+            );
+            setIsWaitingForInitialResponse(false);
+            setIsWaitingForResponse(false);
+            return;
+          }
+
+          processedMessageIdsRef.current.add(cleanedText);
+
           const journeyMsg: Message = {
-            id: Date.now().toString(),
+            id: `${cleanedText.substring(0, 50)}-${Date.now()}`,
             sender: "coach",
             text: cleanedText,
           };
           setMessages((prev) => [...prev, journeyMsg]);
           setIsWaitingForResponse(false); // Hide loading indicator
+          setIsWaitingForInitialResponse(false); // Hide initial loading indicator
           speakText(cleanedText);
 
           // Check if status is completed and redirect to /home
@@ -1210,22 +1315,31 @@ export function SetupPage() {
       } catch (error) {
         console.error("Error processing journey data:", error);
       }
-    });
+    };
+
+    // Set up all event listeners
+    contextSocket.on("connect_error", handleConnectError);
+    contextSocket.on("error", handleError);
+    contextSocket.on("response", handleResponse);
+    contextSocket.on("process_journey", handleProcessJourney);
 
     return () => {
-      // Only disconnect on component unmount, not on dependency changes
-      if (socket && socket.connected) {
-        try {
-          socket.emit("disconnect", { type: "disconnect" });
-        } catch (e) {
-          console.warn("Socket.IO disconnect event send failed", e);
-        }
-        socket.disconnect();
-        socketRef.current = null;
-      }
+      // Clean up event listeners when component unmounts
+      contextSocket.off("journey_response", handleJourneyResponse);
+      contextSocket.off("connect_error", handleConnectError);
+      contextSocket.off("error", handleError);
+      contextSocket.off("response", handleResponse);
+      contextSocket.off("process_journey", handleProcessJourney);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount, dependencies are accessed via refs/state
+  }, [
+    contextSocket,
+    isMale,
+    gender,
+    navigate,
+    contextState,
+    updateFormData,
+    speakText,
+  ]);
 
   // Helper function to stop listening and send the result
   const stopListeningAndSend = useCallback(() => {
@@ -1579,7 +1693,10 @@ export function SetupPage() {
   // Watch for context changes and check for selection options
   useEffect(() => {
     if (contextState) {
-      checkForSelectionOptions();
+      // Use setTimeout to avoid calling setState synchronously in effect
+      setTimeout(() => {
+        checkForSelectionOptions();
+      }, 0);
     }
   }, [contextState, checkForSelectionOptions]);
 
@@ -1696,8 +1813,8 @@ export function SetupPage() {
             </div>
           ))}
 
-          {/* Loading indicator when waiting for response */}
-          {isWaitingForResponse && (
+          {/* Loading indicator when waiting for response (including initial) */}
+          {(isWaitingForResponse || isWaitingForInitialResponse) && (
             <div className="flex justify-start">
               <div className="max-w-[80%] rounded-2xl p-4 bg-white border border-gray-100 shadow-sm rounded-bl-none">
                 <div className="flex items-center gap-1">
