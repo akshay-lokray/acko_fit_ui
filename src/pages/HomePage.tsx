@@ -13,6 +13,8 @@ import {
   Footprints,
   Keyboard,
   Mic,
+  Plus,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -254,6 +256,7 @@ export function HomePage() {
   const [activeTab, setActiveTab] = useState<"goals" | "Your Plans" | "Chat">(
     "goals"
   );
+  const [showQuickLogMenu, setShowQuickLogMenu] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isHabitApiLoading, setHabitApiLoading] = useState(false);
@@ -1773,7 +1776,78 @@ export function HomePage() {
             voiceType={gender as VoiceType}
             isFullScreen={false}
           />
+          
+          {/* Floating + Button - Top right corner of avatar */}
+          <button
+            onClick={() => setShowQuickLogMenu(!showQuickLogMenu)}
+            className="absolute right-4 top-4 w-14 h-14 bg-emerald-600 rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform active:scale-95 z-30"
+            title="Quick Log"
+          >
+            {showQuickLogMenu ? (
+              <X className="w-6 h-6 text-white" />
+            ) : (
+              <Plus className="w-6 h-6 text-white" />
+            )}
+          </button>
+
+          {/* Quick Log Menu - Appears when + button is clicked */}
+          {showQuickLogMenu && (
+            <>
+              {/* Backdrop */}
+              <div
+                className="fixed inset-0 bg-black/20 z-20"
+                onClick={() => setShowQuickLogMenu(false)}
+              />
+              
+              {/* Menu Options */}
+              <div className="absolute right-4 top-20 z-30 flex flex-col gap-3">
+                <button
+                  onClick={() => {
+                    navigate("/log-meal");
+                    setShowQuickLogMenu(false);
+                  }}
+                  className="w-14 h-14 bg-orange-500 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95 group"
+                  title="Log Meal"
+                >
+                  <Utensils className="w-6 h-6 text-white" />
+                </button>
+                
+                <button
+                  onClick={() => {
+                    navigate("/log-water");
+                    setShowQuickLogMenu(false);
+                  }}
+                  className="w-14 h-14 bg-blue-500 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95 group"
+                  title="Log Water"
+                >
+                  <Droplet className="w-6 h-6 text-white" />
+                </button>
+                
+                <button
+                  onClick={() => {
+                    navigate("/log-steps");
+                    setShowQuickLogMenu(false);
+                  }}
+                  className="w-14 h-14 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95 group"
+                  title="Log Steps"
+                >
+                  <Footprints className="w-6 h-6 text-white" />
+                </button>
+                
+                <button
+                  onClick={() => {
+                    navigate("/tracker");
+                    setShowQuickLogMenu(false);
+                  }}
+                  className="w-14 h-14 bg-purple-500 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95 group"
+                  title="Snap Meal"
+                >
+                  <Camera className="w-6 h-6 text-white" />
+                </button>
               </div>
+            </>
+          )}
+        </div>
 
         {/* 2. Interface Tabs (Chat / Explore / Chat) - Fills remaining space and scrolls */}
         <div className="flex-1 bg-white rounded-t-[2rem] relative z-20 flex flex-col min-h-0 overflow-hidden">
