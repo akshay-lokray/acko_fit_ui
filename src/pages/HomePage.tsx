@@ -250,7 +250,7 @@ export function HomePage() {
   const coachName = gender === "male" ? "Dhoni" : "Disha";
 
   // State
-  const [activeTab, setActiveTab] = useState<"goals" | "Your Plans" | "Talk to Dhoni">(
+  const [activeTab, setActiveTab] = useState<"goals" | "Your Plan" | "Talk to Dhoni">(
     "goals"
   );
   const [messages, setMessages] = useState<Message[]>([]);
@@ -1799,13 +1799,13 @@ export function HomePage() {
               )}
             </button>
             <button
-              onClick={() => setActiveTab("Your Plans")}
+              onClick={() => setActiveTab("Your Plan")}
               className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
-                activeTab === "Your Plans" ? "text-emerald-600" : "text-gray-400"
+                activeTab === "Your Plan" ? "text-emerald-600" : "text-gray-400"
               }`}
             >
-              <Compass className="w-4 h-4" /> Your Plans
-              {activeTab === "Your Plans" && (
+              <Compass className="w-4 h-4" /> Your Plan
+              {activeTab === "Your Plan" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600" />
               )}
             </button>
@@ -2129,7 +2129,7 @@ export function HomePage() {
             )}
 
             {/* Explore Tab replaced Map Tab */}
-            {activeTab === "Your Plans" && (
+            {activeTab === "Your Plan" && (
               <div className="flex-1 max-w-2xl mx-auto space-y-6 overflow-y-auto px-4 py-5">
                 <div className="grid grid-cols-2 gap-4 justify-center">
                   <div className="relative">
