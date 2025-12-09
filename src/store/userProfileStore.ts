@@ -36,6 +36,8 @@ const initialFormData = (): FormData => ({
   mealCount: null,
   fitnessGoals: [],
   additionalInfo: [],
+  mealPlanUpdated: false,
+  workoutPlanUpdated: false,
 });
 
 interface UserProfileStore {
@@ -45,6 +47,10 @@ interface UserProfileStore {
   nextStep: () => void;
   prevStep: () => void;
   updateFormData: (updates: Partial<FormData>) => void;
+  setPlanFlag: (
+    flag: "mealPlanUpdated" | "workoutPlanUpdated",
+    value: boolean
+  ) => void;
   resetForm: () => void;
 }
 
@@ -72,6 +78,10 @@ export const useUserProfileStore = create<UserProfileStore>()(
             });
             return { formData: nextFormData };
           }),
+        setPlanFlag: (flag, value) =>
+          set((state) => ({
+            formData: { ...state.formData, [flag]: value },
+          })),
         resetForm: () =>
           set({
             step: 1,

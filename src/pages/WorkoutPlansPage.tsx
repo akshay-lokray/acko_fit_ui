@@ -19,7 +19,7 @@ type WorkoutPlanResponse = {
 
 export function WorkoutPlansPage() {
   const navigate = useNavigate();
-  const { formData: profile } = useUserProfileStore();
+  const { formData: profile, updateFormData } = useUserProfileStore();
   const [planByDay, setPlanByDay] = useState<Record<string, WorkoutDay[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +42,26 @@ export function WorkoutPlansPage() {
 
     fetchPlan();
   }, [profile.mobile]);
+
+  useEffect(() => {
+    if (!profile.workoutPlanUpdated) return;
+    const markWorkoutSeen = async () => {
+      try {
+        await fetch(`/api/users`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ...profile, workoutPlanUpdated: false }),
+        });
+      } catch (error) {
+        console.error("Failed to reset workout plan flag", error);
+      } finally {
+        updateFormData({ workoutPlanUpdated: false });
+      }
+    };
+    markWorkoutSeen();
+  }, [profile.workoutPlanUpdated, profile.mobile, updateFormData]);
 
   const sortedDays = useMemo(() => {
     return Object.keys(planByDay)

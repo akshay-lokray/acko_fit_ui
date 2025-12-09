@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { useUserProfileStore } from "@/store/userProfileStore";
 
 const HARD_CODED_USER_ID = "9795784244";
 
@@ -428,6 +429,7 @@ function RecipeDetailView({
 
 export function RecipesPage() {
   const navigate = useNavigate();
+  const { formData: profile, updateFormData } = useUserProfileStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState<RecipeSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -548,6 +550,26 @@ export function RecipesPage() {
 
     loadMealPlan();
   }, []);
+
+  useEffect(() => {
+    if (!profile.mealPlanUpdated) return;
+    const markMealPlanSeen = async () => {
+      try {
+        await fetch(`/api/users`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ...profile, mealPlanUpdated: false }),
+        });
+      } catch (error) {
+        console.error("Failed to reset meal plan flag", error);
+      } finally {
+        updateFormData({ mealPlanUpdated: false });
+      }
+    };
+    markMealPlanSeen();
+  }, [profile.mealPlanUpdated, profile.mobile, updateFormData]);
 
   const handleSuggestionClick = async (suggestion: string) => {
     // Mark that suggestion was clicked to prevent re-rendering

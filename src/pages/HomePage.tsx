@@ -10,8 +10,6 @@ import {
   Utensils,
   Dumbbell,
   Camera,
-  Target,
-  TrendingUp,
   Droplet,
   Footprints,
 } from "lucide-react";
@@ -20,17 +18,6 @@ import { Input } from "@/components/ui/input";
 import { useUserProfileStore } from "@/store/userProfileStore";
 import AvatarScene from "@/components/AvatarScene";
 import type { VoiceType } from "@/types/voice";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  ReferenceLine,
-} from "recharts";
 import "@/pages/HomePage.css";
 import ackoLogo from "@/assets/acko_logo.png";
 
@@ -260,7 +247,7 @@ export function HomePage() {
   const coachName = gender === "male" ? "Dhoni" : "Disha";
 
   // State
-  const [activeTab, setActiveTab] = useState<"goals" | "explore" | "Chat">(
+  const [activeTab, setActiveTab] = useState<"goals" | "Your Plans" | "Chat">(
     "goals"
   );
   const [messages, setMessages] = useState<Message[]>([]);
@@ -333,9 +320,9 @@ export function HomePage() {
   }>({});
   
   // Goal Chart state
-  const [goalChartLoading, setGoalChartLoading] = useState(true);
+  const [, setGoalChartLoading] = useState(true);
   const [goalHabitData, setGoalHabitData] = useState<HabitSeries>({});
-  const [selectedGoal, setSelectedGoal] = useState<string>("");
+  const [selectedGoal] = useState<string>("");
   const [fetchedUserGoal, setFetchedUserGoal] = useState<string>("");
   const fitnessGoals = profile.fitnessGoals || [];
   
@@ -807,38 +794,6 @@ export function HomePage() {
   }, [activeGoal, goalRefreshTrigger]);
 
   // Combine historical and projected data for chart
-  const combinedGoalChartData = useMemo(() => {
-    const historical = goalChartData.historicalData.map((d) => ({
-      day: d.day,
-      actual: d.goalProgress,
-      projected: null as number | null,
-    }));
-
-    const lastHistorical = historical[historical.length - 1];
-    const firstProjected = goalChartData.projectedData[0];
-
-    const projected = goalChartData.projectedData.map((d) => ({
-      day: d.day,
-      actual: null as number | null,
-      projected: d.goalProgress,
-    }));
-
-    // If there's a gap, add a connecting point
-    if (
-      lastHistorical &&
-      firstProjected &&
-      lastHistorical.day < firstProjected.day - 1
-    ) {
-      const connectingPoint = {
-        day: lastHistorical.day + 1,
-        actual: lastHistorical.actual,
-        projected: lastHistorical.actual,
-      };
-      return [...historical, connectingPoint, ...projected];
-    }
-
-    return [...historical, ...projected];
-  }, [goalChartData]);
   // Award XP when goals are reached (once per goal per user)
   useEffect(() => {
     const phoneNumber = localStorage.getItem("userPhone");
@@ -2015,13 +1970,13 @@ export function HomePage() {
               )}
             </button>
             <button
-              onClick={() => setActiveTab("explore")}
+              onClick={() => setActiveTab("Your Plans")}
               className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
-                activeTab === "explore" ? "text-emerald-600" : "text-gray-400"
+                activeTab === "Your Plans" ? "text-emerald-600" : "text-gray-400"
               }`}
             >
-              <Compass className="w-4 h-4" /> Explore
-              {activeTab === "explore" && (
+              <Compass className="w-4 h-4" /> Your Plans
+              {activeTab === "Your Plans" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600" />
               )}
             </button>
@@ -2308,13 +2263,19 @@ export function HomePage() {
             )}
 
             {/* Explore Tab replaced Map Tab */}
-            {activeTab === "explore" && (
+            {activeTab === "Your Plans" && (
               <div className="flex-1 max-w-2xl mx-auto space-y-6 overflow-y-auto px-4 py-5">
                 <div className="grid grid-cols-2 gap-4 justify-center">
-                  <div
-                    className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
-                    onClick={() => navigate("/recipes")}
-                  >
+                  <div className="relative">
+                    {profile.mealPlanUpdated && (
+                      <span className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-[0.3em] px-2 py-1 rounded-full bg-emerald-600 text-white shadow">
+                        Plan updated
+                      </span>
+                    )}
+                    <div
+                      className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
+                      onClick={() => navigate("/recipes")}
+                    >
                     <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center text-orange-600">
                       <Utensils className="w-7 h-7" />
                     </div>
@@ -2322,17 +2283,25 @@ export function HomePage() {
                       Curated Recipes
                     </span>
                   </div>
+                  </div>
 
-                  <div
-                    className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
-                    onClick={() => navigate("/workouts")}
-                  >
+                  <div className="relative">
+                    {profile.workoutPlanUpdated && (
+                      <span className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-[0.3em] px-2 py-1 rounded-full bg-emerald-600 text-white shadow">
+                        Plan updated
+                      </span>
+                    )}
+                    <div
+                      className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
+                      onClick={() => navigate("/workouts")}
+                    >
                     <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
                       <Dumbbell className="w-7 h-7" />
                     </div>
                     <span className="font-semibold text-gray-700 text-sm">
                       Personalized Workout Plans
                     </span>
+                  </div>
                   </div>
 
                   <div

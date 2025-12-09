@@ -39,5 +39,7 @@ export interface FormData {
   additionalInfo: AdditionalInfo[];
   avatarUrl?: string; // ReadyPlayer.me avatar URL
   avatarName?: string; // Dhoni or Aria
+  mealPlanUpdated?: boolean;
+  workoutPlanUpdated?: boolean;
 }
 
