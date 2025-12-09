@@ -727,7 +727,7 @@ export function SetupPage() {
           setIsWaitingForInitialResponse(false); // Hide initial loading indicator
 
           // Speak the cleaned response using text-to-speech
-          speakTextRef.current?.(cleanedText);
+          speakText(cleanedText);
 
           // Check if status is completed and redirect to /home
           if (isCompleted) {
