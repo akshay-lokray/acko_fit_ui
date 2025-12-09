@@ -118,9 +118,9 @@ export function HomePage() {
   const coachName = gender === "male" ? "Dhoni" : "Disha";
 
   // State
-  const [activeTab, setActiveTab] = useState<
-    "goals" | "explore" | "Chat"
-  >("goals");
+  const [activeTab, setActiveTab] = useState<"goals" | "explore" | "Chat">(
+    "goals"
+  );
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -173,7 +173,7 @@ export function HomePage() {
       const res = await fetch(
         `/api/users/${encodeURIComponent(phoneNumber)}/xp?delta=${delta}`,
         {
-        method: "POST",
+          method: "POST",
         }
       );
       if (!res.ok) return;
@@ -234,7 +234,6 @@ export function HomePage() {
     fetchHabits();
   }, [profile.mobile, routeFormData.mobile]);
 
-
   // Award XP when goals are reached (once per goal per user)
   useEffect(() => {
     const phoneNumber = localStorage.getItem("userPhone");
@@ -283,7 +282,6 @@ export function HomePage() {
 
   // Determining "Persona" styles
   const isMale = gender === "male";
-  const themeColor = isMale ? "text-emerald-600" : "text-purple-700";
 
   const [isListening, setIsListening] = useState(false);
   const socketRef = useRef<Socket | null>(null);
@@ -618,8 +616,8 @@ export function HomePage() {
     });
 
     socket.on("message", (data) => {
-        let text = "";
-        try {
+      let text = "";
+      try {
         if (typeof data === "string") {
           const parsed = JSON.parse(data);
           text = parsed.text ?? String(data);
@@ -628,16 +626,16 @@ export function HomePage() {
         } else {
           text = String(data);
         }
-        } catch {
+      } catch {
         text = String(data);
-        }
-        const coachMsg: Message = {
-          id: Date.now().toString(),
-          sender: "coach",
-          text,
-        };
-        setMessages((prev) => [...prev, coachMsg]);
-        setIsListening(false);
+      }
+      const coachMsg: Message = {
+        id: Date.now().toString(),
+        sender: "coach",
+        text,
+      };
+      setMessages((prev) => [...prev, coachMsg]);
+      setIsListening(false);
     });
 
     // Listen for 'response' event from server
@@ -1330,12 +1328,12 @@ export function HomePage() {
     sendHabitAssistMessage(textToSend)
       .then((reply) => {
         if (reply) {
-        const coachMsg: Message = {
+          const coachMsg: Message = {
             id: (Date.now() + 2).toString(),
-          sender: "coach",
+            sender: "coach",
             text: reply,
-        };
-        setMessages((prev) => [...prev, coachMsg]);
+          };
+          setMessages((prev) => [...prev, coachMsg]);
           speakText(reply);
         }
       })
@@ -1349,9 +1347,9 @@ export function HomePage() {
   }, [messages, isHabitApiLoading]);
 
   return (
-    <div className="min-h-screen bg-white font-sans flex flex-col">
+    <div className="h-screen bg-white font-sans flex flex-col overflow-hidden">
       {/* --- Top HUD (Head-Up Display) --- */}
-      <header className="bg-white border-b border-gray-100 p-4 sticky top-0 z-50">
+      <header className="bg-white border-b border-gray-100 p-4 flex-shrink-0 z-50">
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div
             className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
@@ -1392,35 +1390,14 @@ export function HomePage() {
       </header>
 
       {/* --- Main Content Area --- */}
-      <main className="flex-1 relative overflow-hidden flex flex-col">
+      <main className="flex-1 relative overflow-hidden flex flex-col min-h-0">
         {/* Dynamic Background */}
         <div className="absolute inset-0 pointer-events-none z-0">
           <div className="absolute top-0 left-0 right-0 h-[40%] bg-gradient-to-b from-emerald-50/30 to-transparent" />
         </div>
 
-        {/* Listening Overlay - shown when listening */}
-          {isListening && (
-          <div className="relative z-10 flex flex-col items-center justify-center py-8">
-            <div
-              className={`w-24 h-24 rounded-full flex items-center justify-center ${
-                isMale ? "bg-emerald-500" : "bg-purple-500"
-              } animate-pulse shadow-[0_0_40px_rgba(0,0,0,0.2)]`}
-            >
-                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
-                <div
-                  className={`w-16 h-16 rounded-full flex items-center justify-center animate-ping ${
-                    isMale ? "bg-emerald-100" : "bg-purple-100"
-                  }`}
-                >
-                    <Zap className={`w-8 h-8 ${themeColor}`} />
-                  </div>
-                </div>
-              </div>
-            <p className="mt-6 text-gray-700 font-bold text-lg">Listening...</p>
-            </div>
-          )}
-
-        <div className="home-avatar-banner">
+        {/* Avatar Section - Fixed Height */}
+        <div className="home-avatar-banner flex-shrink-0 relative z-10">
           <AvatarScene
             textToSpeak={
               messages[messages.length - 1].sender === "coach"
@@ -1432,8 +1409,8 @@ export function HomePage() {
           />
         </div>
 
-        {/* 2. Interface Tabs (Chat / Explore / Chat) */}
-        <div className="flex-1 bg-white rounded-t-[2rem] relative z-20 overflow-hidden flex flex-col pb-24">
+        {/* 2. Interface Tabs (Chat / Explore / Chat) - Fills remaining space and scrolls */}
+        <div className="flex-1 bg-white rounded-t-[2rem] relative z-20 flex flex-col min-h-0 overflow-hidden">
           {/* Tab Navigation */}
           <div className="flex border-b border-gray-100 bg-white">
             <button
@@ -1461,9 +1438,7 @@ export function HomePage() {
             <button
               onClick={() => setActiveTab("Chat")}
               className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
-                activeTab === "Chat"
-                  ? "text-emerald-600"
-                  : "text-gray-400"
+                activeTab === "Chat" ? "text-emerald-600" : "text-gray-400"
               }`}
             >
               <MessageSquare className="w-4 h-4" /> Chat
@@ -1474,9 +1449,9 @@ export function HomePage() {
           </div>
 
           {/* Tab Content */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-white px-4 md:px-6 pt-4 pb-0">
+          <div className="flex-1 flex flex-col overflow-y-auto bg-white px-4 md:px-6 pt-4 pb-0 min-h-0">
             {activeTab === "goals" && (
-              <div className="flex-1 flex flex-col max-w-2xl mx-auto space-y-4">
+              <div className="flex-1 flex flex-col max-w-2xl mx-auto space-y-4 overflow-y-auto">
                 <div className="bg-white rounded-2xl shadow-sm p-5">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1486,7 +1461,7 @@ export function HomePage() {
                       <p className="text-lg font-bold text-gray-900">
                         {stageProgress.currentStage}
                       </p>
-                      </div>
+                    </div>
                     <div className="text-right">
                       <p className="text-xs uppercase tracking-wider text-gray-500">
                         Target
@@ -1536,8 +1511,8 @@ export function HomePage() {
                         </div>
                         <span className="text-xs font-semibold text-emerald-600">
                           +{goal.xp} XP
-                            </span>
-                        </div>
+                        </span>
+                      </div>
                       <div className="mt-3 h-2 rounded-full bg-gray-200">
                         <div
                           className="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-green-400"
@@ -1547,8 +1522,8 @@ export function HomePage() {
                       <div className="mt-2 text-[10px] uppercase tracking-wider text-gray-500 flex justify-between">
                         <span>{goal.progress}% complete</span>
                         <span>{goal.detail}</span>
+                      </div>
                     </div>
-                </div>
                   ))}
                 </div>
               </div>
@@ -1556,7 +1531,7 @@ export function HomePage() {
 
             {/* Explore Tab replaced Map Tab */}
             {activeTab === "explore" && (
-              <div className="h-full max-w-2xl mx-auto space-y-6">
+              <div className="flex-1 max-w-2xl mx-auto space-y-6 overflow-y-auto">
                 <div className="grid grid-cols-2 gap-4">
                   <div
                     className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
@@ -1631,9 +1606,9 @@ export function HomePage() {
               </div>
             )}
 
-            {/* Chat Tab (Duplicate of Chat) */}
+            {/* Chat Tab */}
             {activeTab === "Chat" && (
-              <div className="flex-1 flex flex-col max-w-2xl mx-auto min-h-0">
+              <div className="flex-1 flex flex-col max-w-2xl mx-auto min-h-0 w-full">
                 <div
                   ref={messageListRef}
                   className="flex-1 min-h-0 space-y-4 overflow-y-auto pb-20"
@@ -1653,51 +1628,73 @@ export function HomePage() {
                         }`}
                       >
                         {msg.text}
-                </div>
+                      </div>
                     </div>
                   ))}
                   {isHabitApiLoading && (
                     <div className="flex justify-start">
                       <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-500">
                         <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                        Dhoni is typing...
-                  </div>
+                        {coachName} is typing...
+                      </div>
                     </div>
                   )}
-                  </div>
+                </div>
 
-                {/* Input Area */}
-                <div className="sticky bottom-0 left-0 right-0 z-10 bg-white border-t border-gray-100 pt-4 pb-6 flex items-center gap-2">
-                  <Input
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                    placeholder={`Message ${coachName}...`}
-                    className="flex-1 rounded-full border border-gray-200 bg-white px-4 py-3 shadow-sm focus-visible:ring-offset-0 focus-visible:ring-1"
-                  />
-                  <Button
-                    size="icon"
-                    onClick={() => handleSendMessage()}
-                    disabled={!inputValue.trim()}
-                    className={`w-10 h-10 rounded-full transition ${
-                      inputValue.trim()
-                        ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                        : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                    }`}
-                  >
-                    <Send className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    onClick={handleVoiceInput}
-                    className={`w-12 h-12 rounded-full shadow-md transition-all ${
-                      isListening
-                        ? "bg-red-500 animate-pulse text-white"
-                        : "bg-emerald-600 hover:bg-emerald-700 text-white"
-                    }`}
-                  >
-                    <Zap className="w-5 h-5 fill-white text-white" />
-                  </Button>
+                {/* Input Area - Fixed at bottom */}
+                <div className="sticky bottom-0 bg-white border-t border-gray-100 pt-4 pb-4 -mx-4 md:-mx-6 px-4 md:px-6 z-10">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && handleSendMessage()
+                      }
+                      placeholder={`Message ${coachName}...`}
+                      className="flex-1 rounded-full border border-gray-200 bg-white px-4 py-3 shadow-sm focus-visible:ring-offset-0 focus-visible:ring-1"
+                    />
+                    <Button
+                      size="icon"
+                      onClick={() => handleSendMessage()}
+                      disabled={!inputValue.trim()}
+                      className={`w-10 h-10 rounded-full transition ${
+                        inputValue.trim()
+                          ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                          : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                      }`}
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      onClick={handleVoiceInput}
+                      className={`w-12 h-12 rounded-full shadow-md transition-all relative ${
+                        isListening
+                          ? "bg-red-500 text-white"
+                          : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                      }`}
+                    >
+                      {isListening && (
+                        <>
+                          {/* Wave animation rings */}
+                          <div className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping opacity-75" />
+                          <div
+                            className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping opacity-50"
+                            style={{ animationDelay: "0.3s" }}
+                          />
+                          <div
+                            className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping opacity-25"
+                            style={{ animationDelay: "0.6s" }}
+                          />
+                        </>
+                      )}
+                      <Zap
+                        className={`w-5 h-5 fill-white text-white ${
+                          isListening ? "animate-pulse" : ""
+                        }`}
+                      />
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
