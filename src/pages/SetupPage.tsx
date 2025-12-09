@@ -64,7 +64,7 @@ export function SetupPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const gender = location.state?.gender || "female";
-  const coachName = gender === "male" ? "Dhoni" : "Disha";
+  const coachName = gender === "male" ? "Dhoni" : "Sakshi";
   const isMale = gender === "male";
 
   useEffect(() => {
@@ -435,7 +435,7 @@ export function SetupPage() {
       }
 
       try {
-        const avatar = isMale ? "Dhoni" : "Disha";
+        const avatar = isMale ? "Dhoni" : "Sakshi";
         const startPayload = {
           data: {
             text: "start",
@@ -1391,7 +1391,7 @@ export function SetupPage() {
       };
       setMessages((prev) => [...prev, userMsg]);
 
-      const avatar = isMale ? "Dhoni" : "Disha";
+      const avatar = isMale ? "Dhoni" : "Sakshi";
       const payload = {
         data: {
           text: textToSend,
@@ -1666,7 +1666,7 @@ export function SetupPage() {
     setShowTextInput(false);
 
     if (socket && socket.connected) {
-      const avatar = isMale ? "Dhoni" : "Disha";
+      const avatar = isMale ? "Dhoni" : "Sakshi";
       const payload = {
         data: {
           text: textToSend,
@@ -1756,7 +1756,7 @@ export function SetupPage() {
     setMessages((prev) => [...prev, userMsg]);
 
     // Send the selection to the server
-    const avatar = isMale ? "Dhoni" : "Disha";
+    const avatar = isMale ? "Dhoni" : "Sakshi";
     const payload = {
       data: {
         text: responseText,

@@ -111,8 +111,8 @@ function StageModel({ url }: { url: string }) {
         <primitive
             ref={stageGroup}
             object={scene}
-            scale={1.3}
-            position={[0, -1.69, 0]}
+            scale={1.25}
+            position={[0, -1.55, 0]}
             rotation={[0, 0, 0]}
         />
     );
@@ -243,7 +243,7 @@ export function UserLockerPage() {
 
 
             {/* Avatar Timeline */}
-            <div className="profile-timeline py-6 px-4 relative">
+            <div className="profile-timeline py-8 px-4 relative">
                 <div className="flex flex-col items-center gap-2 text-center mb-5">
                     <p className="text-xs uppercase tracking-[0.3em] text-gray-500">
                         Track Your Progress
@@ -252,76 +252,51 @@ export function UserLockerPage() {
                         Evolution Timeline
                     </h2>
                 </div>
-                <div className="flex flex-col md:flex-row items-start md:items-stretch gap-4 w-full max-w-[960px] mx-auto">
-                    <div className="hidden md:flex flex-col items-end gap-6 w-28 text-[11px] uppercase tracking-[0.3em] text-slate-500">
+                <div className="flex flex-col md:flex-row items-start md:items-stretch gap-4 w-full max-w-[960px] mx-auto pt-4">
+                    <div className="hidden md:flex flex-col items-center gap-2 w-32 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">
                         <span className="text-[10px] text-gray-400">Current</span>
-                        <div className="relative flex h-full flex-col justify-between py-4 pr-4">
-                            <div className="absolute inset-y-0 right-3 w-[1px] bg-gradient-to-b from-emerald-500/80 to-slate-200 rounded-full" />
-                            {TIMELINE_STAGES.map((stage) => (
-                                <div key={`current-${stage.id}`} className="flex items-center gap-2 justify-end">
-                                    <span className="w-3 h-3 rounded-full bg-emerald-500 border border-white shadow" />
-                                    <span className="font-semibold">{stage.label}</span>
-                                </div>
-                            ))}
+                        <div className="relative flex h-full flex-col justify-center items-center py-6">
+                            <div className="absolute top-4 bottom-4 right-[13%] w-9 rounded-full bg-gradient-to-b from-emerald-500/90 to-emerald-200 border border-emerald-200" />
+                            <span className="absolute right-[13%] top-[40%] h-5 w-5 -translate-y-1/2 rounded-full bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)]" />
+                            <span className="absolute right-[13%] top-[60%] h-5 w-5 -translate-y-1/2 rounded-full bg-emerald-500/70 shadow-[0_0_12px_rgba(16,185,129,0.6)] border border-white" />
                         </div>
                     </div>
-                    <div className="flex-1 flex flex-col items-center gap-6 w-full">
+                    <div className="flex-1 flex flex-col items-center gap-6 w-full pb-10">
                         {TIMELINE_STAGES.map((stage) => (
-                            <div
-                                key={stage.id}
-                                className="timeline-card relative rounded-3xl border border-gray-100 bg-transparent shadow-[0_25px_60px_rgba(15,23,42,0.08)] backdrop-blur-md overflow-hidden flex justify-center items-center min-h-[240px] pt-4"
-                            >
-                                <div className="absolute top-4 left-6 text-[10px] uppercase tracking-[0.3em] text-slate-400">
-                                    {stage.label}
-                                </div>
-                                <div className="w-48 h-48 -translate-y-8">
-                                    <div className="w-full h-full flex items-center justify-center">
-                                        <StagePreview url={stage.url} />
+                            <div key={`stage-wrapper-${stage.id}`} className="flex flex-col items-center gap-3 w-full">
+                                <div className="timeline-card relative rounded-3xl border border-gray-100 bg-transparent shadow-[0_25px_60px_rgba(15,23,42,0.08)] backdrop-blur-md overflow-hidden flex justify-center items-center min-h-[260px] pt-4 max-w-[420px] mx-auto pb-4">
+                                    <div className="w-52 h-56 -translate-y-6">
+                                        <div className="w-full h-full flex items-center justify-center">
+                                            <StagePreview url={stage.url} />
+                                        </div>
                                     </div>
+                                </div>
+                                <div className="text-[11px] uppercase tracking-[0.5em] text-slate-500">
+                                    {stage.label}
                                 </div>
                             </div>
                         ))}
                     </div>
-                    <div className="hidden md:flex flex-col items-start gap-6 w-28 text-[11px] uppercase tracking-[0.3em] text-slate-500">
+                    <div className="hidden md:flex flex-col items-center gap-2 w-32 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">
                         <span className="text-[10px] text-gray-400">Expected</span>
-                        <div className="relative flex h-full flex-col justify-between py-4 pl-4">
-                            <div className="absolute inset-y-0 left-3 w-[1px] bg-gradient-to-b from-sky-400/80 to-slate-200 rounded-full" />
-                            {TIMELINE_STAGES.map((stage) => (
-                                <div key={`expected-${stage.id}`} className="flex items-center gap-2">
-                                    <span className="w-3 h-3 rounded-full bg-sky-400 border border-white shadow" />
-                                    <span className="font-semibold">{stage.label}</span>
-                                </div>
-                            ))}
+                        <div className="relative flex h-full flex-col justify-center items-center py-6">
+                            <div className="absolute top-4 bottom-4 left-[13%] w-9 rounded-full bg-gradient-to-b from-sky-400/80 to-slate-200 border border-sky-200" />
+                            <span className="absolute left-[13%] top-[55%] h-5 w-5 -translate-y-1/2 rounded-full bg-sky-500 shadow-[0_0_15px_rgba(14,165,233,0.8)] border border-white" />
+                            <span className="absolute left-[13%] top-[75%] h-5 w-5 -translate-y-1/2 rounded-full bg-sky-400/70 shadow-[0_0_12px_rgba(14,165,233,0.6)]" />
                         </div>
                     </div>
                 </div>
-                <div className="md:hidden mt-6 flex flex-col gap-4 text-[10px] uppercase tracking-[0.4em] text-slate-600 items-center">
-                    <div className="w-full flex justify-between px-4">
-                        <span>Current</span>
-                        <span>Expected</span>
+                <div className="md:hidden absolute inset-0 pointer-events-none">
+                    <div className="absolute left-6 top-20 text-[10px] font-semibold tracking-[0.3em] text-black/90">
+                        Current
                     </div>
-                    <div className="flex gap-3 w-full px-4">
-                        <div className="flex-1 h-1 rounded-full bg-gradient-to-r from-emerald-500 to-slate-200" />
-                        <div className="flex-1 h-1 rounded-full bg-gradient-to-r from-sky-400 to-indigo-500" />
+                    <div className="absolute right-6 top-20 text-[10px] font-semibold tracking-[0.3em] text-black/90 text-right">
+                        Expected
                     </div>
-                    <div className="flex flex-col gap-1">
-                        <div className="flex justify-center gap-6 items-center">
-                            {TIMELINE_STAGES.map((stage) => (
-                                <span key={`mobile-current-${stage.id}`} className="flex flex-col items-center gap-1">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                    <span className="text-[10px] text-slate-500">{stage.label}</span>
-                                </span>
-                            ))}
-                        </div>
-                        <div className="flex justify-center gap-6 items-center">
-                            {TIMELINE_STAGES.map((stage) => (
-                                <span key={`mobile-expected-${stage.id}`} className="flex flex-col items-center gap-1">
-                                    <span className="w-2 h-2 rounded-full bg-sky-400" />
-                                    <span className="text-[10px] text-slate-500">{stage.label}</span>
-                                </span>
-                            ))}
-                        </div>
-                    </div>
+                    <div className="absolute left-6 top-20 bottom-24 w-6 rounded-full bg-gradient-to-b from-emerald-500/90 to-emerald-200" />
+                    <span className="absolute left-6 top-[42%] h-5 w-5 -translate-y-1/2 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)]" />
+                    <div className="absolute right-6 top-20 bottom-24 w-6 rounded-full bg-gradient-to-b from-sky-400/80 to-slate-200" />
+                    <span className="absolute right-6 top-[68%] h-5 w-5 -translate-y-1/2 rounded-full bg-sky-500 shadow-[0_0_12px_rgba(14,165,233,0.8)]" />
                 </div>
             </div>
 

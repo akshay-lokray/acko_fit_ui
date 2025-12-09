@@ -247,7 +247,7 @@ export function HomePage() {
   // Safe access to formData with defaults
   const gender = profile.gender || routeFormData.gender || "female";
   const name = profile.name || routeFormData.name || "Traveller";
-  const coachName = gender === "male" ? "Dhoni" : "Disha";
+  const coachName = gender === "male" ? "Dhoni" : "Sakshi";
 
   // State
   const [activeTab, setActiveTab] = useState<"goals" | "Your Plan" | "Talk to Dhoni">(
@@ -1477,7 +1477,7 @@ export function HomePage() {
     }, 100); // Small delay to ensure previous recognition is fully stopped
   }, [isListening, stopListeningAndSend, playStartSound]);
 
-  // Wake word listener - listens for "okay Dhoni" or "ok Disha"
+  // Wake word listener - listens for "okay Dhoni" or "ok Sakshi"
   useEffect(() => {
     const SpeechRecognition =
       (
@@ -1516,7 +1516,7 @@ export function HomePage() {
         // Define wake words based on coach gender
         const wakeWords = isMale
           ? ["okay Dhoni", "ok Dhoni", "hey Dhoni", "Dhoni"]
-          : ["okay Disha", "ok Disha", "hey Disha", "Disha"];
+          : ["okay Sakshi", "ok Sakshi", "hey Sakshi", "Sakshi"];
 
         wakeWordRecognition.onresult = (event: SpeechRecognitionEvent) => {
           // Don't process if already listening
@@ -1832,7 +1832,7 @@ export function HomePage() {
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
                       <p className="text-xs text-emerald-700 font-semibold uppercase tracking-wide">
-                        Current Progress
+                        Current
                       </p>
                     </div>
                     <p className="text-3xl font-bold text-emerald-600">
