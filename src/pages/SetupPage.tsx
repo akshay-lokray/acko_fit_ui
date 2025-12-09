@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
 import { Send, Zap, Mic, Keyboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -57,10 +57,10 @@ interface Message {
 
 export function SetupPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const gender = location.state?.gender || "female";
   const coachName = gender === "male" ? "Dhoni" : "Disha";
   const isMale = gender === "male";
-  const avatar = isMale ? "Dhoni" : "Disha";
 
   // State
   const [messages, setMessages] = useState<Message[]>([]);
@@ -74,11 +74,23 @@ export function SetupPage() {
     keyName: string;
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const contextRef = useRef<unknown[]>([]); // Store context from server responses
+  const [contextState, setContextState] = useState<{
+    status?: string;
+    keys?: Record<string, unknown>;
+  } | null>(null); // Store context from server responses (new structure: {status, keys})
 
   // Socket and recognition refs
   const socketRef = useRef<Socket | null>(null);
   const SOCKET_URL = "http://192.168.233.159:5000";
+
+  // Refs for functions used in socket event handlers to avoid stale closures
+  // Initialize as null, will be set after functions are defined
+  const speakTextRef = useRef<((text: string) => void) | null>(null);
+  const cleanMessageTextRef = useRef<
+    ((text: string, possibleValues?: string[]) => string) | null
+  >(null);
+  const navigateRef = useRef(navigate);
+  const genderRef = useRef(gender);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const recognitionResultRef = useRef<string>("");
   const interimTranscriptRef = useRef<string>(""); // Store interim transcripts
@@ -276,61 +288,104 @@ export function SetupPage() {
     };
   }, []);
 
-  // Function to parse context and find sections with possible_values
+  // Function to parse context and find keys with possible_values
   const checkForSelectionOptions = useCallback(() => {
-    const context = contextRef.current;
-    if (!Array.isArray(context)) return;
+    const context = contextState;
+    console.log("🔍 Checking for selection options. Context:", context);
 
-    // Find the first pending section with possible_values
-    for (const section of context) {
-      if (
-        typeof section === "object" &&
-        section !== null &&
-        "status" in section &&
-        (section as { status?: string }).status === "pending" &&
-        "keys" in section
-      ) {
-        const keys = (section as { keys?: Record<string, unknown> }).keys;
-        if (keys && typeof keys === "object") {
-          // Look for keys with possible_values
-          for (const [keyName, keyData] of Object.entries(keys)) {
+    if (!context || typeof context !== "object") {
+      console.log("❌ No context or invalid context");
+      setSelectionConfig(null);
+      setSelectedOptions([]);
+      return;
+    }
+
+    // New structure: context is {status, keys}
+    // Check if status is not "completed" and look for keys with possible_values
+    if (context.status === "completed") {
+      // If completed, clear selection config
+      console.log("✅ Context status is completed, clearing selection");
+      setSelectionConfig(null);
+      setSelectedOptions([]);
+      return;
+    }
+
+    const keys = context.keys;
+    console.log("🔑 Keys object:", keys);
+
+    if (keys && typeof keys === "object") {
+      // Find the FIRST key with key_status: "pending"
+      for (const [keyName, keyData] of Object.entries(keys)) {
+        console.log(`🔎 Checking key: ${keyName}`, keyData);
+
+        if (keyData && typeof keyData === "object" && "key_status" in keyData) {
+          const keyStatus = (keyData as { key_status?: string }).key_status;
+          console.log(`  Key status: ${keyStatus}`);
+
+          if (keyStatus === "pending") {
+            console.log(`✅ Found pending key: ${keyName}`);
+            // Found the first pending key, now check if it has possible_values with items
             if (
-              keyData &&
-              typeof keyData === "object" &&
               "possible_values" in keyData &&
               Array.isArray(
                 (keyData as { possible_values?: unknown[] }).possible_values
-              ) &&
-              (keyData as { possible_values?: unknown[] }).possible_values!
-                .length > 0
+              )
             ) {
-              const keyDataTyped = keyData as {
-                possible_values: string[];
-                multi_select?: boolean;
-              };
-              setSelectionConfig({
-                possibleValues: keyDataTyped.possible_values,
-                multiSelect: keyDataTyped.multi_select === true,
-                keyName: keyName,
-              });
+              const possibleValues = (
+                keyData as { possible_values?: unknown[] }
+              ).possible_values;
+              console.log(`  Possible values:`, possibleValues);
+
+              // Only show selection UI if possible_values has items
+              if (possibleValues && possibleValues.length > 0) {
+                const keyDataTyped = keyData as {
+                  possible_values: string[];
+                  multi_select?: boolean;
+                };
+                console.log("📋 Setting selection config:", {
+                  keyName,
+                  multiSelect: keyDataTyped.multi_select === true,
+                  options: keyDataTyped.possible_values,
+                });
+                setSelectionConfig({
+                  possibleValues: keyDataTyped.possible_values,
+                  multiSelect: keyDataTyped.multi_select === true,
+                  keyName: keyName,
+                });
+                setSelectedOptions([]);
+                return;
+              } else {
+                // First pending key found but no possible_values or empty array
+                // Don't show selection UI, user can use voice/text input
+                console.log(
+                  `📋 First pending key "${keyName}" found but no selection options (empty array)`
+                );
+                setSelectionConfig(null);
+                setSelectedOptions([]);
+                return;
+              }
+            } else {
+              // First pending key found but no possible_values field
+              console.log(
+                `📋 First pending key "${keyName}" found but no possible_values field`
+              );
+              setSelectionConfig(null);
               setSelectedOptions([]);
-              console.log("📋 Found selection options:", {
-                keyName,
-                multiSelect: keyDataTyped.multi_select,
-                options: keyDataTyped.possible_values,
-              });
               return;
             }
           }
         }
       }
     }
-    // No selection options found, clear the config
+    // No pending keys found, clear the config
+    console.log("❌ No pending keys found");
     setSelectionConfig(null);
     setSelectedOptions([]);
-  }, []);
+  }, [contextState]);
 
   // Function to clean message text by removing options list when selection UI is available
+  // Used via ref in socket event handlers to avoid stale closures
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const cleanMessageText = useCallback(
     (text: string, possibleValues?: string[]): string => {
       const optionsToRemove =
@@ -401,8 +456,14 @@ export function SetupPage() {
     [selectionConfig]
   );
 
-  // Socket connection
+  // Socket connection - only create once, don't recreate on dependency changes
   useEffect(() => {
+    // Check if socket already exists to prevent multiple connections
+    if (socketRef.current?.connected) {
+      console.log("🔌 Socket already connected, skipping reconnection");
+      return;
+    }
+
     const socket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       reconnection: true,
@@ -424,7 +485,7 @@ export function SetupPage() {
         const startPayload = {
           data: {
             text: "start",
-            context: [],
+            context: null,
           },
         };
         console.log("📤 Sending start message:", startPayload);
@@ -508,35 +569,74 @@ export function SetupPage() {
         console.log("📦 Parsed journey response:", parsedData);
 
         let journeyText = "";
-        let journeyContext: unknown[] = [];
+        let journeyContext: {
+          status?: string;
+          keys?: Record<string, unknown>;
+        } | null = null;
 
         // Extract text and context from the parsed data
-        // Handle both formats: {data: {text: "...", context: [...]}} and {text: "...", context: [...]}
+        // New format: {data: {text: "...", context: {status, keys}}}
         if (
           parsedData &&
           typeof parsedData === "object" &&
           parsedData !== null
         ) {
           const data = parsedData as {
-            data?: { text?: string; context?: unknown[] };
+            data?: {
+              text?: string;
+              context?:
+                | {
+                    status?: string;
+                    keys?: Record<string, unknown>;
+                  }
+                | unknown[];
+            };
             text?: string;
-            context?: unknown[];
+            context?:
+              | {
+                  status?: string;
+                  keys?: Record<string, unknown>;
+                }
+              | unknown[];
           };
 
-          // Check nested format first: {data: {text: "...", context: [...]}}
+          // Check nested format first: {data: {text: "...", context: {status, keys}}}
           if (
             data.data &&
             typeof data.data === "object" &&
             data.data !== null
           ) {
             journeyText = String(data.data.text || "");
-            journeyContext = Array.isArray(data.data.context)
-              ? data.data.context
-              : [];
+            // Context is now an object with {status, keys}, not an array
+            if (data.data.context) {
+              if (
+                typeof data.data.context === "object" &&
+                !Array.isArray(data.data.context) &&
+                "status" in data.data.context
+              ) {
+                journeyContext = data.data.context as {
+                  status?: string;
+                  keys?: Record<string, unknown>;
+                };
+              } else if (Array.isArray(data.data.context)) {
+                // Fallback: if it's still an array, convert to new format
+                journeyContext = null;
+              }
+            }
           } else if (data.text !== undefined || data.context !== undefined) {
-            // Handle direct format: {text: "...", context: [...]}
+            // Handle direct format: {text: "...", context: {status, keys}}
             journeyText = String(data.text || "");
-            journeyContext = Array.isArray(data.context) ? data.context : [];
+            if (
+              data.context &&
+              typeof data.context === "object" &&
+              !Array.isArray(data.context) &&
+              "status" in data.context
+            ) {
+              journeyContext = data.context as {
+                status?: string;
+                keys?: Record<string, unknown>;
+              };
+            }
           }
         }
 
@@ -562,65 +662,47 @@ export function SetupPage() {
         }
 
         // Store the context for future messages
-        if (
-          journeyContext &&
-          Array.isArray(journeyContext) &&
-          journeyContext.length > 0
-        ) {
-          contextRef.current = journeyContext;
+        if (journeyContext && typeof journeyContext === "object") {
+          setContextState(journeyContext);
           console.log(
             "📋 Stored context:",
-            JSON.stringify(contextRef.current, null, 2)
+            JSON.stringify(journeyContext, null, 2)
           );
-          // Check for selection options after storing context
-          checkForSelectionOptions();
+          // checkForSelectionOptions will be called automatically via useEffect when contextState changes
         }
 
         // Extract possible values synchronously from context for message cleaning
         let possibleValuesForCleaning: string[] = [];
-        if (Array.isArray(journeyContext)) {
-          for (const section of journeyContext) {
-            if (
-              typeof section === "object" &&
-              section !== null &&
-              "status" in section &&
-              (section as { status?: string }).status === "pending" &&
-              "keys" in section
-            ) {
-              const keys = (section as { keys?: Record<string, unknown> }).keys;
-              if (keys && typeof keys === "object") {
-                for (const keyData of Object.values(keys)) {
-                  if (
-                    keyData &&
-                    typeof keyData === "object" &&
-                    "possible_values" in keyData &&
-                    Array.isArray(
-                      (keyData as { possible_values?: unknown[] })
-                        .possible_values
-                    )
-                  ) {
-                    possibleValuesForCleaning = (
-                      keyData as { possible_values: string[] }
-                    ).possible_values;
-                    break;
-                  }
-                }
-                if (possibleValuesForCleaning.length > 0) break;
+        if (
+          journeyContext &&
+          typeof journeyContext === "object" &&
+          "keys" in journeyContext
+        ) {
+          const keys = journeyContext.keys;
+          if (keys && typeof keys === "object") {
+            for (const keyData of Object.values(keys)) {
+              if (
+                keyData &&
+                typeof keyData === "object" &&
+                "possible_values" in keyData &&
+                Array.isArray(
+                  (keyData as { possible_values?: unknown[] }).possible_values
+                )
+              ) {
+                possibleValuesForCleaning = (
+                  keyData as { possible_values: string[] }
+                ).possible_values;
+                break;
               }
             }
           }
         }
 
-        // Check if there's a pending section in the stored context
-        const hasPendingSection =
-          Array.isArray(contextRef.current) &&
-          contextRef.current.some(
-            (section: unknown) =>
-              typeof section === "object" &&
-              section !== null &&
-              "status" in section &&
-              (section as { status?: string }).status === "pending"
-          );
+        // Check if status is completed
+        const isCompleted =
+          journeyContext &&
+          typeof journeyContext === "object" &&
+          journeyContext.status === "completed";
 
         // Display the message if available and valid
         if (
@@ -629,10 +711,11 @@ export function SetupPage() {
           journeyText !== "[object Object]"
         ) {
           // Clean the message text to remove options list if selection UI is available
-          const cleanedText = cleanMessageText(
-            journeyText.trim(),
-            possibleValuesForCleaning
-          );
+          const cleanedText =
+            cleanMessageTextRef.current?.(
+              journeyText.trim(),
+              possibleValuesForCleaning
+            ) || journeyText.trim();
           const journeyMsg: Message = {
             id: Date.now().toString(),
             sender: "coach",
@@ -642,51 +725,50 @@ export function SetupPage() {
           setShowTextInput(false);
 
           // Speak the cleaned response using text-to-speech
-          speakText(cleanedText);
+          speakTextRef.current?.(cleanedText);
 
-          // After displaying the message, check if there's a pending section
-          // If yes, automatically continue to the next section
-          if (hasPendingSection) {
-            console.log(
-              "🔄 Message displayed but pending section found, continuing to next section..."
-            );
-            const socket = socketRef.current;
-            if (socket && socket.connected) {
-              setTimeout(() => {
-                const continuePayload = {
-                  data: {
-                    text: "continue",
-                    context: contextRef.current,
-                  },
-                };
-                console.log(
-                  "📤 Auto-continuing to next section:",
-                  continuePayload
-                );
-                socket.emit("process_journey", continuePayload);
-              }, 1000); // Delay to let the user hear the current message
+          // Check if status is completed and redirect to /home
+          if (isCompleted) {
+            console.log("✅ Setup completed! Redirecting to /home...");
+
+            // Extract and save phone number to localStorage
+            if (
+              journeyContext?.keys &&
+              typeof journeyContext.keys === "object"
+            ) {
+              const phoneKey = journeyContext.keys.phone;
+              if (
+                phoneKey &&
+                typeof phoneKey === "object" &&
+                "value" in phoneKey &&
+                phoneKey.value &&
+                typeof phoneKey.value === "string"
+              ) {
+                try {
+                  localStorage.setItem("userPhone", phoneKey.value);
+                  console.log(
+                    "📱 Saved phone number to localStorage:",
+                    phoneKey.value
+                  );
+                } catch (error) {
+                  console.error(
+                    "❌ Failed to save phone number to localStorage:",
+                    error
+                  );
+                }
+              }
             }
-          }
-        } else if (hasPendingSection) {
-          // If there's a pending section but no text response, automatically continue
-          console.log(
-            "🔄 No text response but pending section found, continuing..."
-          );
-          const socket = socketRef.current;
-          if (socket && socket.connected) {
+
             setTimeout(() => {
-              const continuePayload = {
-                data: {
-                  text: "continue",
-                  context: contextRef.current,
-                },
-              };
-              console.log(
-                "📤 Auto-continuing to next section:",
-                continuePayload
-              );
-              socket.emit("process_journey", continuePayload);
-            }, 500); // Small delay to ensure context is stored
+              if (navigateRef.current) {
+                navigateRef.current("/home", {
+                  state: {
+                    gender: genderRef.current,
+                    formData: contextState?.keys || {},
+                  },
+                });
+              }
+            }, 2000); // Small delay to let user see the completion message
           }
         } else {
           console.warn(
@@ -731,7 +813,10 @@ export function SetupPage() {
 
       // Handle response with data.text and data.context
       let responseText = "";
-      let responseContext: unknown[] = [];
+      let responseContext: {
+        status?: string;
+        keys?: Record<string, unknown>;
+      } | null = null;
 
       try {
         if (typeof data === "string") {
@@ -746,14 +831,31 @@ export function SetupPage() {
               // Check if it's the new format with data.data
               if (parsed.data && typeof parsed.data === "object") {
                 responseText = String(parsed.data.text || "");
-                responseContext = Array.isArray(parsed.data.context)
-                  ? parsed.data.context
-                  : [];
+                // Context is now an object with {status, keys}, not an array
+                if (
+                  parsed.data.context &&
+                  typeof parsed.data.context === "object" &&
+                  !Array.isArray(parsed.data.context) &&
+                  "status" in parsed.data.context
+                ) {
+                  responseContext = parsed.data.context as {
+                    status?: string;
+                    keys?: Record<string, unknown>;
+                  };
+                }
               } else if (parsed.text) {
                 responseText = String(parsed.text);
-                responseContext = Array.isArray(parsed.context)
-                  ? parsed.context
-                  : [];
+                if (
+                  parsed.context &&
+                  typeof parsed.context === "object" &&
+                  !Array.isArray(parsed.context) &&
+                  "status" in parsed.context
+                ) {
+                  responseContext = parsed.context as {
+                    status?: string;
+                    keys?: Record<string, unknown>;
+                  };
+                }
               } else {
                 responseText = String(data);
               }
@@ -772,20 +874,39 @@ export function SetupPage() {
             responseText = String(data);
           }
         } else if (typeof data === "object" && data !== null) {
-          // Check if it's the new format: { data: { text: "...", context: [...] } }
+          // Check if it's the new format: { data: { text: "...", context: {status, keys} } }
           if (
             data.data &&
             typeof data.data === "object" &&
             data.data !== null
           ) {
             responseText = String(data.data.text || "");
-            responseContext = Array.isArray(data.data.context)
-              ? data.data.context
-              : [];
+            // Context is now an object with {status, keys}, not an array
+            if (
+              data.data.context &&
+              typeof data.data.context === "object" &&
+              !Array.isArray(data.data.context) &&
+              "status" in data.data.context
+            ) {
+              responseContext = data.data.context as {
+                status?: string;
+                keys?: Record<string, unknown>;
+              };
+            }
           } else if (data.text !== undefined) {
             // Old format: { text: "..." }
             responseText = String(data.text);
-            responseContext = Array.isArray(data.context) ? data.context : [];
+            if (
+              data.context &&
+              typeof data.context === "object" &&
+              !Array.isArray(data.context) &&
+              "status" in data.context
+            ) {
+              responseContext = data.context as {
+                status?: string;
+                keys?: Record<string, unknown>;
+              };
+            }
           } else {
             // Fallback: try to stringify the object
             responseText = JSON.stringify(data);
@@ -819,53 +940,47 @@ export function SetupPage() {
       }
 
       // Store the context for future messages
-      if (
-        responseContext &&
-        Array.isArray(responseContext) &&
-        responseContext.length > 0
-      ) {
-        contextRef.current = responseContext;
+      if (responseContext && typeof responseContext === "object") {
+        setContextState(responseContext);
         console.log(
           "📋 Stored context:",
-          JSON.stringify(contextRef.current, null, 2)
+          JSON.stringify(responseContext, null, 2)
         );
-        // Check for selection options after storing context
-        checkForSelectionOptions();
+        // checkForSelectionOptions will be called automatically via useEffect when contextState changes
       }
 
       // Extract possible values synchronously from context for message cleaning
       let possibleValuesForCleaning: string[] = [];
-      if (Array.isArray(responseContext)) {
-        for (const section of responseContext) {
-          if (
-            typeof section === "object" &&
-            section !== null &&
-            "status" in section &&
-            (section as { status?: string }).status === "pending" &&
-            "keys" in section
-          ) {
-            const keys = (section as { keys?: Record<string, unknown> }).keys;
-            if (keys && typeof keys === "object") {
-              for (const keyData of Object.values(keys)) {
-                if (
-                  keyData &&
-                  typeof keyData === "object" &&
-                  "possible_values" in keyData &&
-                  Array.isArray(
-                    (keyData as { possible_values?: unknown[] }).possible_values
-                  )
-                ) {
-                  possibleValuesForCleaning = (
-                    keyData as { possible_values: string[] }
-                  ).possible_values;
-                  break;
-                }
-              }
-              if (possibleValuesForCleaning.length > 0) break;
+      if (
+        responseContext &&
+        typeof responseContext === "object" &&
+        "keys" in responseContext
+      ) {
+        const keys = responseContext.keys;
+        if (keys && typeof keys === "object") {
+          for (const keyData of Object.values(keys)) {
+            if (
+              keyData &&
+              typeof keyData === "object" &&
+              "possible_values" in keyData &&
+              Array.isArray(
+                (keyData as { possible_values?: unknown[] }).possible_values
+              )
+            ) {
+              possibleValuesForCleaning = (
+                keyData as { possible_values: string[] }
+              ).possible_values;
+              break;
             }
           }
         }
       }
+
+      // Check if status is completed
+      const isCompleted =
+        responseContext &&
+        typeof responseContext === "object" &&
+        responseContext.status === "completed";
 
       console.log("📝 Response text:", responseText);
 
@@ -900,10 +1015,12 @@ export function SetupPage() {
         responseText !== "[object Object]"
       ) {
         // Clean the message text to remove options list if selection UI is available
-        const cleanedText = cleanMessageText(
-          responseText.trim(),
-          possibleValuesForCleaning
-        );
+        const cleanedText = cleanMessageTextRef.current
+          ? cleanMessageTextRef.current(
+              responseText.trim(),
+              possibleValuesForCleaning
+            )
+          : responseText.trim();
         const coachMsg: Message = {
           id: Date.now().toString(),
           sender: "coach",
@@ -914,6 +1031,48 @@ export function SetupPage() {
 
         // Speak the cleaned response using text-to-speech
         speakText(cleanedText);
+
+        // Check if status is completed and redirect to /home
+        if (isCompleted) {
+          console.log("✅ Setup completed! Redirecting to /home...");
+
+          // Extract and save phone number to localStorage
+          if (
+            responseContext?.keys &&
+            typeof responseContext.keys === "object"
+          ) {
+            const phoneKey = responseContext.keys.phone;
+            if (
+              phoneKey &&
+              typeof phoneKey === "object" &&
+              "value" in phoneKey &&
+              phoneKey.value &&
+              typeof phoneKey.value === "string"
+            ) {
+              try {
+                localStorage.setItem("userPhone", phoneKey.value);
+                console.log(
+                  "📱 Saved phone number to localStorage:",
+                  phoneKey.value
+                );
+              } catch (error) {
+                console.error(
+                  "❌ Failed to save phone number to localStorage:",
+                  error
+                );
+              }
+            }
+          }
+
+          setTimeout(() => {
+            navigate("/home", {
+              state: {
+                gender,
+                formData: contextState?.keys || {},
+              },
+            });
+          }, 2000); // Small delay to let user see the completion message
+        }
       } else {
         console.warn(
           "⚠️ Skipping message display - invalid or empty text:",
@@ -932,9 +1091,12 @@ export function SetupPage() {
         console.log("🎯 Journey data:", JSON.stringify(data, null, 2));
 
         let journeyText = "";
-        let journeyContext: unknown[] = [];
+        let journeyContext: {
+          status?: string;
+          keys?: Record<string, unknown>;
+        } | null = null;
 
-        // Parse the response format: { data: { text: "...", context: [...] } }
+        // Parse the response format: { data: { text: "...", context: {status, keys} } }
         if (data && typeof data === "object" && data !== null) {
           if (
             data.data &&
@@ -942,12 +1104,31 @@ export function SetupPage() {
             data.data !== null
           ) {
             journeyText = String(data.data.text || "");
-            journeyContext = Array.isArray(data.data.context)
-              ? data.data.context
-              : [];
+            // Context is now an object with {status, keys}, not an array
+            if (
+              data.data.context &&
+              typeof data.data.context === "object" &&
+              !Array.isArray(data.data.context) &&
+              "status" in data.data.context
+            ) {
+              journeyContext = data.data.context as {
+                status?: string;
+                keys?: Record<string, unknown>;
+              };
+            }
           } else if (data.text !== undefined) {
             journeyText = String(data.text);
-            journeyContext = Array.isArray(data.context) ? data.context : [];
+            if (
+              data.context &&
+              typeof data.context === "object" &&
+              !Array.isArray(data.context) &&
+              "status" in data.context
+            ) {
+              journeyContext = data.context as {
+                status?: string;
+                keys?: Record<string, unknown>;
+              };
+            }
           }
         }
 
@@ -970,65 +1151,47 @@ export function SetupPage() {
         }
 
         // Store the context for future messages
-        if (
-          journeyContext &&
-          Array.isArray(journeyContext) &&
-          journeyContext.length > 0
-        ) {
-          contextRef.current = journeyContext;
+        if (journeyContext && typeof journeyContext === "object") {
+          setContextState(journeyContext);
           console.log(
             "📋 Stored context:",
-            JSON.stringify(contextRef.current, null, 2)
+            JSON.stringify(journeyContext, null, 2)
           );
-          // Check for selection options after storing context
-          checkForSelectionOptions();
+          // checkForSelectionOptions will be called automatically via useEffect when contextState changes
         }
 
         // Extract possible values synchronously from context for message cleaning
         let possibleValuesForCleaning: string[] = [];
-        if (Array.isArray(journeyContext)) {
-          for (const section of journeyContext) {
-            if (
-              typeof section === "object" &&
-              section !== null &&
-              "status" in section &&
-              (section as { status?: string }).status === "pending" &&
-              "keys" in section
-            ) {
-              const keys = (section as { keys?: Record<string, unknown> }).keys;
-              if (keys && typeof keys === "object") {
-                for (const keyData of Object.values(keys)) {
-                  if (
-                    keyData &&
-                    typeof keyData === "object" &&
-                    "possible_values" in keyData &&
-                    Array.isArray(
-                      (keyData as { possible_values?: unknown[] })
-                        .possible_values
-                    )
-                  ) {
-                    possibleValuesForCleaning = (
-                      keyData as { possible_values: string[] }
-                    ).possible_values;
-                    break;
-                  }
-                }
-                if (possibleValuesForCleaning.length > 0) break;
+        if (
+          journeyContext &&
+          typeof journeyContext === "object" &&
+          "keys" in journeyContext
+        ) {
+          const keys = journeyContext.keys;
+          if (keys && typeof keys === "object") {
+            for (const keyData of Object.values(keys)) {
+              if (
+                keyData &&
+                typeof keyData === "object" &&
+                "possible_values" in keyData &&
+                Array.isArray(
+                  (keyData as { possible_values?: unknown[] }).possible_values
+                )
+              ) {
+                possibleValuesForCleaning = (
+                  keyData as { possible_values: string[] }
+                ).possible_values;
+                break;
               }
             }
           }
         }
 
-        // Check if there's a pending section in the stored context
-        const hasPendingSection =
-          Array.isArray(contextRef.current) &&
-          contextRef.current.some(
-            (section: unknown) =>
-              typeof section === "object" &&
-              section !== null &&
-              "status" in section &&
-              (section as { status?: string }).status === "pending"
-          );
+        // Check if status is completed
+        const isCompleted =
+          journeyContext &&
+          typeof journeyContext === "object" &&
+          journeyContext.status === "completed";
 
         // Display the message if available and valid
         if (
@@ -1037,10 +1200,11 @@ export function SetupPage() {
           journeyText !== "[object Object]"
         ) {
           // Clean the message text to remove options list if selection UI is available
-          const cleanedText = cleanMessageText(
-            journeyText.trim(),
-            possibleValuesForCleaning
-          );
+          const cleanedText =
+            cleanMessageTextRef.current?.(
+              journeyText.trim(),
+              possibleValuesForCleaning
+            ) || journeyText.trim();
           const journeyMsg: Message = {
             id: Date.now().toString(),
             sender: "coach",
@@ -1049,48 +1213,48 @@ export function SetupPage() {
           setMessages((prev) => [...prev, journeyMsg]);
           speakText(cleanedText);
 
-          // After displaying the message, check if there's a pending section
-          if (hasPendingSection) {
-            console.log(
-              "🔄 Message displayed but pending section found, continuing to next section..."
-            );
-            const socket = socketRef.current;
-            if (socket && socket.connected) {
-              setTimeout(() => {
-                const continuePayload = {
-                  data: {
-                    text: "continue",
-                    context: contextRef.current,
-                  },
-                };
-                console.log(
-                  "📤 Auto-continuing to next section:",
-                  continuePayload
-                );
-                socket.emit("process_journey", continuePayload);
-              }, 1000); // Delay to let the user hear the current message
+          // Check if status is completed and redirect to /home
+          if (isCompleted) {
+            console.log("✅ Setup completed! Redirecting to /home...");
+
+            // Extract and save phone number to localStorage
+            if (
+              journeyContext?.keys &&
+              typeof journeyContext.keys === "object"
+            ) {
+              const phoneKey = journeyContext.keys.phone;
+              if (
+                phoneKey &&
+                typeof phoneKey === "object" &&
+                "value" in phoneKey &&
+                phoneKey.value &&
+                typeof phoneKey.value === "string"
+              ) {
+                try {
+                  localStorage.setItem("userPhone", phoneKey.value);
+                  console.log(
+                    "📱 Saved phone number to localStorage:",
+                    phoneKey.value
+                  );
+                } catch (error) {
+                  console.error(
+                    "❌ Failed to save phone number to localStorage:",
+                    error
+                  );
+                }
+              }
             }
-          }
-        } else if (hasPendingSection) {
-          // If there's a pending section but no text response, automatically continue
-          console.log(
-            "🔄 No text response but pending section found, continuing..."
-          );
-          const socket = socketRef.current;
-          if (socket && socket.connected) {
+
             setTimeout(() => {
-              const continuePayload = {
-                data: {
-                  text: "continue",
-                  context: contextRef.current,
-                },
-              };
-              console.log(
-                "📤 Auto-continuing to next section:",
-                continuePayload
-              );
-              socket.emit("process_journey", continuePayload);
-            }, 500); // Small delay to ensure context is stored
+              if (navigateRef.current) {
+                navigateRef.current("/home", {
+                  state: {
+                    gender: genderRef.current,
+                    formData: contextState?.keys || {},
+                  },
+                });
+              }
+            }, 2000); // Small delay to let user see the completion message
           }
         } else {
           console.warn(
@@ -1104,17 +1268,19 @@ export function SetupPage() {
     });
 
     return () => {
-      if (socket) {
+      // Only disconnect on component unmount, not on dependency changes
+      if (socket && socket.connected) {
         try {
           socket.emit("disconnect", { type: "disconnect" });
         } catch (e) {
           console.warn("Socket.IO disconnect event send failed", e);
         }
         socket.disconnect();
+        socketRef.current = null;
       }
-      socketRef.current = null;
     };
-  }, [SOCKET_URL, speakText, checkForSelectionOptions, cleanMessageText]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount, dependencies are accessed via refs/state
 
   // Helper function to stop listening and send the result
   const stopListeningAndSend = useCallback(() => {
@@ -1167,7 +1333,7 @@ export function SetupPage() {
       const payload = {
         data: {
           text: textToSend,
-          context: contextRef.current, // Include the stored context
+          context: contextState, // Include the stored context
         },
       };
 
@@ -1184,7 +1350,7 @@ export function SetupPage() {
 
     // Play end sound
     playEndSound();
-  }, [playEndSound]);
+  }, [playEndSound, contextState]);
 
   // Voice input handler
   const handleVoiceInput = useCallback(() => {
@@ -1429,7 +1595,7 @@ export function SetupPage() {
       const payload = {
         data: {
           text: textToSend,
-          context: contextRef.current, // Include the stored context
+          context: contextState, // Include the stored context
         },
       };
 
@@ -1449,10 +1615,12 @@ export function SetupPage() {
     }
   };
 
-  // Check for selection options whenever context changes
+  // Watch for context changes and check for selection options
   useEffect(() => {
-    checkForSelectionOptions();
-  }, [checkForSelectionOptions]);
+    if (contextState) {
+      checkForSelectionOptions();
+    }
+  }, [contextState, checkForSelectionOptions]);
 
   // Handle option selection
   const handleOptionToggle = (option: string) => {
@@ -1495,7 +1663,7 @@ export function SetupPage() {
     const payload = {
       data: {
         text: responseText,
-        context: contextRef.current,
+        context: contextState,
       },
     };
 
