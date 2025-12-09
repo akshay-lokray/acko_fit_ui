@@ -1629,25 +1629,15 @@ export function HomePage() {
     async (message: string, userIdOverride?: string) => {
       const userId = userIdOverride || HARD_CODED_USER_ID;
       try {
-<<<<<<< HEAD
         const params = new URLSearchParams();
         params.append("userId", userId);
         params.append("message", message);
-=======
-        const body = new URLSearchParams();
-        body.append("userId", userId);
-        body.append("message", message);
->>>>>>> e856267c23d34eb97c2699201996a70cdecb81bd
         const response = await fetch("/api/habits/ai-assist", {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
           },
-<<<<<<< HEAD
           body: params.toString(),
-=======
-          body,
->>>>>>> e856267c23d34eb97c2699201996a70cdecb81bd
         });
 
         if (!response.ok) {
