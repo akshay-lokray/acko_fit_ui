@@ -10,12 +10,12 @@ import {
   Utensils,
   Dumbbell,
   Camera,
-  Shield,
   Target,
   TrendingUp,
+  Droplet,
+  Footprints,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { useUserProfileStore } from "@/store/userProfileStore";
 import AvatarScene from "@/components/AvatarScene";
@@ -32,6 +32,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import "@/pages/HomePage.css";
+import ackoLogo from "@/assets/acko_logo.png";
 
 // Type definitions for Speech Recognition API
 interface SpeechRecognition extends EventTarget {
@@ -81,21 +82,6 @@ interface Message {
   text: string;
 }
 
-interface Goal {
-  id: string;
-  title: string;
-  detail: string;
-  progress: number;
-  xp: number;
-}
-
-interface Quest {
-  id: string;
-  title: string;
-  xp: number;
-  completed: boolean;
-  type: "daily" | "weekly";
-}
 
 // Goal Chart types
 interface ChartDataPoint {
@@ -118,6 +104,15 @@ interface HabitLog {
     unit?: string;
     source?: string;
     note?: string;
+    mealName?: string;
+    healthNote?: string;
+    items?: Array<{ name: string; calories: number; quantity?: string; note?: string }>;
+    quickNote?: string;
+    mealType?: string;
+    cheatMeal?: boolean;
+    food?: string | Array<string>; // Food items from metadata
+    foodName?: string; // Food name for cheat meal
+    [key: string]: any; // Allow additional properties
   };
 }
 
@@ -249,18 +244,6 @@ function calculateGoalProgress(
 const HARD_CODED_USER_ID = "9795784244";
 
 // --- Mock Data ---
-const DAILY_QUESTS: Quest[] = [
-  { id: "1", title: "Log Meal", xp: 50, completed: false, type: "daily" },
-  {
-    id: "2",
-    title: "Walk 5,000 Steps",
-    xp: 100,
-    completed: false,
-    type: "daily",
-  },
-  { id: "3", title: "Drink 2L Water", xp: 50, completed: true, type: "daily" },
-];
-
 export function HomePage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -280,16 +263,57 @@ export function HomePage() {
   const [activeTab, setActiveTab] = useState<"goals" | "explore" | "Chat">(
     "goals"
   );
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      sender: "coach",
-      text: `Welcome back, ${name}. Ready to conquer today's mission?`,
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isHabitApiLoading, setHabitApiLoading] = useState(false);
   const xp = profile.xp ?? routeFormData.xp ?? 350;
+  const setupMessageText =
+    "We have created a personalized plan to help you reach your goals. Your fitness journey is no longer boring—head to Explore for curated meals and workouts, log habits, log meals in chat for calorie tracking, and unlock even more support.";
+  const defaultWelcomeText = `We have created a personalized plan to help you reach your goals. Your fitness journey is no longer boring—head to Explore for curated meals and workouts, log habits, log meals in chat for calorie tracking, and unlock even more support.`;
+  const repeatWelcomeText = `Great to see you again, ${name}. Let's keep the momentum going.`;
+
+  useEffect(() => {
+    if (messages.length > 0) return;
+    const messageId = Date.now().toString();
+    const todayKey = new Date().toISOString().split("T")[0];
+    let messageText = defaultWelcomeText;
+
+    if (typeof window !== "undefined") {
+      const fromSetup = window.sessionStorage.getItem("visitedSetup") === "true";
+      const setupMessageShown =
+        window.sessionStorage.getItem("setupHomeMessageShown") === "true";
+      const lastDailyGreeting =
+        window.sessionStorage.getItem("homeDailyWelcomeDate") || "";
+
+      if (fromSetup && !setupMessageShown) {
+        messageText = setupMessageText;
+        window.sessionStorage.setItem("setupHomeMessageShown", "true");
+        window.sessionStorage.removeItem("visitedSetup");
+      } else if (lastDailyGreeting !== todayKey) {
+        messageText = defaultWelcomeText;
+        window.sessionStorage.setItem("homeDailyWelcomeDate", todayKey);
+      } else {
+        messageText = repeatWelcomeText;
+      }
+    }
+
+    setMessages([{ id: messageId, sender: "coach", text: messageText }]);
+  }, [
+    defaultWelcomeText,
+    messages.length,
+    repeatWelcomeText,
+    setupMessageText,
+  ]);
+  const latestCoachMessage = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].sender === "coach") {
+        return messages[i];
+      }
+    }
+    return null;
+  }, [messages]);
+  const latestCoachText =
+    latestCoachMessage?.text ?? setupMessageText ?? defaultWelcomeText;
   const [habitStats, setHabitStats] = useState<{
     calorie?: number;
     water?: number;
@@ -302,6 +326,37 @@ export function HomePage() {
   const [selectedGoal, setSelectedGoal] = useState<string>("");
   const [fetchedUserGoal, setFetchedUserGoal] = useState<string>("");
   const fitnessGoals = profile.fitnessGoals || [];
+  
+  // Refresh trigger for goal section
+  const [goalRefreshTrigger, setGoalRefreshTrigger] = useState(0);
+  
+  // Today's intake state
+  const [todayIntake, setTodayIntake] = useState<{
+    calories: { achieved: number; target: number };
+    water: { achieved: number; target: number };
+    steps: { achieved: number; target: number };
+  }>({
+    calories: { achieved: 0, target: 0 },
+    water: { achieved: 0, target: 0 },
+    steps: { achieved: 0, target: 0 },
+  });
+  const [todayIntakeLoading, setTodayIntakeLoading] = useState(false);
+  
+  // Cheat meals / missed meals state
+  interface CheatMealEntry {
+    date: string;
+    meals: Array<{
+      mealName?: string;
+      calories?: number;
+      healthNote?: string;
+      note?: string;
+      items?: Array<{ name: string; calories: number }>;
+      food?: string | Array<string>; // Food items from metadata
+      foodName?: string; // Food name for cheat meal
+    }>;
+  }
+  const [cheatMeals, setCheatMeals] = useState<CheatMealEntry[]>([]);
+  const [cheatMealsLoading, setCheatMealsLoading] = useState(false);
   // Use selected goal, fetched user goal, profile goal, or default
   const activeGoal =
     selectedGoal ||
@@ -355,9 +410,24 @@ export function HomePage() {
     fetchUserProfile(userId);
   }, [profile.mobile, routeFormData.mobile, fetchUserProfile]);
 
+  // Refresh goal section when page comes into focus (user navigated back from logging data)
+  useEffect(() => {
+    const handleFocus = () => {
+      // Small delay to ensure data is saved before refreshing
+      setTimeout(() => {
+        setGoalRefreshTrigger((prev) => prev + 1);
+      }, 500);
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
+
   // Fetch user goal from API
   useEffect(() => {
-    const userId = "783482642";
+    const userId = HARD_CODED_USER_ID;
 
     const fetchUserGoal = async () => {
       try {
@@ -383,9 +453,9 @@ export function HomePage() {
     fetchUserGoal();
   }, []);
 
-  // Fetch daily habit stats on mount
+  // Fetch daily habit stats on mount and when refresh is triggered
   useEffect(() => {
-    const userId = "783482642";
+    const userId = HARD_CODED_USER_ID;
 
     const fetchHabits = async () => {
       try {
@@ -440,7 +510,159 @@ export function HomePage() {
     };
 
     fetchHabits();
-  }, []);
+  }, [goalRefreshTrigger]);
+
+  // Fetch today's intake (calories, water, steps)
+  useEffect(() => {
+    const userId = HARD_CODED_USER_ID;
+    setTodayIntakeLoading(true);
+
+    const fetchTodayIntake = async () => {
+      try {
+        const res = await fetch(
+          `/api/habits/user?userId=${encodeURIComponent(userId)}`
+        );
+        if (!res.ok) {
+          setTodayIntakeLoading(false);
+          return;
+        }
+        const habitLogs: HabitLog[] = await res.json();
+
+        // Get today's date
+        const today = new Date();
+        const todayStr = today.toISOString().slice(0, 10);
+
+        // Calculate today's intake for all metrics
+        let todayCaloriesAchieved = 0;
+        let todayWaterAchieved = 0;
+        let todayStepsAchieved = 0;
+
+        habitLogs.forEach((log) => {
+          const date = new Date(log.recordedAt);
+          const dateStr = date.toISOString().slice(0, 10);
+          if (dateStr === todayStr) {
+            const habitName = log.habit.toLowerCase();
+            if (habitName === "calories" || habitName === "calorie") {
+              todayCaloriesAchieved += log.value;
+            } else if (habitName === "water") {
+              todayWaterAchieved += log.value;
+            } else if (habitName === "steps" || habitName === "step") {
+              todayStepsAchieved += log.value;
+            }
+          }
+        });
+
+        // Get targets based on goal
+        const targetCalories = activeGoal.toLowerCase().includes("lose weight")
+          ? 1500
+          : 2500;
+        const targetWater = 2000; // ml
+        const targetSteps = 10000;
+
+        setTodayIntake({
+          calories: {
+            achieved: todayCaloriesAchieved,
+            target: targetCalories,
+          },
+          water: {
+            achieved: todayWaterAchieved,
+            target: targetWater,
+          },
+          steps: {
+            achieved: todayStepsAchieved,
+            target: targetSteps,
+          },
+        });
+      } catch (e) {
+        console.error("Failed to fetch today's intake", e);
+      } finally {
+        setTodayIntakeLoading(false);
+      }
+    };
+
+    fetchTodayIntake();
+  }, [activeGoal, goalRefreshTrigger]);
+
+  // Fetch cheat meals / missed meals
+  useEffect(() => {
+    const userId = HARD_CODED_USER_ID;
+    setCheatMealsLoading(true);
+
+    const fetchCheatMeals = async () => {
+      try {
+        const res = await fetch(
+          `/api/habits/user?userId=${encodeURIComponent(userId)}`
+        );
+        if (!res.ok) {
+          setCheatMealsLoading(false);
+          return;
+        }
+        const habitLogs: HabitLog[] = await res.json();
+
+        // Group meals by date
+        const mealsByDate: Record<string, CheatMealEntry["meals"]> = {};
+
+        habitLogs.forEach((log) => {
+          const habitName = log.habit.toLowerCase();
+          
+          // Check specifically for cheat meals: habit == "calories" and meta.cheatMeal == true
+          if (habitName === "calories" || habitName === "calorie") {
+            const isCheatMeal = log.meta?.cheatMeal === true;
+            
+            if (isCheatMeal) {
+              const date = new Date(log.recordedAt);
+              const dateStr = date.toISOString().slice(0, 10);
+              
+              if (!mealsByDate[dateStr]) {
+                mealsByDate[dateStr] = [];
+              }
+              
+              // Extract food items from metadata
+              let foodItems: string[] = [];
+              if (log.meta?.food) {
+                if (Array.isArray(log.meta.food)) {
+                  foodItems = log.meta.food;
+                } else if (typeof log.meta.food === "string") {
+                  foodItems = [log.meta.food];
+                }
+              }
+              
+              // Also check items array if food is not present
+              if (foodItems.length === 0 && log.meta?.items && Array.isArray(log.meta.items)) {
+                foodItems = log.meta.items.map((item: any) => item.name || String(item)).filter(Boolean);
+              }
+              
+              // Use foodName if present, otherwise use "cheat meal"
+              const displayName = log.meta?.foodName || log.meta?.mealName || "cheat meal";
+              
+              mealsByDate[dateStr].push({
+                mealName: displayName,
+                calories: log.value,
+                healthNote: log.meta?.healthNote,
+                note: log.meta?.note,
+                items: log.meta?.items,
+                food: foodItems.length > 0 ? foodItems : undefined,
+                foodName: log.meta?.foodName,
+              });
+            }
+          }
+        });
+
+        // Convert to array and sort by date (newest first)
+        const cheatMealsArray: CheatMealEntry[] = Object.entries(mealsByDate)
+          .map(([date, meals]) => ({ date, meals }))
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        setCheatMeals(cheatMealsArray);
+      } catch (e) {
+        console.error("Failed to fetch cheat meals", e);
+      } finally {
+        setCheatMealsLoading(false);
+      }
+    };
+
+    fetchCheatMeals();
+  }, [goalRefreshTrigger]);
 
   // Removed leaderboard fetching - using Goal Chart instead
 
@@ -470,7 +692,7 @@ export function HomePage() {
 
   // Fetch habit data from API and calculate daily goal progress
   useEffect(() => {
-    const userId = "783482642";
+    const userId = HARD_CODED_USER_ID;
 
     if (!activeGoal) return;
 
@@ -570,7 +792,7 @@ export function HomePage() {
     };
 
     fetchHabitData();
-  }, [activeGoal]);
+  }, [activeGoal, goalRefreshTrigger]);
 
   // Combine historical and projected data for chart
   const combinedGoalChartData = useMemo(() => {
@@ -1610,18 +1832,13 @@ export function HomePage() {
 
   const sendHabitAssistMessage = useCallback(
     async (message: string) => {
-      const userId =
-        profile.userId ??
-        profile.mobile ??
-        routeFormData.userId ??
-        routeFormData.mobile ??
-        "783482642";
+      const userId = HARD_CODED_USER_ID;
       try {
         const body = new URLSearchParams();
         body.append("userId", userId);
         body.append("message", message);
         const response = await fetch(
-          "http://192.168.237.53:8080/api/habits/ai-assist",
+          "/api/habits/ai-assist",
           {
             method: "POST",
             headers: {
@@ -1707,6 +1924,8 @@ export function HomePage() {
           setMessages((prev) => [...prev, coachMsg]);
           speakText(reply);
         }
+        // Refresh goal section after chat message
+        setGoalRefreshTrigger((prev) => prev + 1);
       })
       .finally(() => setHabitApiLoading(false));
   };
@@ -1741,13 +1960,13 @@ export function HomePage() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-4 text-sm font-medium text-gray-700">
-            <div
-              className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => navigate("/rewards")}
-            >
-              <Zap className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-              <span>{xp} XP</span>
+          <div className="flex items-center gap-2">
+            <div className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center overflow-hidden border border-emerald-200">
+              <img
+                src={ackoLogo}
+                alt="ACKO logo"
+                className="w-9 h-9 object-contain"
+              />
             </div>
           </div>
         </div>
@@ -1763,11 +1982,7 @@ export function HomePage() {
         {/* Avatar Section - Fixed Height */}
         <div className="home-avatar-banner flex-shrink-0 relative z-10">
           <AvatarScene
-            textToSpeak={
-              messages[messages.length - 1].sender === "coach"
-                ? messages[messages.length - 1].text
-                : ""
-            }
+            textToSpeak={latestCoachText}
             voiceType={gender as VoiceType}
             isFullScreen={false}
           />
@@ -1865,12 +2080,12 @@ export function HomePage() {
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-2 h-2 rounded-full bg-purple-500"></div>
                       <p className="text-xs text-purple-700 font-semibold uppercase tracking-wide">
-                        Days Remaining
+                        Weeks Remaining
                       </p>
                     </div>
                     <p className="text-3xl font-bold text-purple-600">
                       {goalChartData.daysRemaining > 0
-                        ? goalChartData.daysRemaining
+                        ? Math.ceil(goalChartData.daysRemaining / 7)
                         : "—"}
                     </p>
                     {goalChartData.daysRemaining > 0 && (
@@ -1881,191 +2096,272 @@ export function HomePage() {
                   </div>
                 </div>
 
-                {/* Chart */}
+                {/* Section 1: Today's Intake */}
                 <div className="bg-white rounded-3xl p-6 border border-gray-200 shadow-sm">
-                  <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
-                      <Target className="w-5 h-5 text-white" />
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
+                      <Utensils className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-gray-900">
-                        {activeGoal || "Your Goal"}
+                      <h2 className="text-lg font-bold text-gray-900">
+                        Today's Intake
                       </h2>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        Track your journey to success
+                        Daily target progress
                       </p>
                     </div>
                   </div>
+                  {todayIntakeLoading ? (
+                    <div className="h-32 flex items-center justify-center">
+                      <div className="w-8 h-8 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin"></div>
+                    </div>
+                  ) : (
+                    <div className="space-y-5">
+                      {/* Calories */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Utensils className="w-4 h-4 text-orange-600" />
+                            <span className="text-sm font-medium text-gray-700">
+                              Calories
+                            </span>
+                          </div>
+                          <span className="text-sm font-bold text-gray-900">
+                            {todayIntake.calories.achieved} / {todayIntake.calories.target} kcal
+                          </span>
+                        </div>
+                        <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-orange-500 to-orange-600 rounded-full transition-all duration-500"
+                            style={{
+                              width: `${Math.min(100, (todayIntake.calories.achieved / todayIntake.calories.target) * 100)}%`,
+                            }}
+                          ></div>
+                        </div>
+                        <p className="text-xs text-gray-500 text-right">
+                          {((todayIntake.calories.achieved / todayIntake.calories.target) * 100).toFixed(1)}% of daily target
+                        </p>
+                      </div>
 
-                  {goalChartLoading ? (
-                    <div className="h-80 flex flex-col items-center justify-center py-12">
-                      <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4"></div>
-                      <p className="text-sm text-gray-500 font-medium">
-                        Loading chart data...
+                      {/* Water */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Droplet className="w-4 h-4 text-blue-600" />
+                            <span className="text-sm font-medium text-gray-700">
+                              Water
+                            </span>
+                          </div>
+                          <span className="text-sm font-bold text-gray-900">
+                            {todayIntake.water.achieved} / {todayIntake.water.target} ml
+                          </span>
+                        </div>
+                        <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-500"
+                            style={{
+                              width: `${Math.min(100, (todayIntake.water.achieved / todayIntake.water.target) * 100)}%`,
+                            }}
+                          ></div>
+                        </div>
+                        <p className="text-xs text-gray-500 text-right">
+                          {((todayIntake.water.achieved / todayIntake.water.target) * 100).toFixed(1)}% of daily target
+                        </p>
+                      </div>
+
+                      {/* Steps */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Footprints className="w-4 h-4 text-emerald-600" />
+                            <span className="text-sm font-medium text-gray-700">
+                              Steps
+                            </span>
+                          </div>
+                          <span className="text-sm font-bold text-gray-900">
+                            {todayIntake.steps.achieved.toLocaleString()} / {todayIntake.steps.target.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-500"
+                            style={{
+                              width: `${Math.min(100, (todayIntake.steps.achieved / todayIntake.steps.target) * 100)}%`,
+                            }}
+                          ></div>
+                        </div>
+                        <p className="text-xs text-gray-500 text-right">
+                          {((todayIntake.steps.achieved / todayIntake.steps.target) * 100).toFixed(1)}% of daily target
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 2: Cheat Meals / Missed Meals */}
+                <div className="bg-white rounded-3xl p-6 border border-gray-200 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-md">
+                      <Utensils className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-gray-900">
+                        Cheat Meals you took
+                      </h2>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Impact on your goal timeline
                       </p>
                     </div>
-                  ) : combinedGoalChartData.length === 0 ? (
-                    <div className="h-80 flex flex-col items-center justify-center py-12">
-                      <Target className="w-16 h-16 text-gray-300 mb-4" />
-                      <p className="text-sm text-gray-500 font-medium text-center px-4">
-                        No data available. Start logging your habits to see
-                        progress!
+                  </div>
+                  {cheatMealsLoading ? (
+                    <div className="h-48 flex items-center justify-center">
+                      <div className="w-8 h-8 border-4 border-red-200 border-t-red-600 rounded-full animate-spin"></div>
+                    </div>
+                  ) : cheatMeals.length === 0 ? (
+                    <div className="h-48 flex flex-col items-center justify-center text-center px-4">
+                      <Utensils className="w-12 h-12 text-gray-300 mb-3" />
+                      <p className="text-sm text-gray-500 font-medium">
+                        No cheat meals or missed meals recorded
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Keep up the great work!
                       </p>
                     </div>
                   ) : (
-                    <div className="px-2">
-                      <ResponsiveContainer width="100%" height={320}>
-                        <LineChart data={combinedGoalChartData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis
-                            dataKey="day"
-                            label={{
-                              value: "Days",
-                              position: "insideBottom",
-                              offset: -5,
-                            }}
-                            stroke="#6b7280"
-                          />
-                          <YAxis
-                            label={{
-                              value: "Goal Progress (%)",
-                              angle: -90,
-                              position: "insideLeft",
-                            }}
-                            domain={[0, 100]}
-                            stroke="#6b7280"
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "white",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "12px",
-                              padding: "12px",
-                              boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                            }}
-                            formatter={(value: any, name: string) => {
-                              if (value === null || value === undefined)
-                                return null;
-                              const numValue =
-                                typeof value === "number" ? value : Number(value);
-                              if (isNaN(numValue)) return null;
-                              return [`${numValue.toFixed(1)}%`, name];
-                            }}
-                          />
-                          <Legend
-                            wrapperStyle={{ paddingTop: "20px" }}
-                            iconType="line"
-                          />
-                          <ReferenceLine
-                            y={100}
-                            stroke="#a855f7"
-                            strokeDasharray="3 3"
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="actual"
-                            stroke="#10b981"
-                            strokeWidth={3}
-                            dot={{ fill: "#10b981", r: 4, strokeWidth: 2, stroke: "#fff" }}
-                            activeDot={{ r: 6 }}
-                            name="Actual Progress"
-                            connectNulls={false}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="projected"
-                            stroke="#a855f7"
-                            strokeWidth={2.5}
-                            strokeDasharray="6 4"
-                            dot={{ fill: "#a855f7", r: 3, strokeWidth: 2, stroke: "#fff" }}
-                            activeDot={{ r: 5 }}
-                            name="Projected Progress"
-                            connectNulls={false}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
+                    <div className="max-h-64 overflow-y-auto space-y-4 pr-2">
+                      {cheatMeals.map((entry, idx) => {
+                        const date = new Date(entry.date);
+                        const formattedDate = date.toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        });
+                        return (
+                          <div
+                            key={idx}
+                            className="bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl p-4 border border-red-200"
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <p className="text-sm font-bold text-red-700">
+                                {formattedDate}
+                              </p>
+                              <span className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded-full">
+                                {entry.meals.length} meal{entry.meals.length !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+                            <div className="space-y-2">
+                              {entry.meals.map((meal, mealIdx) => (
+                                <div
+                                  key={mealIdx}
+                                  className="bg-white/60 rounded-xl p-3 border border-red-200/50"
+                                >
+                                  <div className="flex items-start justify-between mb-1">
+                                    <p className="text-sm font-semibold text-gray-800">
+                                      {meal.foodName || meal.mealName || "cheat meal"}
+                                    </p>
+                                    {meal.calories && (
+                                      <span className="text-xs font-medium text-red-600">
+                                        {meal.calories} kcal
+                                      </span>
+                                    )}
+                                  </div>
+                                  {meal.healthNote && (
+                                    <p className="text-xs text-gray-600 mt-1">
+                                      {meal.healthNote}
+                                    </p>
+                                  )}
+                                  {/* Display food items from metadata */}
+                                  {meal.food && Array.isArray(meal.food) && meal.food.length > 0 && (
+                                    <div className="mt-2 pt-2 border-t border-red-200/50">
+                                      <p className="text-xs font-medium text-gray-700 mb-1">
+                                        Food Items:
+                                      </p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {meal.food.map((foodItem, foodIdx) => (
+                                          <span
+                                            key={foodIdx}
+                                            className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full"
+                                          >
+                                            {foodItem}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {/* Fallback to items array if food is not available */}
+                                  {(!meal.food || (Array.isArray(meal.food) && meal.food.length === 0)) && meal.items && meal.items.length > 0 && (
+                                    <div className="mt-2 pt-2 border-t border-red-200/50">
+                                      <p className="text-xs font-medium text-gray-700 mb-1">
+                                        Items:
+                                      </p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {meal.items.map((item, itemIdx) => (
+                                          <span
+                                            key={itemIdx}
+                                            className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full"
+                                          >
+                                            {item.name}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
-
-                  {/* Info Box */}
-                  <div className="mt-6 p-5 bg-gradient-to-br from-purple-50 via-purple-50/50 to-emerald-50/30 rounded-2xl border border-purple-200/50 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md flex-shrink-0">
-                        <TrendingUp className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-bold text-purple-900 mb-2 text-sm">
-                          How it works
-                        </p>
-                        <p className="text-xs text-purple-800 leading-relaxed mb-3">
-                          The chart shows your progress toward your goal. The
-                          solid green line represents actual progress based on
-                          your habit data (each day contributes up to 5%),
-                          while the dashed purple line projects future progress
-                          based on your current trend.
-                        </p>
-                        {goalChartData.daysRemaining > 0 && (
-                          <div className="bg-white/60 rounded-xl p-3 border border-purple-200/50">
-                            <p className="font-semibold text-purple-900 text-xs">
-                              🎯 If you continue at this rate, you'll reach your
-                              goal in{" "}
-                              <span className="text-purple-600">
-                                {goalChartData.daysRemaining} day
-                                {goalChartData.daysRemaining !== 1 ? "s" : ""}
-                              </span>
-                              .
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
                 </div>
+
+                
               </div>
             )}
 
             {/* Explore Tab replaced Map Tab */}
             {activeTab === "explore" && (
-              <div className="flex-1 max-w-2xl mx-auto space-y-6 overflow-y-auto">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="flex-1 max-w-2xl mx-auto space-y-6 overflow-y-auto px-4 py-5">
+                <div className="grid grid-cols-2 gap-4 justify-center">
                   <div
-                    className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
+                    className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
                     onClick={() => navigate("/recipes")}
                   >
                     <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center text-orange-600">
                       <Utensils className="w-7 h-7" />
                     </div>
                     <span className="font-semibold text-gray-700 text-sm">
-                      Recipes
+                      Curated Recipes
                     </span>
                   </div>
 
                   <div
-                    className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
+                    className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
                     onClick={() => navigate("/workouts")}
                   >
                     <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
                       <Dumbbell className="w-7 h-7" />
                     </div>
                     <span className="font-semibold text-gray-700 text-sm">
-                      Workouts
+                      Personalized Workout Plans
                     </span>
                   </div>
 
                   <div
-                    className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
+                    className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
                     onClick={() => navigate("/tracker")}
                   >
                     <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center text-purple-600">
                       <Camera className="w-7 h-7" />
                     </div>
                     <span className="font-semibold text-gray-700 text-sm">
-                      Photo Track
+                      Snap Your Meal
                     </span>
                   </div>
 
                   <div
-                    className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
+                    className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
                     onClick={() => navigate("/habits")}
                   >
                     <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
@@ -2076,28 +2372,8 @@ export function HomePage() {
                     </span>
                   </div>
 
-                  <div
-                    className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
-                    onClick={() => navigate("/devices")}
-                  >
-                    <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
-                      <Zap className="w-7 h-7" />
-                    </div>
-                    <span className="font-semibold text-gray-700 text-sm">
-                      Wearable Sync
-                    </span>
-                  </div>
                 </div>
 
-                <div className="bg-gradient-to-r from-purple-600 to-emerald-600 rounded-2xl p-6 text-white shadow-lg">
-                  <h3 className="font-bold text-lg mb-2">Weekly Challenge</h3>
-                  <p className="opacity-90 text-sm mb-4">
-                    Complete 3 workouts this week to unlock the "Iron Will"
-                    badge.
-                  </p>
-                  <Progress value={33} className="h-2 bg-white/30" />
-                  <p className="text-xs mt-2 font-medium">1/3 Completed</p>
-                </div>
               </div>
             )}
 
@@ -2130,7 +2406,7 @@ export function HomePage() {
                     <div className="flex justify-start">
                       <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-500">
                         <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                        {coachName} is typing...
+                        thinking...
                       </div>
                     </div>
                   )}

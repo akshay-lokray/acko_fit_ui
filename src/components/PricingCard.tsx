@@ -7,12 +7,14 @@ interface PricingCardProps {
   finalPremium: number;
   mockXp: number;
   setMockXp: (value: number) => void;
+  basePrice?: number;
 }
 
 const PricingCard: React.FC<PricingCardProps> = ({
   finalPremium,
   mockXp,
   setMockXp,
+  basePrice = 499,
 }) => {
   const navigate = useNavigate();
 
@@ -33,7 +35,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
             <span className="text-5xl font-bold bg-gradient-to-r from-purple-700 to-emerald-600 bg-clip-text text-transparent transition-all duration-300">
               ₹{finalPremium}
             </span>
-            <span className="text-lg text-gray-400 line-through">₹499</span>
+            <span className="text-lg text-gray-400 line-through">₹{basePrice}</span>
           </div>
           <p className="text-sm font-medium text-emerald-600">Based on your XP in the next month!</p>
         </div>
