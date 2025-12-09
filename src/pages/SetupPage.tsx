@@ -1700,18 +1700,15 @@ export function SetupPage() {
     }
   }, [contextState, checkForSelectionOptions]);
 
-  // Auto-scroll to show latest message near the top
+  // Auto-scroll to bottom when new message is added
   useEffect(() => {
     if (chatContainerRef.current && messagesEndRef.current) {
       // Small delay to ensure DOM is updated
       setTimeout(() => {
         if (chatContainerRef.current && messagesEndRef.current) {
-          const scrollOffset = 20; // Space from top in pixels
-          const elementTop = messagesEndRef.current.offsetTop;
-
-          // Scroll to show the latest message near the top with some offset
+          // Scroll to the bottom to show the latest message
           chatContainerRef.current.scrollTo({
-            top: elementTop - scrollOffset,
+            top: chatContainerRef.current.scrollHeight,
             behavior: "smooth",
           });
         }
@@ -1776,9 +1773,9 @@ export function SetupPage() {
   };
 
   return (
-    <div className="setup-page-root min-h-screen bg-white font-sans flex flex-col">
+    <div className="setup-page-root h-screen bg-white font-sans flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="bg-white border-b border-gray-100 p-4 sticky top-0 z-50 shadow-sm">
+      <header className="bg-white border-b border-gray-100 p-4 flex-shrink-0 z-50 shadow-sm">
         <div className="max-w-2xl mx-auto">
           <h1 className="text-xl font-bold text-gray-900">
             Setup your profile with {coachName}
@@ -1787,142 +1784,144 @@ export function SetupPage() {
         </div>
       </header>
 
-      {/* Chat Messages */}
-      <main className="setup-chat-area p-4 bg-gray-50/50">
+      {/* Chat Messages - Takes available space */}
+      <main className="flex-1 min-h-0 overflow-hidden flex flex-col bg-gray-50/50">
         <div
           ref={chatContainerRef}
-          className="max-w-2xl mx-auto space-y-4 overflow-y-auto"
-          style={{ maxHeight: "calc(100vh - 300px)", paddingTop: "20px" }}
+          className="flex-1 overflow-y-auto p-4 pb-24"
         >
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${
-                msg.sender === "user" ? "justify-end" : "justify-start"
-              }`}
-            >
+          <div className="max-w-2xl mx-auto space-y-4">
+            {messages.map((msg) => (
               <div
-                className={`max-w-[80%] rounded-2xl p-4 text-sm ${
-                  msg.sender === "user"
-                    ? "bg-gray-900 text-white rounded-br-none"
-                    : "bg-white border border-gray-100 shadow-sm text-gray-800 rounded-bl-none"
+                key={msg.id}
+                className={`flex ${
+                  msg.sender === "user" ? "justify-end" : "justify-start"
                 }`}
               >
-                {msg.text}
+                <div
+                  className={`max-w-[80%] rounded-2xl p-4 text-sm ${
+                    msg.sender === "user"
+                      ? "bg-gray-900 text-white rounded-br-none"
+                      : "bg-white border border-gray-100 shadow-sm text-gray-800 rounded-bl-none"
+                  }`}
+                >
+                  {msg.text}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
 
-          {/* Loading indicator when waiting for response (including initial) */}
-          {(isWaitingForResponse || isWaitingForInitialResponse) && (
-            <div className="flex justify-start">
-              <div className="max-w-[80%] rounded-2xl p-4 bg-white border border-gray-100 shadow-sm rounded-bl-none">
-                <div className="flex items-center gap-1">
-                  <div className="flex gap-1">
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "0ms" }}
-                    ></div>
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "150ms" }}
-                    ></div>
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "300ms" }}
-                    ></div>
+            {/* Loading indicator when waiting for response (including initial) */}
+            {(isWaitingForResponse || isWaitingForInitialResponse) && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] rounded-2xl p-4 bg-white border border-gray-100 shadow-sm rounded-bl-none">
+                  <div className="flex items-center gap-1">
+                    <div className="flex gap-1">
+                      <div
+                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                        style={{ animationDelay: "0ms" }}
+                      ></div>
+                      <div
+                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                        style={{ animationDelay: "150ms" }}
+                      ></div>
+                      <div
+                        className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                        style={{ animationDelay: "300ms" }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Listening Indicator - Explicit Listening */}
-          {isListening && (
-            <div className="flex justify-center py-4">
-              <div
-                className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                  isMale ? "bg-emerald-500" : "bg-purple-500"
-                } animate-pulse shadow-lg`}
-              >
-                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center animate-ping ${
-                      isMale ? "bg-emerald-100" : "bg-purple-100"
-                    }`}
-                  >
-                    <Zap className={`w-6 h-6 ${themeColor}`} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Selection Options UI - Only show when keyboard input is active */}
-          {selectionConfig && showTextInput && (
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-              <p className="text-sm font-medium text-gray-700 mb-3">
-                {selectionConfig.multiSelect
-                  ? "Select one or more options:"
-                  : "Select an option:"}
-              </p>
-              <div className="space-y-2 mb-4">
-                {selectionConfig.possibleValues.map((option) => {
-                  const isSelected = selectedOptions.includes(option);
-                  return (
-                    <label
-                      key={option}
-                      className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        isSelected
-                          ? isMale
-                            ? "border-emerald-500 bg-emerald-50"
-                            : "border-purple-500 bg-purple-50"
-                          : "border-gray-200 hover:border-gray-300 bg-white"
+            {/* Listening Indicator - Explicit Listening */}
+            {isListening && (
+              <div className="flex justify-center py-4">
+                <div
+                  className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                    isMale ? "bg-emerald-500" : "bg-purple-500"
+                  } animate-pulse shadow-lg`}
+                >
+                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center animate-ping ${
+                        isMale ? "bg-emerald-100" : "bg-purple-100"
                       }`}
                     >
-                      <input
-                        type={
-                          selectionConfig.multiSelect ? "checkbox" : "radio"
-                        }
-                        checked={isSelected}
-                        onChange={() => handleOptionToggle(option)}
-                        className={`w-5 h-5 ${
-                          selectionConfig.multiSelect
-                            ? "rounded"
-                            : "rounded-full"
-                        } ${
-                          isMale
-                            ? "text-emerald-600 focus:ring-emerald-500"
-                            : "text-purple-600 focus:ring-purple-500"
-                        } cursor-pointer`}
-                      />
-                      <span
-                        className={`flex-1 text-sm ${
-                          isSelected ? "font-medium" : "font-normal"
-                        } text-gray-800`}
-                      >
-                        {option}
-                      </span>
-                    </label>
-                  );
-                })}
+                      <Zap className={`w-6 h-6 ${themeColor}`} />
+                    </div>
+                  </div>
+                </div>
               </div>
-              <Button
-                onClick={handleSubmitSelection}
-                disabled={selectedOptions.length === 0}
-                className={`w-full ${buttonBg} disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                Submit
-              </Button>
-            </div>
-          )}
+            )}
 
-          {/* Invisible element to scroll to */}
-          <div ref={messagesEndRef} />
+            {/* Selection Options UI - Only show when keyboard input is active */}
+            {selectionConfig && showTextInput && (
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                <p className="text-sm font-medium text-gray-700 mb-3">
+                  {selectionConfig.multiSelect
+                    ? "Select one or more options:"
+                    : "Select an option:"}
+                </p>
+                <div className="space-y-2 mb-4">
+                  {selectionConfig.possibleValues.map((option) => {
+                    const isSelected = selectedOptions.includes(option);
+                    return (
+                      <label
+                        key={option}
+                        className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                          isSelected
+                            ? isMale
+                              ? "border-emerald-500 bg-emerald-50"
+                              : "border-purple-500 bg-purple-50"
+                            : "border-gray-200 hover:border-gray-300 bg-white"
+                        }`}
+                      >
+                        <input
+                          type={
+                            selectionConfig.multiSelect ? "checkbox" : "radio"
+                          }
+                          checked={isSelected}
+                          onChange={() => handleOptionToggle(option)}
+                          className={`w-5 h-5 ${
+                            selectionConfig.multiSelect
+                              ? "rounded"
+                              : "rounded-full"
+                          } ${
+                            isMale
+                              ? "text-emerald-600 focus:ring-emerald-500"
+                              : "text-purple-600 focus:ring-purple-500"
+                          } cursor-pointer`}
+                        />
+                        <span
+                          className={`flex-1 text-sm ${
+                            isSelected ? "font-medium" : "font-normal"
+                          } text-gray-800`}
+                        >
+                          {option}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <Button
+                  onClick={handleSubmitSelection}
+                  disabled={selectedOptions.length === 0}
+                  className={`w-full ${buttonBg} disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  Submit
+                </Button>
+              </div>
+            )}
+
+            {/* Invisible element to scroll to */}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
       </main>
 
-      <div className="setup-page-avatar-zone">
+      {/* Avatar Zone - Fixed at bottom */}
+      <div className="setup-page-avatar-zone flex-shrink-0">
         <div className="setup-avatar-panel">
           <div className="setup-avatar-inner">
             <AvatarScene
@@ -1939,8 +1938,8 @@ export function SetupPage() {
         </div>
       </div>
 
-      {/* Input Area */}
-      <div className="bg-white border-t border-gray-100 p-4 sticky bottom-0 z-50">
+      {/* Input Area - Fixed at bottom */}
+      <div className="bg-white border-t border-gray-100 p-4 flex-shrink-0 z-50">
         <div className="max-w-2xl mx-auto">
           {/* Text Input (shown when user clicks keyboard icon) */}
           {showTextInput && (
