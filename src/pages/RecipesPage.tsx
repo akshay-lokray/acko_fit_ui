@@ -949,7 +949,9 @@ export function RecipesPage() {
           >
             <ArrowLeft className="w-6 h-6 text-black" />
           </button>
-          <h1 className="text-xl font-bold text-black flex-1">Recipes</h1>
+          <h1 className="text-xl font-bold text-black flex-1">
+            Curated Recipes
+          </h1>
           <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <Bookmark className="w-6 h-6 text-black" />
           </button>

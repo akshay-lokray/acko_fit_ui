@@ -67,6 +67,12 @@ export function SetupPage() {
   const coachName = gender === "male" ? "Dhoni" : "Disha";
   const isMale = gender === "male";
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem("visitedSetup", "true");
+    }
+  }, []);
+
   // State
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");

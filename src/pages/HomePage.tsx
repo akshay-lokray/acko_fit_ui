@@ -10,12 +10,10 @@ import {
   Utensils,
   Dumbbell,
   Camera,
-  Shield,
   Target,
   TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { useUserProfileStore } from "@/store/userProfileStore";
 import AvatarScene from "@/components/AvatarScene";
@@ -32,6 +30,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import "@/pages/HomePage.css";
+import ackoLogo from "@/assets/acko_logo.png";
 
 // Type definitions for Speech Recognition API
 interface SpeechRecognition extends EventTarget {
@@ -81,21 +80,6 @@ interface Message {
   text: string;
 }
 
-interface Goal {
-  id: string;
-  title: string;
-  detail: string;
-  progress: number;
-  xp: number;
-}
-
-interface Quest {
-  id: string;
-  title: string;
-  xp: number;
-  completed: boolean;
-  type: "daily" | "weekly";
-}
 
 // Goal Chart types
 interface ChartDataPoint {
@@ -249,18 +233,6 @@ function calculateGoalProgress(
 const HARD_CODED_USER_ID = "9795784244";
 
 // --- Mock Data ---
-const DAILY_QUESTS: Quest[] = [
-  { id: "1", title: "Log Meal", xp: 50, completed: false, type: "daily" },
-  {
-    id: "2",
-    title: "Walk 5,000 Steps",
-    xp: 100,
-    completed: false,
-    type: "daily",
-  },
-  { id: "3", title: "Drink 2L Water", xp: 50, completed: true, type: "daily" },
-];
-
 export function HomePage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -280,16 +252,57 @@ export function HomePage() {
   const [activeTab, setActiveTab] = useState<"goals" | "explore" | "Chat">(
     "goals"
   );
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      sender: "coach",
-      text: `Welcome back, ${name}. Ready to conquer today's mission?`,
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isHabitApiLoading, setHabitApiLoading] = useState(false);
   const xp = profile.xp ?? routeFormData.xp ?? 350;
+  const setupMessageText =
+    "We have created a personalized plan to help you reach your goals. Your fitness journey is no longer boring—head to Explore for curated meals and workouts, log habits, log meals in chat for calorie tracking, and unlock even more support.";
+  const defaultWelcomeText = `We have created a personalized plan to help you reach your goals. Your fitness journey is no longer boring—head to Explore for curated meals and workouts, log habits, log meals in chat for calorie tracking, and unlock even more support.`;
+  const repeatWelcomeText = `Great to see you again, ${name}. Let's keep the momentum going.`;
+
+  useEffect(() => {
+    if (messages.length > 0) return;
+    const messageId = Date.now().toString();
+    const todayKey = new Date().toISOString().split("T")[0];
+    let messageText = defaultWelcomeText;
+
+    if (typeof window !== "undefined") {
+      const fromSetup = window.sessionStorage.getItem("visitedSetup") === "true";
+      const setupMessageShown =
+        window.sessionStorage.getItem("setupHomeMessageShown") === "true";
+      const lastDailyGreeting =
+        window.sessionStorage.getItem("homeDailyWelcomeDate") || "";
+
+      if (fromSetup && !setupMessageShown) {
+        messageText = setupMessageText;
+        window.sessionStorage.setItem("setupHomeMessageShown", "true");
+        window.sessionStorage.removeItem("visitedSetup");
+      } else if (lastDailyGreeting !== todayKey) {
+        messageText = defaultWelcomeText;
+        window.sessionStorage.setItem("homeDailyWelcomeDate", todayKey);
+      } else {
+        messageText = repeatWelcomeText;
+      }
+    }
+
+    setMessages([{ id: messageId, sender: "coach", text: messageText }]);
+  }, [
+    defaultWelcomeText,
+    messages.length,
+    repeatWelcomeText,
+    setupMessageText,
+  ]);
+  const latestCoachMessage = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].sender === "coach") {
+        return messages[i];
+      }
+    }
+    return null;
+  }, [messages]);
+  const latestCoachText =
+    latestCoachMessage?.text ?? setupMessageText ?? defaultWelcomeText;
   const [habitStats, setHabitStats] = useState<{
     calorie?: number;
     water?: number;
@@ -334,7 +347,7 @@ export function HomePage() {
       const res = await fetch(
         `/api/users/${encodeURIComponent(phoneNumber)}/xp?delta=${delta}`,
         {
-          method: "POST",
+        method: "POST",
         }
       );
       if (!res.ok) return;
@@ -987,8 +1000,8 @@ export function HomePage() {
     });
 
     socket.on("message", (data) => {
-      let text = "";
-      try {
+        let text = "";
+        try {
         if (typeof data === "string") {
           const parsed = JSON.parse(data);
           text = parsed.text ?? String(data);
@@ -997,16 +1010,16 @@ export function HomePage() {
         } else {
           text = String(data);
         }
-      } catch {
+        } catch {
         text = String(data);
-      }
-      const coachMsg: Message = {
-        id: Date.now().toString(),
-        sender: "coach",
-        text,
-      };
-      setMessages((prev) => [...prev, coachMsg]);
-      setIsListening(false);
+        }
+        const coachMsg: Message = {
+          id: Date.now().toString(),
+          sender: "coach",
+          text,
+        };
+        setMessages((prev) => [...prev, coachMsg]);
+        setIsListening(false);
     });
 
     // Listen for 'response' event from server
@@ -1699,12 +1712,12 @@ export function HomePage() {
     sendHabitAssistMessage(textToSend)
       .then((reply) => {
         if (reply) {
-          const coachMsg: Message = {
+        const coachMsg: Message = {
             id: (Date.now() + 2).toString(),
-            sender: "coach",
+          sender: "coach",
             text: reply,
-          };
-          setMessages((prev) => [...prev, coachMsg]);
+        };
+        setMessages((prev) => [...prev, coachMsg]);
           speakText(reply);
         }
       })
@@ -1741,20 +1754,13 @@ export function HomePage() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-4 text-sm font-medium text-gray-700">
-            <div
-              className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => navigate("/rewards")}
-            >
-              <Zap className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-              <span>{xp} XP</span>
-            </div>
-            <div
-              className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => navigate("/rankings")}
-            >
-              <Shield className="w-4 h-4 text-blue-500" />
-              <span>Warrior</span>
+          <div className="flex items-center gap-2">
+            <div className="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center overflow-hidden border border-emerald-200">
+              <img
+                src={ackoLogo}
+                alt="ACKO logo"
+                className="w-9 h-9 object-contain"
+              />
             </div>
           </div>
         </div>
@@ -1770,15 +1776,11 @@ export function HomePage() {
         {/* Avatar Section - Fixed Height */}
         <div className="home-avatar-banner flex-shrink-0 relative z-10">
           <AvatarScene
-            textToSpeak={
-              messages[messages.length - 1].sender === "coach"
-                ? messages[messages.length - 1].text
-                : ""
-            }
+            textToSpeak={latestCoachText}
             voiceType={gender as VoiceType}
             isFullScreen={false}
           />
-        </div>
+              </div>
 
         {/* 2. Interface Tabs (Chat / Explore / Chat) - Fills remaining space and scrolls */}
         <div className="flex-1 bg-white rounded-t-[2rem] relative z-20 flex flex-col min-h-0 overflow-hidden">
@@ -1842,8 +1844,8 @@ export function HomePage() {
                         >
                           {goal}
                         </button>
-                      ))}
-                    </div>
+                  ))}
+                </div>
                   </div>
                 )}
 
@@ -1866,15 +1868,15 @@ export function HomePage() {
                           width: `${Math.min(100, goalChartData.currentProgress)}%`,
                         }}
                       ></div>
-                    </div>
-                  </div>
+                        </div>
+                        </div>
                   <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-3xl p-5 border border-purple-200 shadow-sm">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-2 h-2 rounded-full bg-purple-500"></div>
                       <p className="text-xs text-purple-700 font-semibold uppercase tracking-wide">
                         Days Remaining
                       </p>
-                    </div>
+                      </div>
                     <p className="text-3xl font-bold text-purple-600">
                       {goalChartData.daysRemaining > 0
                         ? goalChartData.daysRemaining
@@ -1884,8 +1886,8 @@ export function HomePage() {
                       <p className="text-xs text-purple-600 mt-2">
                         Until goal reached
                       </p>
-                    )}
-                  </div>
+                      )}
+                    </div>
                 </div>
 
                 {/* Chart */}
@@ -2033,46 +2035,46 @@ export function HomePage() {
 
             {/* Explore Tab replaced Map Tab */}
             {activeTab === "explore" && (
-              <div className="flex-1 max-w-2xl mx-auto space-y-6 overflow-y-auto">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="flex-1 max-w-2xl mx-auto space-y-6 overflow-y-auto px-4 py-5">
+                <div className="grid grid-cols-2 gap-4 justify-center">
                   <div
-                    className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
+                    className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
                     onClick={() => navigate("/recipes")}
                   >
                     <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center text-orange-600">
                       <Utensils className="w-7 h-7" />
                     </div>
                     <span className="font-semibold text-gray-700 text-sm">
-                      Recipes
+                      Curated Recipes
                     </span>
                   </div>
 
                   <div
-                    className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
+                    className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
                     onClick={() => navigate("/workouts")}
                   >
                     <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
                       <Dumbbell className="w-7 h-7" />
                     </div>
                     <span className="font-semibold text-gray-700 text-sm">
-                      Workouts
+                      Curated Workout Plans
                     </span>
                   </div>
 
                   <div
-                    className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
+                    className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
                     onClick={() => navigate("/tracker")}
                   >
                     <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center text-purple-600">
                       <Camera className="w-7 h-7" />
                     </div>
                     <span className="font-semibold text-gray-700 text-sm">
-                      Photo Track
+                      Snap Your Meal
                     </span>
                   </div>
 
                   <div
-                    className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
+                    className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
                     onClick={() => navigate("/habits")}
                   >
                     <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
@@ -2083,28 +2085,8 @@ export function HomePage() {
                     </span>
                   </div>
 
-                  <div
-                    className="p-5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
-                    onClick={() => navigate("/devices")}
-                  >
-                    <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
-                      <Zap className="w-7 h-7" />
-                    </div>
-                    <span className="font-semibold text-gray-700 text-sm">
-                      Wearable Sync
-                    </span>
-                  </div>
                 </div>
 
-                <div className="bg-gradient-to-r from-purple-600 to-emerald-600 rounded-2xl p-6 text-white shadow-lg">
-                  <h3 className="font-bold text-lg mb-2">Weekly Challenge</h3>
-                  <p className="opacity-90 text-sm mb-4">
-                    Complete 3 workouts this week to unlock the "Iron Will"
-                    badge.
-                  </p>
-                  <Progress value={33} className="h-2 bg-white/30" />
-                  <p className="text-xs mt-2 font-medium">1/3 Completed</p>
-                </div>
               </div>
             )}
 
@@ -2130,18 +2112,18 @@ export function HomePage() {
                         }`}
                       >
                         {msg.text}
-                      </div>
+                </div>
                     </div>
                   ))}
                   {isHabitApiLoading && (
                     <div className="flex justify-start">
                       <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-500">
                         <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                        {coachName} is typing...
-                      </div>
+                        thinking...
+                  </div>
                     </div>
                   )}
-                </div>
+                  </div>
 
                 {/* Input Area - Fixed at bottom */}
                 <div className="sticky bottom-0 bg-white border-t border-gray-100 pt-4 pb-4 -mx-4 md:-mx-6 px-4 md:px-6 z-10">
@@ -2196,7 +2178,7 @@ export function HomePage() {
                         }`}
                       />
                     </Button>
-                  </div>
+                    </div>
                 </div>
               </div>
             )}

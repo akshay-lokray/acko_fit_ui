@@ -225,7 +225,7 @@ export function PhotoTrackingPage() {
                 <Button variant="ghost" size="icon" className="absolute left-4" onClick={() => navigate(-1)}>
                     <ArrowLeft className="w-6 h-6" />
                 </Button>
-                <h1 className="text-lg font-bold">Log Meal</h1>
+                <h1 className="text-lg font-bold">Snap Your Meal</h1>
             </div>
 
             {/* Viewfinder */}
@@ -315,7 +315,7 @@ export function PhotoTrackingPage() {
                 <Button variant="ghost" size="icon" onClick={() => setStep("camera")}>
                     <ChevronLeft className="w-6 h-6" />
                 </Button>
-                <h1 className="text-lg font-bold">Log Meal</h1>
+                <h1 className="text-lg font-bold">Snap Your Meal</h1>
                 <div className="w-10" /> {/* Spacer */}
             </div>
 

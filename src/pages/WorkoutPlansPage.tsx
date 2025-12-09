@@ -86,7 +86,7 @@ export function WorkoutPlansPage() {
                     <ArrowLeft className="w-6 h-6" />
                 </Button>
                 <div>
-                    <h1 className="text-2xl font-bold">Workout Plans</h1>
+                    <h1 className="text-2xl font-bold">Curated Workout Plans</h1>
                     <p className="text-sm text-gray-500">Day-wise exercises aligned with your goals.</p>
                 </div>
             </div>
