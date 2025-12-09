@@ -57,20 +57,6 @@ export function CoachIntroPage() {
                     </div>
                 </div>
 
-                {!isClicked && (
-                    <Button
-                        onClick={handleButtonClick}
-                        disabled={!isButtonVisible}
-                        className={`h-14 px-10 text-lg text-white shadow-lg transition-all duration-500 hover:scale-105 hover:shadow-xl rounded-full mt-8 ${buttonBg} ${
-                            showButton 
-                                ? 'opacity-100 pointer-events-auto' 
-                                : 'opacity-0 pointer-events-none'
-                        }`}
-                    >
-                        Start Assessment
-                        <ArrowRight className="ml-3 h-6 w-6" />
-                    </Button>
-                )}
             </div>
 
             {/* Avatar fills the remaining space */}
@@ -81,6 +67,22 @@ export function CoachIntroPage() {
                     isFullScreen={true}
                 />
             </div>
+            {!isClicked && (
+                <div className="absolute left-0 right-0 bottom-6 z-20 flex justify-center">
+                    <Button
+                        onClick={handleButtonClick}
+                        disabled={!isButtonVisible}
+                        className={`h-14 px-10 text-lg text-white shadow-lg transition-all duration-500 hover:scale-105 hover:shadow-xl rounded-full ${buttonBg} ${
+                            showButton
+                                ? 'opacity-100 pointer-events-auto'
+                                : 'opacity-0 pointer-events-none'
+                        }`}
+                    >
+                        Start Assessment
+                        <ArrowRight className="ml-3 h-6 w-6" />
+                    </Button>
+                </div>
+            )}
         </div>
     );
 }

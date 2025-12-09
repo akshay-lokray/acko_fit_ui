@@ -2,11 +2,88 @@ import { useRef, useEffect, useState, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment, Html, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { MaleAvatarModel } from './MaleAvatarModel';
+import { MaleAvatarModel, MaleAnimatedAvatarModel } from './MaleAvatarModel';
 import { FemaleAvatarModel } from './FemaleAvatarModel';
 import SpeechController from './SpeechController';
 import type { VoiceType } from '../types/voice';
 import './AvatarScene.css';
+
+const REALISTIC_VISEME_MAP: Record<
+  string,
+  { morphs: Record<string, number> }
+> = {
+  silence: {
+    morphs: {},
+  },
+  A: {
+    morphs: {
+      jawOpen: 0.35,
+      mouthFunnel: 0.15,
+    },
+  },
+  E: {
+    morphs: {
+      jawOpen: 0.2,
+      mouthSmileLeft: 0.3,
+      mouthSmileRight: 0.3,
+      mouthStretchLeft: 0.2,
+      mouthStretchRight: 0.2,
+    },
+  },
+  I: {
+    morphs: {
+      jawOpen: 0.2,
+      mouthSmileLeft: 0.1,
+      mouthSmileRight: 0.1,
+    },
+  },
+  O: {
+    morphs: {
+      jawOpen: 0.35,
+      mouthFunnel: 0.7,
+    },
+  },
+  U: {
+    morphs: {
+      jawOpen: 0.1,
+      mouthPucker: 0.9,
+      mouthFunnel: 0.1,
+    },
+  },
+  M: {
+    morphs: {
+      jawOpen: 0.05,
+      mouthRollUpper: 0.2,
+      mouthRollLower: 0.2,
+      mouthShrugUpper: 0.2,
+    },
+  },
+  F: {
+    morphs: {
+      jawOpen: 0.15,
+      mouthRollLower: 0.4,
+      mouthLowerDownLeft: 0.2,
+      mouthLowerDownRight: 0.2,
+    },
+  },
+  TH: {
+    morphs: {
+      jawOpen: 0.2,
+      mouthFunnel: 0.3,
+    },
+  },
+  default: {
+    morphs: {
+      jawOpen: 0.05,
+      mouthSmileLeft: 0.05,
+      mouthSmileRight: 0.05,
+    },
+  },
+};
+
+REALISTIC_VISEME_MAP['B'] = REALISTIC_VISEME_MAP['M'];
+REALISTIC_VISEME_MAP['P'] = REALISTIC_VISEME_MAP['M'];
+REALISTIC_VISEME_MAP['V'] = REALISTIC_VISEME_MAP['F'];
 
 interface AvatarSceneProps {
   textToSpeak?: string;
@@ -15,31 +92,6 @@ interface AvatarSceneProps {
   onSpeakEnd?: () => void;
   isFullScreen?: boolean; // true for coach-intro, false for inner pages (200x200 face-only)
 }
-
-// Viseme mapping - maps phonemes to mouth shapes
-const VISEME_MAP: Record<string, number[]> = {
-  // Silence/Closed
-  'silence': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  // A, E, I sounds - open mouth
-  'A': [0.7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  'E': [0.5, 0.3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  'I': [0.3, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  // O, U sounds - rounded mouth
-  'O': [0.4, 0, 0, 0.6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  'U': [0.3, 0, 0, 0.7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  // M, P, B sounds - closed lips
-  'M': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  'P': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  'B': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  // F, V sounds - lower lip bite
-  'F': [0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  'V': [0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  // Th sounds - tongue out
-  'TH': [0.3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  // Default - slight open
-  'default': [0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-};
-
 // Simple phoneme detection from text
 function getPhonemeFromText(text: string, position: number): string {
   if (position >= text.length) return 'silence';
@@ -64,7 +116,15 @@ function getPhonemeFromText(text: string, position: number): string {
 }
 
 // Auto-zoom camera component - different behavior for full screen vs face-only
-function AutoZoomCamera({ target = [0, 2.6, 0], isFullScreen = false }: { target?: [number, number, number]; isFullScreen?: boolean }) {
+function AutoZoomCamera({
+  target = [0, 2.6, 0],
+  isFullScreen = false,
+  overrideDistance,
+}: {
+  target?: [number, number, number];
+  isFullScreen?: boolean;
+  overrideDistance?: number;
+}) {
   const { camera } = useThree();
   const targetRef = useRef(new THREE.Vector3(...target));
   const animationCompletedRef = useRef(false);
@@ -76,8 +136,9 @@ function AutoZoomCamera({ target = [0, 2.6, 0], isFullScreen = false }: { target
   const fullBodyDistance = 2.2; // Closer full body for intro
   const fullBodyY = 1.4; // Camera height for intro
   
-  const startDistance = isFullScreen ? 2.2 : fullBodyDistance; // Intro stays close
-  const targetDistance = isFullScreen ? 2.2 : 3.2; // Intro stays close; inner pages zoom to show full face
+  const effectiveDistance = overrideDistance ?? (isFullScreen ? 2.2 : 3.2);
+  const startDistance = isFullScreen ? effectiveDistance : fullBodyDistance; // Intro stays close
+  const targetDistance = effectiveDistance; // Intro stays close; inner pages zoom to show full face
   const startY = isFullScreen ? 1.4 : fullBodyY;
   const targetY = isFullScreen ? 1.4 : 8.1; // Inner pages face level
   
@@ -277,33 +338,42 @@ function AvatarWithVisemes({
   }, [voiceType]); // Re-find head when voice type changes
 
   useFrame(() => {
-    if (!headRef.current || !isSpeaking) {
-      if (headRef.current?.morphTargetInfluences) {
-        for (let i = 0; i < headRef.current.morphTargetInfluences.length; i++) {
-          headRef.current.morphTargetInfluences[i] *= 0.9; // Fade out
-        }
-      }
+    const head = headRef.current;
+    if (!head || !head.morphTargetDictionary || !head.morphTargetInfluences) {
       return;
     }
 
-    // Calculate phoneme based on audio time
+    const dict = head.morphTargetDictionary;
+    const influences = head.morphTargetInfluences;
+
+    if (!isSpeaking) {
+      Object.keys(dict).forEach((name) => {
+        const idx = dict[name];
+        influences[idx] = THREE.MathUtils.lerp(influences[idx], 0, 0.55);
+      });
+      return;
+    }
+
     const charIndex = Math.floor(audioTime * 6.67);
     const phoneme = getPhonemeFromText(text, charIndex);
-    const viseme = VISEME_MAP[phoneme] || VISEME_MAP['default'];
+    const targetData = REALISTIC_VISEME_MAP[phoneme] || REALISTIC_VISEME_MAP['default'];
+    const targetMorphs = targetData.morphs;
 
-    if (headRef.current?.morphTargetInfluences) {
-      for (let i = 0; i < Math.min(viseme.length, headRef.current.morphTargetInfluences.length); i++) {
-        const target = viseme[i];
-        const current = headRef.current.morphTargetInfluences[i];
-        headRef.current.morphTargetInfluences[i] = current * 0.7 + target * 0.3;
-      }
-    }
+      Object.keys(dict).forEach((name) => {
+        const idx = dict[name];
+        const targetValue = targetMorphs[name] ?? 0;
+        influences[idx] = THREE.MathUtils.lerp(influences[idx], targetValue, 0.35);
+      });
   });
 
   return (
     <group ref={groupRef}>
       {voiceType === 'male' ? (
-        <MaleAvatarModel isFullScreen={isFullScreen} isSpeaking={isSpeaking} />
+        isFullScreen ? (
+          <MaleAnimatedAvatarModel isFullScreen={isFullScreen} isSpeaking={isSpeaking} />
+        ) : (
+          <MaleAvatarModel isFullScreen={isFullScreen} isSpeaking={isSpeaking} />
+        )
       ) : (
         <FemaleAvatarModel isFullScreen={isFullScreen} isSpeaking={isSpeaking} />
       )}
@@ -368,6 +438,11 @@ export default function AvatarScene({
     );
   }
 
+  const isAnimatedMale = voiceType === 'male' && isFullScreen;
+  const cameraDistance = isAnimatedMale ? 5 : undefined;
+  const cameraHeight = isAnimatedMale ? 40.1 : undefined;
+  const targetHeight = isAnimatedMale ? 1.7 : undefined;
+
   return (
     <div className="avatar-scene-container">
       <SpeechController
@@ -386,11 +461,13 @@ export default function AvatarScene({
         onAudioTimeUpdate={setAudioTime}
       />
       
-      <Canvas
-        camera={{ 
-          position: isFullScreen ? [0, 1.6, 2.2] : [0, 2.8, 1.8], 
-          fov: isFullScreen ? 35 : 45 
-        }}
+        <Canvas
+          camera={{
+            position: isFullScreen
+              ? [0, cameraHeight ?? 1.6, cameraDistance ?? 2.2]
+              : [0, 2.8, 1.8],
+            fov: isFullScreen ? 35 : 45,
+          }}
         shadows
         gl={{ antialias: true, alpha: true }}
         onError={(err) => {
@@ -423,26 +500,23 @@ export default function AvatarScene({
           </group>
         </Suspense>
         
-        <AutoZoomCamera 
-          target={isFullScreen ? [0, 1.2, 0] : [0, 8.1, 0]} 
-          isFullScreen={isFullScreen}
-        />
+          <AutoZoomCamera
+            target={isFullScreen ? [0, targetHeight ?? 1.2, 0] : [0, 8.1, 0]}
+            isFullScreen={isFullScreen}
+            overrideDistance={cameraDistance}
+          />
         
-        {/* OrbitControls for coach-intro (full screen) - only horizontal rotation, no zoom */}
+        <Environment preset="sunset" />
         {isFullScreen && (
           <OrbitControls
             enablePan={false}
             enableZoom={false}
             enableRotate={true}
-            minDistance={5.0}
-            maxDistance={5.0}
-            minPolarAngle={Math.PI / 2} // Lock to horizontal rotation only
-            maxPolarAngle={Math.PI / 2} // Lock to horizontal rotation only
-            target={[0, 1.2, 0]}
+            minPolarAngle={Math.PI / 2}
+            maxPolarAngle={Math.PI / 2}
+            target={[0, targetHeight ?? 1.2, 0]}
           />
         )}
-        
-        <Environment preset="sunset" />
       </Canvas>
       
     </div>

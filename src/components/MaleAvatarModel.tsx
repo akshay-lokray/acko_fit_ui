@@ -1,8 +1,8 @@
 import { useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useGLTF } from '@react-three/drei';
+import { useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
-import { MALE_DHONI_AVATAR_URL } from '@/constants/avatarUrls';
+import { MALE_DHONI_ANIM_URL, MALE_DHONI_AVATAR_URL } from '@/constants/avatarUrls';
 
 export function MaleAvatarModel(props: any) {
   try {
@@ -212,6 +212,30 @@ export function MaleAvatarModel(props: any) {
     console.error('Error loading male avatar:', error);
     return null;
   }
+}
+
+export function MaleAnimatedAvatarModel(props: any) {
+  const gltf = useGLTF(MALE_DHONI_ANIM_URL) as any;
+  const { scene, animations } = gltf || {};
+  const { actions } = useAnimations(animations, scene);
+  const actionRef = useRef<THREE.AnimationAction | null>(null);
+
+  useEffect(() => {
+    const action = actions && Object.values(actions)[0];
+    if (action) {
+      actionRef.current = action;
+      action.reset().play();
+    }
+    return () => {
+      actionRef.current?.stop();
+    };
+  }, [actions]);
+
+  if (!scene) {
+    return null;
+  }
+
+  return <primitive object={scene} {...props} dispose={null} />;
 }
 
 useGLTF.preload(MALE_DHONI_AVATAR_URL);

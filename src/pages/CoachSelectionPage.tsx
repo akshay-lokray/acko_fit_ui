@@ -5,7 +5,11 @@ import { ArrowRight, Dumbbell, Zap } from "lucide-react";
 import { useState, useEffect } from "react";
 import AvatarScene from "@/components/AvatarScene";
 import { useGLTF } from "@react-three/drei";
-import { MALE_DHONI_AVATAR_URL, FEMALE_DEFAULT_AVATAR_URL } from "@/constants/avatarUrls";
+import {
+  MALE_DHONI_AVATAR_URL,
+  FEMALE_DEFAULT_AVATAR_URL,
+  MALE_DHONI_ANIM_URL,
+} from "@/constants/avatarUrls";
 
 export function CoachSelectionPage() {
     const navigate = useNavigate();
@@ -13,6 +17,7 @@ export function CoachSelectionPage() {
 
     useEffect(() => {
         useGLTF.preload(MALE_DHONI_AVATAR_URL);
+        useGLTF.preload(MALE_DHONI_ANIM_URL);
         useGLTF.preload(FEMALE_DEFAULT_AVATAR_URL);
     }, []);
 
