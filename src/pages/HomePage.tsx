@@ -1949,9 +1949,8 @@ export function HomePage() {
               {level}
             </div>
             <div>
-              <p className="text-xs text-gray-700 font-semibold">
-                LEVEL {level} NOVICE
-              </p>
+              <p className="text-sm font-semibold text-slate-900">{name}</p>
+            
               <div className="w-32 h-1.5 bg-gray-200 rounded-full mt-1">
                 <div
                   className="h-full rounded-full bg-gray-300"
