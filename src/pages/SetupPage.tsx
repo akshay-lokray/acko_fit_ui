@@ -66,6 +66,7 @@ export function SetupPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isListening, setIsListening] = useState(false);
+  const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [selectionConfig, setSelectionConfig] = useState<{
@@ -723,6 +724,7 @@ export function SetupPage() {
           };
           setMessages((prev) => [...prev, journeyMsg]);
           setShowTextInput(false);
+          setIsWaitingForResponse(false); // Hide loading indicator
 
           // Speak the cleaned response using text-to-speech
           speakTextRef.current?.(cleanedText);
@@ -1028,6 +1030,7 @@ export function SetupPage() {
         };
         setMessages((prev) => [...prev, coachMsg]);
         setShowTextInput(false);
+        setIsWaitingForResponse(false); // Hide loading indicator
 
         // Speak the cleaned response using text-to-speech
         speakText(cleanedText);
@@ -1211,6 +1214,7 @@ export function SetupPage() {
             text: cleanedText,
           };
           setMessages((prev) => [...prev, journeyMsg]);
+          setIsWaitingForResponse(false); // Hide loading indicator
           speakText(cleanedText);
 
           // Check if status is completed and redirect to /home
@@ -1344,6 +1348,7 @@ export function SetupPage() {
         );
       }
       socket.emit("process_journey", payload);
+      setIsWaitingForResponse(true); // Show loading indicator
       recognitionResultRef.current = "";
       interimTranscriptRef.current = "";
     }
@@ -1601,6 +1606,7 @@ export function SetupPage() {
 
       console.log("📤 Sending chat message:", payload);
       socket.emit("process_journey", payload);
+      setIsWaitingForResponse(true); // Show loading indicator
     }
   };
 
@@ -1669,6 +1675,7 @@ export function SetupPage() {
 
     console.log("📤 Sending selection:", payload);
     socket.emit("process_journey", payload);
+    setIsWaitingForResponse(true); // Show loading indicator
 
     // Clear selection UI
     setSelectionConfig(null);
@@ -1708,6 +1715,30 @@ export function SetupPage() {
               </div>
             </div>
           ))}
+
+          {/* Loading indicator when waiting for response */}
+          {isWaitingForResponse && (
+            <div className="flex justify-start">
+              <div className="max-w-[80%] rounded-2xl p-4 bg-white border border-gray-100 shadow-sm rounded-bl-none">
+                <div className="flex items-center gap-1">
+                  <div className="flex gap-1">
+                    <div
+                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    ></div>
+                    <div
+                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    ></div>
+                    <div
+                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Listening Indicator */}
           {isListening && (

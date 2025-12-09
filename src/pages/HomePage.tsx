@@ -329,6 +329,7 @@ export function HomePage() {
     : "bg-purple-700 hover:bg-purple-800";
 
   const [isListening, setIsListening] = useState(false);
+  const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const SOCKET_URL = "http://192.168.233.159:5000";
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -602,6 +603,7 @@ export function HomePage() {
           "type:",
           audioBlob.type
         );
+        setIsWaitingForResponse(false); // Hide loading indicator when audio response received
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
         audio.play().catch((error) => {
@@ -679,6 +681,7 @@ export function HomePage() {
       };
       setMessages((prev) => [...prev, coachMsg]);
       setIsListening(false);
+      setIsWaitingForResponse(false); // Hide loading indicator
     });
 
     // Listen for 'response' event from server
@@ -730,6 +733,7 @@ export function HomePage() {
       };
       setMessages((prev) => [...prev, coachMsg]);
       setIsListening(false);
+      setIsWaitingForResponse(false); // Hide loading indicator
 
       // Speak the response using text-to-speech
       speakText(responseText);
@@ -782,6 +786,7 @@ export function HomePage() {
       }
       socketRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [SOCKET_URL]);
 
   // Helper function to stop listening and send the result
@@ -841,6 +846,7 @@ export function HomePage() {
       console.log("📤 Sending transcribed text:", payload);
 
       socket.emit("process_audio", payload);
+      setIsWaitingForResponse(true); // Show loading indicator
       recognitionResultRef.current = "";
     }
   }, [isMale, playEndSound]);
@@ -1299,10 +1305,13 @@ export function HomePage() {
       try {
         console.log("📤 Sending chat message:", payload);
         socket.emit("process_audio", payload);
+        setIsWaitingForResponse(true); // Show loading indicator
       } catch {
+        setIsWaitingForResponse(false);
         sendFallbackCoachResponse();
       }
     } else {
+      setIsWaitingForResponse(false);
       sendFallbackCoachResponse();
     }
   };
@@ -1455,6 +1464,30 @@ export function HomePage() {
                       </div>
                     </div>
                   ))}
+
+                  {/* Loading indicator when waiting for response */}
+                  {isWaitingForResponse && (
+                    <div className="flex justify-start">
+                      <div className="max-w-[80%] rounded-2xl p-4 bg-white border border-gray-200 shadow-sm rounded-bl-none">
+                        <div className="flex items-center gap-1">
+                          <div className="flex gap-1">
+                            <div
+                              className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                              style={{ animationDelay: "0ms" }}
+                            ></div>
+                            <div
+                              className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                              style={{ animationDelay: "150ms" }}
+                            ></div>
+                            <div
+                              className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                              style={{ animationDelay: "300ms" }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Welcome Message Card */}
