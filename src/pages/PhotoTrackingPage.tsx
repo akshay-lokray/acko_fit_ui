@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -10,8 +10,8 @@ import {
   ChevronLeft,
   Star,
   Flame,
-  Minus,
-  Plus,
+  Camera,
+  Mic,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,10 @@ export function PhotoTrackingPage() {
   const [loggingMeal, setLoggingMeal] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
   const [healthNote, setHealthNote] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
   const { formData: profile } = useUserProfileStore();
   const streak = profile.streak ?? 0;
 
@@ -199,38 +203,107 @@ export function PhotoTrackingPage() {
     }
   };
 
-  const handleItemChange = (
-    index: number,
-    field: keyof FoodItem,
-    value: string | number
-  ) => {
-    setItems((prev) => {
-      const next = [...prev];
-      if (field === "calories") {
-        next[index] = { ...next[index], calories: Number(value) };
-      } else {
-        next[index] = { ...next[index], [field]: value };
+  const handleVoiceIntent = useCallback(
+    async (text: string) => {
+      if (!text.trim()) return;
+      setVoiceError(null);
+      setVoiceTranscript(text);
+      const params = new URLSearchParams();
+      params.append("text", text);
+      try {
+        const response = await fetch("/api/users/intent/submit", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: params.toString(),
+        });
+        if (!response.ok) {
+          throw new Error("Intent check failed");
+        }
+        const data = await response.json();
+        if (data?.submit) {
+          await handleConfirmLog();
+        } else {
+          setLogError("AI assistant suggested not submitting right now.");
+        }
+      } catch (error) {
+        console.error("Intent API failed", error);
+        setVoiceError("Voice assistant couldn't determine intent.");
       }
-      return next;
-    });
-  };
+    },
+    [handleConfirmLog]
+  );
 
-  const handleDeleteItem = (index: number) => {
-    setItems((prev) => prev.filter((_, idx) => idx !== index));
-  };
+  const startVoiceCapture = useCallback(() => {
+    if (isListening) return;
+    const SpeechRecognition =
+      (window as unknown as {
+        SpeechRecognition?: {
+          new (): SpeechRecognition;
+        };
+        webkitSpeechRecognition?: {
+          new (): SpeechRecognition;
+        };
+      }).SpeechRecognition ||
+      (window as unknown as {
+        webkitSpeechRecognition?: {
+          new (): SpeechRecognition;
+        };
+      }).webkitSpeechRecognition;
 
-  const handleAddRow = () => {
-    setItems((prev) => [
-      ...prev,
-      {
-        id: `new-${Date.now()}`,
-        name: "",
-        quantity: "",
-        calories: 0,
-        note: "",
-      },
-    ]);
-  };
+    if (!SpeechRecognition) {
+      setVoiceError("Speech recognition is not supported in this browser.");
+      return;
+    }
+
+    recognitionRef.current?.stop();
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const transcript = Array.from(event.results)
+        .map((result) => result[0].transcript)
+        .join(" ")
+        .trim();
+      setVoiceTranscript(transcript);
+      handleVoiceIntent(transcript);
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      setVoiceError(event.error || "Voice recording failed.");
+      recognition.stop();
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      recognitionRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+    try {
+      recognition.start();
+      setIsListening(true);
+      setVoiceError(null);
+    } catch (error) {
+      console.error("Voice recognition start failed", error);
+      setVoiceError("Unable to start voice recording.");
+    }
+  }, [handleVoiceIntent, isListening]);
+
+  const stopVoiceCapture = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop();
+    };
+  }, []);
 
   // --- Steps Renderers ---
 
@@ -437,13 +510,39 @@ export function PhotoTrackingPage() {
               {logError}
             </div>
           )}
-          <Button
-            onClick={handleConfirmLog}
-            className="w-full h-14 text-lg bg-emerald-500 hover:bg-emerald-600 rounded-2xl shadow-lg shadow-emerald-200"
-            disabled={loggingMeal}
-          >
-            {loggingMeal ? "Saving..." : "Confirm & Log Meal"}
-          </Button>
+          <div className="flex flex-col items-center gap-3">
+            <Button
+              size="sm"
+              onClick={() => {
+                if (isListening) {
+                  stopVoiceCapture();
+                } else {
+                  startVoiceCapture();
+                }
+              }}
+              className="w-12 h-12 rounded-full shadow-lg bg-emerald-600 hover:bg-emerald-700 transition-transform flex items-center justify-center"
+            >
+              <Mic className="w-5 h-5 text-white" />
+            </Button>
+            <p className="text-xs text-gray-500">
+              {isListening ? "Listening… tap again to stop" : "Tap to speak submission"}
+            </p>
+            {voiceTranscript && (
+              <p className="text-xs text-slate-500 text-center">
+                "{voiceTranscript}"
+              </p>
+            )}
+            {voiceError && (
+              <p className="text-xs text-red-500 text-center">{voiceError}</p>
+            )}
+            <Button
+              onClick={handleConfirmLog}
+              className="w-32 h-12 text-sm bg-emerald-500 hover:bg-emerald-600 rounded-full shadow-lg shadow-emerald-200"
+              disabled={loggingMeal}
+            >
+              {loggingMeal ? "Saving..." : "Submit"}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
