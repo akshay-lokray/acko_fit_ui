@@ -71,6 +71,14 @@ export function SetupPage() {
   const [isBackgroundListening, setIsBackgroundListening] = useState(false);
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
+  const lastCoachMessage = (() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].sender === "coach") {
+        return messages[i].text;
+      }
+    }
+    return "";
+  })();
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [selectionConfig, setSelectionConfig] = useState<{
     possibleValues: string[];
@@ -78,6 +86,8 @@ export function SetupPage() {
     keyName: string;
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const [contextState, setContextState] = useState<{
     status?: string;
     keys?: Record<string, unknown>;
@@ -587,6 +597,7 @@ export function SetupPage() {
       return;
     }
 
+    const avatar = isMale ? "Dhoni" : "Disha";
     const socket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       reconnection: true,
@@ -596,6 +607,9 @@ export function SetupPage() {
       timeout: 20000,
       forceNew: false,
       withCredentials: false,
+      auth: {
+        avatar: avatar,
+      },
     });
 
     socketRef.current = socket;
@@ -605,10 +619,12 @@ export function SetupPage() {
 
       // Send start message as soon as connected
       try {
+        const avatar = isMale ? "Dhoni" : "Disha";
         const startPayload = {
           data: {
             text: "start",
             context: null,
+            avatar: avatar,
           },
         };
         console.log("📤 Sending start message:", startPayload);
@@ -951,8 +967,8 @@ export function SetupPage() {
             (trimmedData.startsWith("{") && trimmedData.endsWith("}")) ||
             (trimmedData.startsWith("[") && trimmedData.endsWith("]"))
           ) {
-            try {
-              const parsed = JSON.parse(data);
+          try {
+            const parsed = JSON.parse(data);
               // Check if it's the new format with data.data
               if (parsed.data && typeof parsed.data === "object") {
                 responseText = String(parsed.data.text || "");
@@ -1146,9 +1162,9 @@ export function SetupPage() {
               possibleValuesForCleaning
             )
           : responseText.trim();
-        const coachMsg: Message = {
-          id: Date.now().toString(),
-          sender: "coach",
+      const coachMsg: Message = {
+        id: Date.now().toString(),
+        sender: "coach",
           text: cleanedText,
         };
         setMessages((prev) => [...prev, coachMsg]);
@@ -1403,7 +1419,7 @@ export function SetupPage() {
           console.warn("Socket.IO disconnect event send failed", e);
         }
         socket.disconnect();
-        socketRef.current = null;
+      socketRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1457,10 +1473,12 @@ export function SetupPage() {
       };
       setMessages((prev) => [...prev, userMsg]);
 
+      const avatar = isMale ? "Dhoni" : "Disha";
       const payload = {
         data: {
           text: textToSend,
           context: contextState, // Include the stored context
+          avatar: avatar,
         },
       };
 
@@ -1485,7 +1503,7 @@ export function SetupPage() {
         startBackgroundListeningRef.current?.();
       }, 1000);
     }
-  }, [playEndSound, contextState]);
+  }, [playEndSound, contextState, isMale]);
 
   // Update stopListeningAndSend ref
   useEffect(() => {
@@ -1752,10 +1770,12 @@ export function SetupPage() {
     setShowTextInput(false);
 
     if (socket && socket.connected) {
+      const avatar = isMale ? "Dhoni" : "Disha";
       const payload = {
         data: {
           text: textToSend,
           context: contextState, // Include the stored context
+          avatar: avatar,
         },
       };
 
@@ -1782,6 +1802,25 @@ export function SetupPage() {
       checkForSelectionOptions();
     }
   }, [contextState, checkForSelectionOptions]);
+
+  // Auto-scroll to show latest message near the top
+  useEffect(() => {
+    if (chatContainerRef.current && messagesEndRef.current) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        if (chatContainerRef.current && messagesEndRef.current) {
+          const scrollOffset = 20; // Space from top in pixels
+          const elementTop = messagesEndRef.current.offsetTop;
+
+          // Scroll to show the latest message near the top with some offset
+          chatContainerRef.current.scrollTo({
+            top: elementTop - scrollOffset,
+            behavior: "smooth",
+          });
+        }
+      }, 100);
+    }
+  }, [messages, isWaitingForResponse, selectionConfig]);
 
   // Handle option selection
   const handleOptionToggle = (option: string) => {
@@ -1821,10 +1860,12 @@ export function SetupPage() {
     setMessages((prev) => [...prev, userMsg]);
 
     // Send the selection to the server
+    const avatar = isMale ? "Dhoni" : "Disha";
     const payload = {
       data: {
         text: responseText,
         context: contextState,
+        avatar: avatar,
       },
     };
 
@@ -1851,7 +1892,11 @@ export function SetupPage() {
 
       {/* Chat Messages */}
       <main className="setup-chat-area p-4 bg-gray-50/50">
-        <div className="max-w-2xl mx-auto space-y-4">
+        <div
+          ref={chatContainerRef}
+          className="max-w-2xl mx-auto space-y-4 overflow-y-auto"
+          style={{ maxHeight: "calc(100vh - 300px)", paddingTop: "20px" }}
+        >
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -1992,9 +2037,12 @@ export function SetupPage() {
               </Button>
             </div>
           )}
+
+          {/* Invisible element to scroll to */}
+          <div ref={messagesEndRef} />
         </div>
       </main>
-
+      
       <div className="setup-page-avatar-zone">
         <div className="setup-avatar-panel">
           <div className="setup-avatar-inner">
