@@ -17,7 +17,6 @@ import { HabitTrackerPage } from "./pages/HabitTrackerPage";
 import { UserLockerPage } from "./pages/UserLockerPage";
 import { DevicesPage } from "./pages/DevicesPage";
 import { RewardsPage } from "./pages/RewardsPage";
-import { RankingsPage } from "./pages/RankingsPage";
 import { LogLunchPage } from "./pages/LogLunchPage";
 import { LogStepsPage } from "./pages/LogStepsPage";
 import { LogWaterPage } from "./pages/LogWaterPage";
@@ -74,7 +73,6 @@ function App() {
         <Route path="/profile" element={<UserLockerPage />} />
         <Route path="/devices" element={<DevicesPage />} />
         <Route path="/rewards" element={<RewardsPage />} />
-        <Route path="/rankings" element={<RankingsPage />} />
         <Route path="/log-meal" element={<LogLunchPage />} />
         <Route path="/log-steps" element={<LogStepsPage />} />
         <Route path="/log-water" element={<LogWaterPage />} />

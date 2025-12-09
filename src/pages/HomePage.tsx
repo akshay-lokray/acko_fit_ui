@@ -1749,13 +1749,6 @@ export function HomePage() {
               <Zap className="w-4 h-4 text-yellow-500 fill-yellow-500" />
               <span>{xp} XP</span>
             </div>
-            <div
-              className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => navigate("/rankings")}
-            >
-              <Shield className="w-4 h-4 text-blue-500" />
-              <span>Warrior</span>
-            </div>
           </div>
         </div>
       </header>
