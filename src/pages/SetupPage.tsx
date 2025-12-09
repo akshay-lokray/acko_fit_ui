@@ -1826,7 +1826,12 @@ export function SetupPage() {
         <div className="setup-avatar-panel">
           <div className="setup-avatar-inner">
             <AvatarScene
-              textToSpeak={messages[messages.length - 1]?.text || ""}
+              textToSpeak={
+                messages
+                  .slice()
+                  .reverse()
+                  .find((msg) => msg.sender === "coach")?.text || ""
+              }
               voiceType={gender as VoiceType}
               isFullScreen={false}
             />
