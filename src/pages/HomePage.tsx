@@ -4,16 +4,13 @@ import { io, Socket } from "socket.io-client";
 import {
   MessageSquare,
   Zap,
-  Shield,
   Send,
   CheckCircle2,
   Compass,
   Utensils,
   Dumbbell,
   Camera,
-  MapPin,
-  Trophy,
-  Crown,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -71,56 +68,39 @@ interface Message {
   text: string;
 }
 
-interface Quest {
+interface Goal {
   id: string;
   title: string;
-  xp: number;
-  completed: boolean;
-  type: "daily" | "weekly";
-}
-
-interface LeaderboardUser {
-  userId: string;
-  rank: number;
-  name: string;
+  detail: string;
+  progress: number;
   xp: number;
 }
 
-type LeaderboardApiResponse = {
-  topUsers: Array<{
-    userId: string;
-    name: string | null;
-    xp: number;
-    rank: number;
-  }>;
-  currentUser: {
-    userId: string;
-    name: string | null;
-    xp: number;
-    rank: number;
-    percentile?: number;
-  };
-};
+const SAMPLE_GOALS: Goal[] = [
+  {
+    id: "hydration",
+    title: "Hydration streak",
+    detail: "Stay above 2.5L for 3 days",
+    progress: 72,
+    xp: 120,
+  },
+  {
+    id: "strength",
+    title: "Strength focus",
+    detail: "4 strength sessions this week",
+    progress: 45,
+    xp: 80,
+  },
+  {
+    id: "mindset",
+    title: "Mindset clarity",
+    detail: "Journal for 10 min daily",
+    progress: 30,
+    xp: 60,
+  },
+];
 
 // --- Mock Data ---
-const DAILY_QUESTS: Quest[] = [
-  { id: "1", title: "Log Meal", xp: 50, completed: false, type: "daily" },
-  {
-    id: "2",
-    title: "Walk 5,000 Steps",
-    xp: 100,
-    completed: false,
-    type: "daily",
-  },
-  { id: "3", title: "Drink 2L Water", xp: 50, completed: true, type: "daily" },
-];
-
-const FALLBACK_LEADERBOARD: LeaderboardUser[] = [
-  { userId: "1", rank: 1, name: "Aarav P.", xp: 15400 },
-  { userId: "2", rank: 2, name: "Sneha K.", xp: 14200 },
-  { userId: "3", rank: 3, name: "Rohan M.", xp: 13850 },
-  { userId: "you", rank: 144, name: "You", xp: 350 },
-];
 
 export function HomePage() {
   const location = useLocation();
@@ -138,10 +118,9 @@ export function HomePage() {
   const coachName = gender === "male" ? "Dhoni" : "Disha";
 
   // State
-  // Changed "community" to "leaderboard"
   const [activeTab, setActiveTab] = useState<
-    "chat" | "explore" | "leaderboard"
-  >("chat");
+    "goals" | "explore" | "Chat"
+  >("goals");
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -150,21 +129,21 @@ export function HomePage() {
     },
   ]);
   const [inputValue, setInputValue] = useState("");
+  const [isHabitApiLoading, setHabitApiLoading] = useState(false);
   const xp = profile.xp ?? routeFormData.xp ?? 350;
-  const [userLocation, setUserLocation] = useState("India"); // Default location (show actual percentile from API)
   const [habitStats, setHabitStats] = useState<{
     calorie?: number;
     water?: number;
     steps?: number;
   }>({});
-  const [leaderboardData, setLeaderboardData] =
-    useState<LeaderboardApiResponse | null>(null);
-  const currentPercentile = Math.round(
-    leaderboardData?.currentUser?.percentile ?? 15
-  );
 
   const levelingXp = 1000;
   const level = 1;
+  const stageProgress = {
+    currentStage: "Novice",
+    targetStage: "Warrior",
+    progress: 58,
+  };
 
   const fetchUserProfile = async () => {
     try {
@@ -194,7 +173,7 @@ export function HomePage() {
       const res = await fetch(
         `/api/users/${encodeURIComponent(phoneNumber)}/xp?delta=${delta}`,
         {
-          method: "POST",
+        method: "POST",
         }
       );
       if (!res.ok) return;
@@ -255,25 +234,6 @@ export function HomePage() {
     fetchHabits();
   }, [profile.mobile, routeFormData.mobile]);
 
-  useEffect(() => {
-    const userId = profile.mobile || routeFormData.mobile || "";
-    if (!userId) return;
-
-    const loadLeaderboard = async () => {
-      try {
-        const res = await fetch(
-          `/api/users/leaderboard?userId=${encodeURIComponent(userId)}`
-        );
-        if (!res.ok) return;
-        const data: LeaderboardApiResponse = await res.json();
-        setLeaderboardData(data);
-      } catch (e) {
-        console.error("Failed to load leaderboard", e);
-      }
-    };
-
-    loadLeaderboard();
-  }, [profile.mobile, routeFormData.mobile]);
 
   // Award XP when goals are reached (once per goal per user)
   useEffect(() => {
@@ -324,12 +284,8 @@ export function HomePage() {
   // Determining "Persona" styles
   const isMale = gender === "male";
   const themeColor = isMale ? "text-emerald-600" : "text-purple-700";
-  const buttonBg = isMale
-    ? "bg-emerald-600 hover:bg-emerald-700"
-    : "bg-purple-700 hover:bg-purple-800";
 
   const [isListening, setIsListening] = useState(false);
-  const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const SOCKET_URL = "http://192.168.233.159:5000";
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -338,8 +294,10 @@ export function HomePage() {
   const maxListeningTimeoutRef = useRef<number | null>(null);
   const silenceTimeoutRef = useRef<number | null>(null);
   const lastSpeechTimeRef = useRef<number>(0);
+  const silenceMonitorRef = useRef<number | null>(null);
   const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const SILENCE_TIMEOUT_MS = 3000;
 
   // Function to play audio feedback - start listening sound
   const playStartSound = useCallback(() => {
@@ -603,7 +561,6 @@ export function HomePage() {
           "type:",
           audioBlob.type
         );
-        setIsWaitingForResponse(false); // Hide loading indicator when audio response received
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
         audio.play().catch((error) => {
@@ -661,8 +618,8 @@ export function HomePage() {
     });
 
     socket.on("message", (data) => {
-      let text = "";
-      try {
+        let text = "";
+        try {
         if (typeof data === "string") {
           const parsed = JSON.parse(data);
           text = parsed.text ?? String(data);
@@ -671,17 +628,16 @@ export function HomePage() {
         } else {
           text = String(data);
         }
-      } catch {
+        } catch {
         text = String(data);
-      }
-      const coachMsg: Message = {
-        id: Date.now().toString(),
-        sender: "coach",
-        text,
-      };
-      setMessages((prev) => [...prev, coachMsg]);
-      setIsListening(false);
-      setIsWaitingForResponse(false); // Hide loading indicator
+        }
+        const coachMsg: Message = {
+          id: Date.now().toString(),
+          sender: "coach",
+          text,
+        };
+        setMessages((prev) => [...prev, coachMsg]);
+        setIsListening(false);
     });
 
     // Listen for 'response' event from server
@@ -733,7 +689,6 @@ export function HomePage() {
       };
       setMessages((prev) => [...prev, coachMsg]);
       setIsListening(false);
-      setIsWaitingForResponse(false); // Hide loading indicator
 
       // Speak the response using text-to-speech
       speakText(responseText);
@@ -790,9 +745,18 @@ export function HomePage() {
   }, [SOCKET_URL]);
 
   // Helper function to stop listening and send the result
+  const clearSilenceMonitor = useCallback(() => {
+    if (silenceMonitorRef.current) {
+      window.clearInterval(silenceMonitorRef.current);
+      silenceMonitorRef.current = null;
+    }
+  }, []);
+
   const stopListeningAndSend = useCallback(() => {
     const socket = socketRef.current;
     setIsListening(false);
+
+    clearSilenceMonitor();
 
     // Play end sound to indicate listening has stopped
     playEndSound();
@@ -846,10 +810,20 @@ export function HomePage() {
       console.log("📤 Sending transcribed text:", payload);
 
       socket.emit("process_audio", payload);
-      setIsWaitingForResponse(true); // Show loading indicator
       recognitionResultRef.current = "";
     }
-  }, [isMale, playEndSound]);
+  }, [isMale, playEndSound, clearSilenceMonitor]);
+
+  const startSilenceMonitor = useCallback(() => {
+    clearSilenceMonitor();
+    silenceMonitorRef.current = window.setInterval(() => {
+      const idle = Date.now() - lastSpeechTimeRef.current;
+      if (idle >= SILENCE_TIMEOUT_MS) {
+        console.log("🔇 Silence monitor triggered, stopping recognition");
+        stopListeningAndSend();
+      }
+    }, 400);
+  }, [clearSilenceMonitor, stopListeningAndSend]);
 
   // Voice input handler - wrapped in useCallback for use in wake word detection
   const handleVoiceInput = useCallback(() => {
@@ -1097,6 +1071,7 @@ export function HomePage() {
         setIsListening(true);
         recognitionResultRef.current = "";
         lastSpeechTimeRef.current = Date.now();
+        startSilenceMonitor();
 
         // Play start sound to indicate listening has started
         playStartSound();
@@ -1262,6 +1237,45 @@ export function HomePage() {
   }, [isListening, isMale, handleVoiceInput]);
 
   // Helper: Chat Response Logic (Mock Narrative AI)
+  const messageListRef = useRef<HTMLDivElement | null>(null);
+
+  const sendHabitAssistMessage = useCallback(
+    async (message: string) => {
+      const userId =
+        profile.userId ??
+        profile.mobile ??
+        routeFormData.userId ??
+        routeFormData.mobile ??
+        "783482642";
+      try {
+        const body = new URLSearchParams();
+        body.append("userId", userId);
+        body.append("message", message);
+        const response = await fetch(
+          "http://192.168.237.53:8080/api/habits/ai-assist",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body,
+          }
+        );
+
+        if (!response.ok) {
+          console.error("Habit assist API error", response.status);
+          return "";
+        }
+        const data = await response.json();
+        return data?.reply ?? "";
+      } catch (error) {
+        console.error("Habit assist request failed", error);
+        return "";
+      }
+    },
+    [profile, routeFormData]
+  );
+
   const handleSendMessage = (textOverride?: string) => {
     const textToSend = textOverride || inputValue;
     if (!textToSend.trim()) return;
@@ -1305,16 +1319,34 @@ export function HomePage() {
       try {
         console.log("📤 Sending chat message:", payload);
         socket.emit("process_audio", payload);
-        setIsWaitingForResponse(true); // Show loading indicator
       } catch {
-        setIsWaitingForResponse(false);
         sendFallbackCoachResponse();
       }
     } else {
-      setIsWaitingForResponse(false);
       sendFallbackCoachResponse();
     }
+
+    setHabitApiLoading(true);
+    sendHabitAssistMessage(textToSend)
+      .then((reply) => {
+        if (reply) {
+        const coachMsg: Message = {
+            id: (Date.now() + 2).toString(),
+          sender: "coach",
+            text: reply,
+        };
+        setMessages((prev) => [...prev, coachMsg]);
+          speakText(reply);
+        }
+      })
+      .finally(() => setHabitApiLoading(false));
   };
+
+  useEffect(() => {
+    if (messageListRef.current) {
+      messageListRef.current.scrollTop = messageListRef.current.scrollHeight;
+    }
+  }, [messages, isHabitApiLoading]);
 
   return (
     <div className="min-h-screen bg-white font-sans flex flex-col">
@@ -1367,26 +1399,26 @@ export function HomePage() {
         </div>
 
         {/* Listening Overlay - shown when listening */}
-        {isListening && (
+          {isListening && (
           <div className="relative z-10 flex flex-col items-center justify-center py-8">
             <div
               className={`w-24 h-24 rounded-full flex items-center justify-center ${
                 isMale ? "bg-emerald-500" : "bg-purple-500"
               } animate-pulse shadow-[0_0_40px_rgba(0,0,0,0.2)]`}
             >
-              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
+                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
                 <div
                   className={`w-16 h-16 rounded-full flex items-center justify-center animate-ping ${
                     isMale ? "bg-emerald-100" : "bg-purple-100"
                   }`}
                 >
-                  <Zap className={`w-8 h-8 ${themeColor}`} />
+                    <Zap className={`w-8 h-8 ${themeColor}`} />
+                  </div>
                 </div>
               </div>
-            </div>
             <p className="mt-6 text-gray-700 font-bold text-lg">Listening...</p>
-          </div>
-        )}
+            </div>
+          )}
 
         <div className="home-avatar-banner">
           <AvatarScene
@@ -1400,18 +1432,18 @@ export function HomePage() {
           />
         </div>
 
-        {/* 2. Interface Tabs (Chat / Explore / Leaderboard) */}
-        <div className="flex-1 bg-white rounded-t-[2rem] relative z-20 overflow-hidden flex flex-col">
+        {/* 2. Interface Tabs (Chat / Explore / Chat) */}
+        <div className="flex-1 bg-white rounded-t-[2rem] relative z-20 overflow-hidden flex flex-col pb-24">
           {/* Tab Navigation */}
           <div className="flex border-b border-gray-100 bg-white">
             <button
-              onClick={() => setActiveTab("chat")}
+              onClick={() => setActiveTab("goals")}
               className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
-                activeTab === "chat" ? "text-emerald-600" : "text-gray-400"
+                activeTab === "goals" ? "text-emerald-600" : "text-gray-400"
               }`}
             >
-              <MessageSquare className="w-4 h-4" /> Comms
-              {activeTab === "chat" && (
+              <Zap className="w-4 h-4" /> Goals
+              {activeTab === "goals" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600" />
               )}
             </button>
@@ -1427,200 +1459,97 @@ export function HomePage() {
               )}
             </button>
             <button
-              onClick={() => setActiveTab("leaderboard")}
+              onClick={() => setActiveTab("Chat")}
               className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
-                activeTab === "leaderboard"
+                activeTab === "Chat"
                   ? "text-emerald-600"
                   : "text-gray-400"
               }`}
             >
-              <Trophy className="w-4 h-4" /> Ranking
-              {activeTab === "leaderboard" && (
+              <MessageSquare className="w-4 h-4" /> Chat
+              {activeTab === "Chat" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600" />
               )}
             </button>
           </div>
 
           {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white">
-            {activeTab === "chat" && (
-              <div className="h-full flex flex-col max-w-2xl mx-auto justify-between">
-                <div className="flex-1 space-y-4 mb-4 overflow-auto">
-                  {messages.map((msg) => (
+          <div className="flex-1 flex flex-col overflow-hidden bg-white px-4 md:px-6 pt-4 pb-0">
+            {activeTab === "goals" && (
+              <div className="flex-1 flex flex-col max-w-2xl mx-auto space-y-4">
+                <div className="bg-white rounded-2xl shadow-sm p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-gray-500">
+                        Current stage
+                      </p>
+                      <p className="text-lg font-bold text-gray-900">
+                        {stageProgress.currentStage}
+                      </p>
+                      </div>
+                    <div className="text-right">
+                      <p className="text-xs uppercase tracking-wider text-gray-500">
+                        Target
+                      </p>
+                      <p className="text-lg font-bold text-gray-900">
+                        {stageProgress.targetStage}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 relative h-2 rounded-full bg-gray-200">
                     <div
-                      key={msg.id}
-                      className={`flex ${
-                        msg.sender === "user" ? "justify-end" : "justify-start"
-                      }`}
-                    >
-                      <div
-                        className={`max-w-[80%] rounded-2xl p-4 text-sm ${
-                          msg.sender === "user"
-                            ? "bg-gray-900 text-white rounded-br-none"
-                            : "bg-white border border-gray-200 shadow-sm text-gray-800 rounded-bl-none"
-                        }`}
-                      >
-                        {msg.text}
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Loading indicator when waiting for response */}
-                  {isWaitingForResponse && (
-                    <div className="flex justify-start">
-                      <div className="max-w-[80%] rounded-2xl p-4 bg-white border border-gray-200 shadow-sm rounded-bl-none">
-                        <div className="flex items-center gap-1">
-                          <div className="flex gap-1">
-                            <div
-                              className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                              style={{ animationDelay: "0ms" }}
-                            ></div>
-                            <div
-                              className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                              style={{ animationDelay: "150ms" }}
-                            ></div>
-                            <div
-                              className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                              style={{ animationDelay: "300ms" }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Welcome Message Card */}
-                <div className="mb-4">
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
-                    <p className="text-sm text-gray-700">
-                      Welcome back, {name.split(" ")[0]}. Ready to conquer
-                      today's mission?
+                      className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-500 to-green-400"
+                      style={{ width: `${stageProgress.progress}%` }}
+                    />
+                  </div>
+                  <div className="mt-2 flex justify-between text-xs text-gray-500">
+                    <span>{stageProgress.progress}% progress</span>
+                    <span>Next milestone ahead</span>
+                  </div>
+                  <div className="mt-4 text-xs text-gray-500">
+                    <p>
+                      Keep the streak going—Dhoni is watching the plan and
+                      upgrading you soon.
                     </p>
                   </div>
                 </div>
 
-                {/* Task List (Mini) */}
-                <div className="mb-4 space-y-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    DAILY OBJECTIVES
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+                  <p className="text-sm text-gray-700">
+                    Welcome back, {name.split(" ")[0]}. Ready to conquer today's
+                    mission?
                   </p>
-                  {DAILY_QUESTS.map((quest) => {
-                    const goalHit =
-                      (quest.title === "Walk 5,000 Steps" &&
-                        habitStats.steps != null &&
-                        habitStats.steps >= 5000) ||
-                      (quest.title === "Drink 2L Water" &&
-                        habitStats.water != null &&
-                        habitStats.water >= 2000);
-
-                    return (
-                      <div
-                        key={quest.id}
-                        className={`bg-white p-4 rounded-2xl border border-gray-200 flex items-center justify-between shadow-sm ${
-                          quest.title === "Log Meal" ||
-                          quest.title === "Walk 5,000 Steps" ||
-                          quest.title === "Drink 2L Water"
-                            ? "cursor-pointer hover:shadow-md transition-shadow"
-                            : ""
-                        } ${goalHit ? "border-emerald-200" : ""}`}
-                        onClick={() => {
-                          if (quest.title === "Log Meal") {
-                            navigate("/log-meal", {
-                              state: { formData: profile },
-                            });
-                          }
-                        }}
-                      >
-                        <div className="flex items-center gap-3 flex-1">
-                          <div
-                            className={`w-5 h-5 rounded-full flex items-center justify-center border-2 ${
-                              quest.completed || goalHit
-                                ? "bg-emerald-500 border-emerald-500"
-                                : "bg-white border-gray-300"
-                            }`}
-                          >
-                            {quest.completed || goalHit ? (
-                              <CheckCircle2
-                                className="w-3 h-3 text-white fill-white"
-                                strokeWidth={3}
-                              />
-                            ) : null}
-                          </div>
-                          <div className="flex flex-col">
-                            <span
-                              className={`text-sm font-medium ${
-                                quest.completed
-                                  ? "text-gray-400 line-through"
-                                  : "text-gray-700"
-                              }`}
-                            >
-                              {quest.title}
-                            </span>
-                            {quest.title === "Log Meal" &&
-                              habitStats.calorie != null && (
-                                <span className="text-xs text-emerald-600">
-                                  {habitStats.calorie} kcal today
-                                </span>
-                              )}
-                            {quest.title === "Walk 5,000 Steps" &&
-                              habitStats.steps != null && (
-                                <span className="text-xs text-emerald-600">
-                                  {habitStats.steps} steps today
-                                  {habitStats.steps >= 5000
-                                    ? " · Goal hit!"
-                                    : ""}
-                                </span>
-                              )}
-                            {quest.title === "Drink 2L Water" &&
-                              habitStats.water != null && (
-                                <span className="text-xs text-emerald-600">
-                                  {habitStats.water} ml today
-                                  {habitStats.water >= 2000
-                                    ? " · Goal hit!"
-                                    : ""}
-                                </span>
-                              )}
-                          </div>
-                        </div>
-                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-yellow-100 text-yellow-700">
-                          +{quest.xp} XP
-                        </span>
-                      </div>
-                    );
-                  })}
                 </div>
 
-                {/* Input Area */}
-                <div className="relative flex items-center gap-2">
-                  <Input
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                    placeholder={`Message ${coachName}...`}
-                    className="flex-1 py-6 rounded-2xl border-gray-200 shadow-sm focus-visible:ring-offset-0 focus-visible:ring-1 pr-12"
-                  />
-                  {inputValue ? (
-                    <Button
-                      size="icon"
-                      onClick={() => handleSendMessage()}
-                      className={`absolute right-14 top-2 rounded-full w-8 h-8 bg-emerald-600 hover:bg-emerald-700`}
+                <div className="space-y-3">
+                  {SAMPLE_GOALS.map((goal) => (
+                    <div
+                      key={goal.id}
+                      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4"
                     >
-                      <Send className="w-4 h-4" />
-                    </Button>
-                  ) : null}
-
-                  <Button
-                    size="icon"
-                    onClick={handleVoiceInput}
-                    className={`w-12 h-12 rounded-full shadow-md transition-all ${
-                      isListening
-                        ? "bg-red-500 animate-pulse"
-                        : "bg-emerald-600 hover:bg-emerald-700"
-                    }`}
-                  >
-                    <Zap className="w-5 h-5 fill-white text-white" />
-                  </Button>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {goal.title}
+                          </p>
+                          <p className="text-xs text-gray-500">{goal.detail}</p>
+                        </div>
+                        <span className="text-xs font-semibold text-emerald-600">
+                          +{goal.xp} XP
+                            </span>
+                        </div>
+                      <div className="mt-3 h-2 rounded-full bg-gray-200">
+                        <div
+                          className="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-green-400"
+                          style={{ width: `${goal.progress}%` }}
+                        />
+                      </div>
+                      <div className="mt-2 text-[10px] uppercase tracking-wider text-gray-500 flex justify-between">
+                        <span>{goal.progress}% complete</span>
+                        <span>{goal.detail}</span>
+                    </div>
+                </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -1702,157 +1631,73 @@ export function HomePage() {
               </div>
             )}
 
-            {/* Leaderboard Tab (Replaces Squad) */}
-            {activeTab === "leaderboard" && (
-              <div className="h-full space-y-6 max-w-2xl mx-auto">
-                {/* Location Header */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900">
-                      Leaderboard
-                    </h2>
-                    <div className="flex items-center gap-1 text-sm text-gray-500 mt-1">
-                      <MapPin className="w-4 h-4 text-emerald-500" />
-                      <span>
-                        Ranking in{" "}
-                        <span className="font-bold text-gray-900">
-                          {userLocation}
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                    onClick={() =>
-                      setUserLocation((prev) =>
-                        prev === "India" ? "Global" : "India"
-                      )
-                    }
-                  >
-                    {userLocation === "India" ? "Show Global" : "Show Local"}
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 items-end pt-4 mb-8">
-                  {[0, 1, 2].map((position) => {
-                    const topUsers =
-                      leaderboardData?.topUsers ?? FALLBACK_LEADERBOARD;
-                    const user =
-                      topUsers[position] ||
-                      topUsers[position % topUsers.length];
-                    const badgeColor =
-                      position === 0
-                        ? "bg-gradient-to-br from-yellow-400 to-yellow-600"
-                        : position === 1
-                        ? "bg-gradient-to-br from-gray-300 to-gray-500"
-                        : "bg-gradient-to-br from-orange-400 to-orange-600";
-                    const size = position === 0 ? "w-20 h-20" : "w-16 h-16";
-                    const innerSize = position === 0 ? "w-12 h-12" : "w-8 h-8";
-                    const badgeSize = position === 0 ? "w-6 h-6" : "w-5 h-5";
-                    const badgeTextSize =
-                      position === 0 ? "text-xs" : "text-[10px]";
-
-                    return (
+            {/* Chat Tab (Duplicate of Chat) */}
+            {activeTab === "Chat" && (
+              <div className="flex-1 flex flex-col max-w-2xl mx-auto min-h-0">
+                <div
+                  ref={messageListRef}
+                  className="flex-1 min-h-0 space-y-4 overflow-y-auto pb-20"
+                >
+                  {messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${
+                        msg.sender === "user" ? "justify-end" : "justify-start"
+                      }`}
+                    >
                       <div
-                        key={`podium-${position}`}
-                        className={`flex flex-col items-center ${
-                          position === 0 ? "-mt-4" : ""
+                        className={`max-w-[80%] rounded-2xl p-4 text-sm ${
+                          msg.sender === "user"
+                            ? "bg-gray-900 text-white rounded-br-none"
+                            : "bg-white border border-gray-200 shadow-sm text-gray-800 rounded-bl-none"
                         }`}
                       >
-                        {position === 0 && (
-                          <Crown className="w-6 h-6 text-yellow-500 mb-1" />
-                        )}
-                        <div
-                          className={`${size} ${badgeColor} rounded-full flex items-center justify-center mb-2 relative shadow-md`}
-                        >
-                          <div
-                            className={`${innerSize} bg-white rounded-full flex items-center justify-center`}
-                          >
-                            <span className="text-white font-bold text-sm">
-                              W
-                            </span>
-                          </div>
-                          <div
-                            className={`absolute -bottom-1 ${badgeColor} text-white ${badgeTextSize} ${badgeSize} rounded-full flex items-center justify-center font-bold shadow-sm`}
-                          >
-                            #{user.rank}
-                          </div>
-                        </div>
-                        <p
-                          className={`font-bold ${
-                            position === 0 ? "text-sm" : "text-xs"
-                          } text-center truncate w-full text-gray-900`}
-                        >
-                          {user.name || "Unknown"}
-                        </p>
-                        <p
-                          className={`${
-                            position === 0 ? "text-xs" : "text-[10px]"
-                          } text-gray-500`}
-                        >
-                          {user.xp.toLocaleString()} XP
-                        </p>
-                      </div>
-                    );
-                  })}
+                        {msg.text}
                 </div>
-
-                <div className="bg-gray-900 p-4 rounded-2xl flex items-center justify-between text-white shadow-lg">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center font-bold text-sm">
-                      You
-                    </div>
-                    <div>
-                      <p className="font-bold text-sm">Your Rank</p>
-                      <p className="text-xs text-gray-400">
-                        Top {currentPercentile}% in {userLocation}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-emerald-400">
-                      #
-                      {leaderboardData?.currentUser?.rank ??
-                        FALLBACK_LEADERBOARD[3].rank}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {leaderboardData?.currentUser?.xp ??
-                        FALLBACK_LEADERBOARD[3].xp}{" "}
-                      XP
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-4 pt-2">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    RUNNERS UP
-                  </p>
-                  {(
-                    leaderboardData?.topUsers?.slice(3) ??
-                    FALLBACK_LEADERBOARD.slice(3)
-                  ).map((user) => (
-                    <div
-                      key={`runner-${user.userId}`}
-                      className="flex items-center justify-between p-3 bg-white rounded-2xl border border-gray-200 shadow-sm"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="font-bold text-gray-400 text-sm w-6">
-                          #{user.rank}
-                        </span>
-                        <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-xs font-bold text-gray-500">
-                          {user.name ? user.name.charAt(0) : "U"}
-                        </div>
-                        <span className="font-medium text-sm text-gray-700">
-                          {user.name || "Unknown"}
-                        </span>
-                      </div>
-                      <span className="text-xs font-bold text-gray-500">
-                        {user.xp.toLocaleString()} XP
-                      </span>
                     </div>
                   ))}
+                  {isHabitApiLoading && (
+                    <div className="flex justify-start">
+                      <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-500">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                        Dhoni is typing...
+                  </div>
+                    </div>
+                  )}
+                  </div>
+
+                {/* Input Area */}
+                <div className="sticky bottom-0 left-0 right-0 z-10 bg-white border-t border-gray-100 pt-4 pb-6 flex items-center gap-2">
+                  <Input
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                    placeholder={`Message ${coachName}...`}
+                    className="flex-1 rounded-full border border-gray-200 bg-white px-4 py-3 shadow-sm focus-visible:ring-offset-0 focus-visible:ring-1"
+                  />
+                  <Button
+                    size="icon"
+                    onClick={() => handleSendMessage()}
+                    disabled={!inputValue.trim()}
+                    className={`w-10 h-10 rounded-full transition ${
+                      inputValue.trim()
+                        ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                        : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                    }`}
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    onClick={handleVoiceInput}
+                    className={`w-12 h-12 rounded-full shadow-md transition-all ${
+                      isListening
+                        ? "bg-red-500 animate-pulse text-white"
+                        : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                    }`}
+                  >
+                    <Zap className="w-5 h-5 fill-white text-white" />
+                  </Button>
                 </div>
               </div>
             )}

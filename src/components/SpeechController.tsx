@@ -64,48 +64,43 @@ export default function SpeechController({
     utteranceRef.current = utterance;
 
     // Configure voice settings
-    utterance.rate = 1.0;
-    utterance.pitch = voiceType === 'male' ? 0.9 : 1.1; // Slightly lower for male, higher for female
+    utterance.rate = voiceType === 'male' ? 0.9 : 1.05;
+    utterance.pitch = voiceType === 'male' ? 0.85 : 1.1;
     utterance.volume = 1.0;
 
-    // Get available voices
     const voices = synthRef.current.getVoices();
-    
-    // Filter voices by gender/type
     let preferredVoice: SpeechSynthesisVoice | null = null;
 
-    if (voiceType === 'female') {
-      // Try to find female voices (usually have "Female" in name or higher pitch)
+    const maleNames = [
+      "Google UK English Male",
+      "Google US English Male",
+      "Microsoft George",
+      "Google Hindi Male",
+    ];
+    if (voiceType === "male") {
       preferredVoice =
-        voices.find(
-          (voice) =>
-            voice.lang.includes('en') &&
-            (voice.name.toLowerCase().includes('female') ||
-             voice.name.toLowerCase().includes('zira') ||
-             voice.name.toLowerCase().includes('samantha') ||
-             voice.name.toLowerCase().includes('karen') ||
-             voice.name.toLowerCase().includes('susan'))
+        voices.find((voice) =>
+          maleNames.some((name) =>
+            voice.name.toLowerCase().includes(name.toLowerCase())
+          )
         ) ||
         voices.find(
           (voice) =>
-            voice.lang.includes('en') &&
-            (voice.name.includes('Natural') || voice.name.includes('Enhanced'))
+            voice.lang.includes("en") &&
+            (voice.name.toLowerCase().includes("male") ||
+              voice.name.toLowerCase().includes("david"))
         ) ||
-        voices.find((voice) => voice.lang.includes('en-US')) ||
+        voices.find((voice) => voice.lang.includes("en-US")) ||
         voices[0];
     } else {
-      // Try to find male voices (usually have "Male" in name or lower pitch)
       preferredVoice =
-        voices.find(
-          (voice) =>
-            voice.lang.includes('en') &&
-            (voice.name.toLowerCase().includes('male') ||
-             voice.name.toLowerCase().includes('david') ||
-             voice.name.toLowerCase().includes('mark') ||
-             voice.name.toLowerCase().includes('richard') ||
-             voice.name.toLowerCase().includes('james'))
+        voices.find((voice) =>
+          voice.lang.includes("en") &&
+          (voice.name.toLowerCase().includes("female") ||
+            voice.name.toLowerCase().includes("zira") ||
+            voice.name.toLowerCase().includes("samantha"))
         ) ||
-        voices.find((voice) => voice.lang.includes('en-US')) ||
+        voices.find((voice) => voice.lang.includes("en-US")) ||
         voices[0];
     }
 
