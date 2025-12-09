@@ -84,6 +84,8 @@ export function SetupPage() {
     keyName: string;
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const [contextState, setContextState] = useState<{
     status?: string;
     keys?: Record<string, unknown>;
@@ -666,6 +668,7 @@ export function SetupPage() {
       return;
     }
 
+    const avatar = isMale ? "Dhoni" : "Disha";
     const socket = io(SOCKET_URL, {
       transports: ["websocket", "polling"],
       reconnection: true,
@@ -675,6 +678,9 @@ export function SetupPage() {
       timeout: 20000,
       forceNew: false,
       withCredentials: false,
+      auth: {
+        avatar: avatar,
+      },
     });
 
     socketRef.current = socket;
@@ -684,10 +690,12 @@ export function SetupPage() {
 
       // Send start message as soon as connected
       try {
+        const avatar = isMale ? "Dhoni" : "Disha";
         const startPayload = {
           data: {
             text: "start",
             context: null,
+            avatar: avatar,
           },
         };
         console.log("📤 Sending start message:", startPayload);
@@ -1535,10 +1543,12 @@ export function SetupPage() {
       };
       setMessages((prev) => [...prev, userMsg]);
 
+      const avatar = isMale ? "Dhoni" : "Disha";
       const payload = {
         data: {
           text: textToSend,
           context: contextState, // Include the stored context
+          avatar: avatar,
         },
       };
 
@@ -1563,7 +1573,7 @@ export function SetupPage() {
         startBackgroundListeningRef.current?.();
       }, 1000);
     }
-  }, [playEndSound, contextState]);
+  }, [playEndSound, contextState, isMale]);
 
   // Update stopListeningAndSend ref
   useEffect(() => {
@@ -1830,10 +1840,12 @@ export function SetupPage() {
     setShowTextInput(false);
 
     if (socket && socket.connected) {
+      const avatar = isMale ? "Dhoni" : "Disha";
       const payload = {
         data: {
           text: textToSend,
           context: contextState, // Include the stored context
+          avatar: avatar,
         },
       };
 
@@ -1860,6 +1872,25 @@ export function SetupPage() {
       checkForSelectionOptions();
     }
   }, [contextState, checkForSelectionOptions]);
+
+  // Auto-scroll to show latest message near the top
+  useEffect(() => {
+    if (chatContainerRef.current && messagesEndRef.current) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        if (chatContainerRef.current && messagesEndRef.current) {
+          const scrollOffset = 20; // Space from top in pixels
+          const elementTop = messagesEndRef.current.offsetTop;
+
+          // Scroll to show the latest message near the top with some offset
+          chatContainerRef.current.scrollTo({
+            top: elementTop - scrollOffset,
+            behavior: "smooth",
+          });
+        }
+      }, 100);
+    }
+  }, [messages, isWaitingForResponse, selectionConfig]);
 
   // Handle option selection
   const handleOptionToggle = (option: string) => {
@@ -1899,10 +1930,12 @@ export function SetupPage() {
     setMessages((prev) => [...prev, userMsg]);
 
     // Send the selection to the server
+    const avatar = isMale ? "Dhoni" : "Disha";
     const payload = {
       data: {
         text: responseText,
         context: contextState,
+        avatar: avatar,
       },
     };
 
@@ -1929,7 +1962,11 @@ export function SetupPage() {
 
       {/* Chat Messages */}
       <main className="setup-chat-area p-4 bg-gray-50/50">
-        <div className="max-w-2xl mx-auto space-y-4">
+        <div
+          ref={chatContainerRef}
+          className="max-w-2xl mx-auto space-y-4 overflow-y-auto"
+          style={{ maxHeight: "calc(100vh - 300px)", paddingTop: "20px" }}
+        >
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -2070,6 +2107,9 @@ export function SetupPage() {
               </Button>
             </div>
           )}
+
+          {/* Invisible element to scroll to */}
+          <div ref={messagesEndRef} />
         </div>
       </main>
       
