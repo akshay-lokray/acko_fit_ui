@@ -115,7 +115,11 @@ export function PremiumPlanPage() {
                 {/* CTA Button */}
                 <div className="space-y-3">
                     <Button
-                        onClick={() => navigate("/home")}
+                        onClick={() =>
+                            navigate("/home", {
+                                state: { fromPremium: true },
+                            })
+                        }
                         className="w-full py-6 text-base font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all"
                     >
                         START 7 Days FREE TRIAL

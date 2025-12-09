@@ -271,6 +271,7 @@ export function HomePage() {
     "We have created a personalized plan to help you reach your goals. Your fitness journey is no longer boring—head to Explore for curated meals and workouts, log habits, log meals in chat for calorie tracking, and unlock even more support.";
   const defaultWelcomeText = `We have created a personalized plan to help you reach your goals. Your fitness journey is no longer boring—head to Explore for curated meals and workouts, log habits, log meals in chat for calorie tracking, and unlock even more support.`;
   const repeatWelcomeText = `Great to see you again, ${name}. Let's keep the momentum going.`;
+  const isPremiumReturn = location.state?.fromPremium === true;
 
   useEffect(() => {
     if (messages.length > 0) return;
@@ -284,11 +285,20 @@ export function HomePage() {
         window.sessionStorage.getItem("setupHomeMessageShown") === "true";
       const lastDailyGreeting =
         window.sessionStorage.getItem("homeDailyWelcomeDate") || "";
+      const defaultGreetingShown =
+        window.sessionStorage.getItem("homeDefaultGreetingShown") === "true";
 
       if (fromSetup && !setupMessageShown) {
         messageText = setupMessageText;
         window.sessionStorage.setItem("setupHomeMessageShown", "true");
         window.sessionStorage.removeItem("visitedSetup");
+      } else if (isPremiumReturn) {
+        messageText = defaultWelcomeText;
+        window.sessionStorage.setItem("homeDefaultGreetingShown", "true");
+      } else if (!defaultGreetingShown) {
+        messageText = defaultWelcomeText;
+        window.sessionStorage.setItem("homeDefaultGreetingShown", "true");
+        window.sessionStorage.setItem("homeDailyWelcomeDate", todayKey);
       } else if (lastDailyGreeting !== todayKey) {
         messageText = defaultWelcomeText;
         window.sessionStorage.setItem("homeDailyWelcomeDate", todayKey);
@@ -300,9 +310,11 @@ export function HomePage() {
     setMessages([{ id: messageId, sender: "coach", text: messageText }]);
   }, [
     defaultWelcomeText,
+    isPremiumReturn,
     messages.length,
     repeatWelcomeText,
     setupMessageText,
+    location.key,
   ]);
   const latestCoachMessage = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {

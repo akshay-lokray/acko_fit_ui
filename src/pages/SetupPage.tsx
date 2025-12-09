@@ -206,18 +206,19 @@ export function SetupPage() {
   const speakText = useCallback(
     (text: string) => {
       if (!text || !text.trim()) {
-        return;
+      return Promise.resolve();
       }
 
       if (!("speechSynthesis" in window)) {
         console.warn("Speech synthesis not supported");
-        return;
+      return Promise.resolve();
       }
 
       if (speechSynthesisRef.current) {
         window.speechSynthesis.cancel();
       }
 
+    return new Promise<void>((resolve) => {
       try {
         const utterance = new SpeechSynthesisUtterance(text);
         speechSynthesisRef.current = utterance;
@@ -268,18 +269,22 @@ export function SetupPage() {
         utterance.onend = () => {
           console.log("🔊 Finished speaking response");
           speechSynthesisRef.current = null;
+          resolve();
         };
 
         utterance.onerror = (event) => {
           console.error("❌ Speech synthesis error:", event.error);
           speechSynthesisRef.current = null;
+          resolve();
         };
 
         window.speechSynthesis.speak(utterance);
         console.log("🔊 Speaking response:", text.substring(0, 50) + "...");
       } catch (error) {
         console.error("Failed to speak text:", error);
+        resolve();
       }
+    });
     },
     [isMale]
   );
@@ -732,52 +737,51 @@ export function SetupPage() {
           setIsWaitingForResponse(false); // Hide loading indicator
           setIsWaitingForInitialResponse(false); // Hide initial loading indicator
 
-          // Speak the cleaned response using text-to-speech
-          speakText(cleanedText);
+          const speechPromise = speakText(cleanedText);
 
-          // Check if status is completed and redirect to /home
-          if (isCompleted) {
-            console.log("✅ Setup completed! Redirecting to /home...");
-
-            // Extract and save phone number to localStorage
+          // Extract and save phone number to localStorage
+          if (
+            journeyContext?.keys &&
+            typeof journeyContext.keys === "object"
+          ) {
+            const phoneKey = journeyContext.keys.phone;
             if (
-              journeyContext?.keys &&
-              typeof journeyContext.keys === "object"
+              phoneKey &&
+              typeof phoneKey === "object" &&
+              "value" in phoneKey &&
+              phoneKey.value &&
+              typeof phoneKey.value === "string"
             ) {
-              const phoneKey = journeyContext.keys.phone;
-              if (
-                phoneKey &&
-                typeof phoneKey === "object" &&
-                "value" in phoneKey &&
-                phoneKey.value &&
-                typeof phoneKey.value === "string"
-              ) {
-                try {
-                  localStorage.setItem("userPhone", HARD_CODED_USER_ID);
-                  console.log(
-                    "📱 Saved phone number to localStorage:",
-                    HARD_CODED_USER_ID
-                  );
-                  updateFormData({ mobile: HARD_CODED_USER_ID });
-                } catch (error) {
-                  console.error(
-                    "❌ Failed to save phone number to localStorage:",
-                    error
-                  );
-                }
+              try {
+                localStorage.setItem("userPhone", HARD_CODED_USER_ID);
+                console.log(
+                  "📱 Saved phone number to localStorage:",
+                  HARD_CODED_USER_ID
+                );
+                updateFormData({ mobile: HARD_CODED_USER_ID });
+              } catch (error) {
+                console.error(
+                  "❌ Failed to save phone number to localStorage:",
+                  error
+                );
               }
             }
+          }
 
-            setTimeout(() => {
-              if (navigateRef.current) {
-                navigateRef.current("/premium", {
-                  state: {
-                    gender: genderRef.current,
-                    formData: contextState?.keys || {},
-                  },
-                });
-              }
-            }, 2000); // Small delay to let user see the completion message
+          if (isCompleted) {
+            console.log("✅ Setup completed! Redirecting to /home...");
+            speechPromise.finally(() => {
+              setTimeout(() => {
+                if (navigateRef.current) {
+                  navigateRef.current("/premium", {
+                    state: {
+                      gender: genderRef.current,
+                      formData: contextState?.keys || {},
+                    },
+                  });
+                }
+              }, 2000);
+            });
           }
         } else {
           console.warn(
@@ -838,8 +842,8 @@ export function SetupPage() {
             (trimmedData.startsWith("{") && trimmedData.endsWith("}")) ||
             (trimmedData.startsWith("[") && trimmedData.endsWith("]"))
           ) {
-            try {
-              const parsed = JSON.parse(data);
+          try {
+            const parsed = JSON.parse(data);
               // Check if it's the new format with data.data
               if (parsed.data && typeof parsed.data === "object") {
                 responseText = String(parsed.data.text || "");
@@ -1053,13 +1057,13 @@ export function SetupPage() {
 
         processedMessageIdsRef.current.add(cleanedText);
 
-        const coachMsg: Message = {
+      const coachMsg: Message = {
           id: `${cleanedText.substring(0, 50)}-${Date.now()}`,
-          sender: "coach",
+        sender: "coach",
           text: cleanedText,
-        };
-        setMessages((prev) => [...prev, coachMsg]);
-        setShowTextInput(false);
+      };
+      setMessages((prev) => [...prev, coachMsg]);
+      setShowTextInput(false);
         setIsWaitingForResponse(false); // Hide loading indicator
         setIsWaitingForInitialResponse(false); // Hide initial loading indicator
 
@@ -1796,25 +1800,25 @@ export function SetupPage() {
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto p-4 pb-24"
         >
-          <div className="max-w-2xl mx-auto space-y-4">
-            {messages.map((msg) => (
+        <div className="max-w-2xl mx-auto space-y-4">
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex ${
+                msg.sender === "user" ? "justify-end" : "justify-start"
+              }`}
+            >
               <div
-                key={msg.id}
-                className={`flex ${
-                  msg.sender === "user" ? "justify-end" : "justify-start"
+                className={`max-w-[80%] rounded-2xl p-4 text-sm ${
+                  msg.sender === "user"
+                    ? "bg-gray-900 text-white rounded-br-none"
+                    : "bg-white border border-gray-100 shadow-sm text-gray-800 rounded-bl-none"
                 }`}
               >
-                <div
-                  className={`max-w-[80%] rounded-2xl p-4 text-sm ${
-                    msg.sender === "user"
-                      ? "bg-gray-900 text-white rounded-br-none"
-                      : "bg-white border border-gray-100 shadow-sm text-gray-800 rounded-bl-none"
-                  }`}
-                >
-                  {msg.text}
-                </div>
+                {msg.text}
               </div>
-            ))}
+            </div>
+          ))}
 
             {/* Loading indicator when waiting for response (including initial) */}
             {(isWaitingForResponse || isWaitingForInitialResponse) && (
@@ -1841,25 +1845,25 @@ export function SetupPage() {
             )}
 
             {/* Listening Indicator - Explicit Listening */}
-            {isListening && (
-              <div className="flex justify-center py-4">
-                <div
-                  className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                    isMale ? "bg-emerald-500" : "bg-purple-500"
-                  } animate-pulse shadow-lg`}
-                >
-                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center animate-ping ${
-                        isMale ? "bg-emerald-100" : "bg-purple-100"
-                      }`}
-                    >
-                      <Zap className={`w-6 h-6 ${themeColor}`} />
-                    </div>
+          {isListening && (
+            <div className="flex justify-center py-4">
+              <div
+                className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                  isMale ? "bg-emerald-500" : "bg-purple-500"
+                } animate-pulse shadow-lg`}
+              >
+                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center animate-ping ${
+                      isMale ? "bg-emerald-100" : "bg-purple-100"
+                    }`}
+                  >
+                    <Zap className={`w-6 h-6 ${themeColor}`} />
                   </div>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
             {/* Selection Options UI - Only show when keyboard input is active */}
             {selectionConfig && showTextInput && (
@@ -1925,7 +1929,7 @@ export function SetupPage() {
           </div>
         </div>
       </main>
-
+      
       {/* Avatar Zone - Fixed at bottom */}
       <div className="setup-page-avatar-zone flex-shrink-0">
         <div className="setup-avatar-panel">
