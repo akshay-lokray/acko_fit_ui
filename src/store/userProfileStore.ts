@@ -1,34 +1,49 @@
-import { create } from "zustand"
-import { devtools, persist } from "zustand/middleware"
-import type { FormData } from "@/types/form"
+import { create } from "zustand";
+import { devtools, persist } from "zustand/middleware";
+import type { FormData } from "@/types/form";
 
 const initialFormData = (): FormData => ({
-  gender: "",
+  userId: undefined,
   name: "",
   mobile: "",
-  selectedOptions: [],
-  activityLevel: "",
-  age: 20,
-  height: 170,
+  gender: "",
+  age: 0,
+  height: 0,
   heightUnit: "cm",
-  currentWeight: 80,
+  currentWeight: null,
+  targetWeight: null,
   weightUnit: "kg",
-  goalPace: 0.25,
-  targetWeight: 60,
-  autoTrackEnabled: false,
-  medicalConditions: ["None"],
-  xp: 0,
-  streak: 0,
-})
+  goalPace: null,
+  autoTrackEnabled: null,
+  activityLevel: null,
+  selectedOptions: [],
+  medicalConditions: [],
+  streak: null,
+  lastActivityDate: null,
+  xp: null,
+  xpUpdatedDate: null,
+  xpIncrementsToday: null,
+  mealLoggerEnabled: null,
+  mealLoggerRelation: null,
+  mealLoggerPhone: null,
+  mealLoggerName: null,
+  mealLoggerEmail: null,
+  mealLoggerMeta: null,
+  weightCategory: null,
+  foodStyle: null,
+  mealCount: null,
+  fitnessGoals: [],
+  additionalInfo: [],
+});
 
 interface UserProfileStore {
-  step: number
-  formData: FormData
-  setStep: (step: number) => void
-  nextStep: () => void
-  prevStep: () => void
-  updateFormData: (updates: Partial<FormData>) => void
-  resetForm: () => void
+  step: number;
+  formData: FormData;
+  setStep: (step: number) => void;
+  nextStep: () => void;
+  prevStep: () => void;
+  updateFormData: (updates: Partial<FormData>) => void;
+  resetForm: () => void;
 }
 
 export const useUserProfileStore = create<UserProfileStore>()(
@@ -42,9 +57,12 @@ export const useUserProfileStore = create<UserProfileStore>()(
         prevStep: () => set((state) => ({ step: Math.max(1, state.step - 1) })),
         updateFormData: (updates) =>
           set((state) => {
-            const nextFormData = { ...state.formData, ...updates }
-            console.log("[userProfileStore] updateFormData", { updates, nextFormData })
-            return { formData: nextFormData }
+            const nextFormData = { ...state.formData, ...updates };
+            console.log("[userProfileStore] updateFormData", {
+              updates,
+              nextFormData,
+            });
+            return { formData: nextFormData };
           }),
         resetForm: () =>
           set({
@@ -59,5 +77,4 @@ export const useUserProfileStore = create<UserProfileStore>()(
     ),
     { name: "userProfileStore" }
   )
-)
-
+);

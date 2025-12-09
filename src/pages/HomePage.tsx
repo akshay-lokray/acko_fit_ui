@@ -20,6 +20,7 @@ import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { useUserProfileStore } from "@/store/userProfileStore";
 import AvatarScene from "@/components/AvatarScene";
+import type { VoiceType } from "@/types/voice";
 import "@/pages/HomePage.css";
 
 // Type definitions for Speech Recognition API
@@ -165,9 +166,15 @@ export function HomePage() {
   const levelingXp = 1000;
   const level = 1;
 
-  const fetchUserProfile = async (userId: string) => {
+  const fetchUserProfile = async () => {
     try {
-      const res = await fetch(`/api/users/${encodeURIComponent(userId)}`);
+      // Get phone number from localStorage
+      const phoneNumber = localStorage.getItem("userPhone");
+      if (!phoneNumber) {
+        console.warn("No phone number found in localStorage");
+        return;
+      }
+      const res = await fetch(`/api/users/${encodeURIComponent(phoneNumber)}`);
       if (!res.ok) return;
       const data = await res.json();
       updateFormData(data);
@@ -176,16 +183,22 @@ export function HomePage() {
     }
   };
 
-  const awardXp = async (userId: string, delta: number) => {
+  const awardXp = async (delta: number) => {
     try {
+      // Get phone number from localStorage
+      const phoneNumber = localStorage.getItem("userPhone");
+      if (!phoneNumber) {
+        console.warn("No phone number found in localStorage");
+        return;
+      }
       const res = await fetch(
-        `/api/users/${encodeURIComponent(userId)}/xp?delta=${delta}`,
+        `/api/users/${encodeURIComponent(phoneNumber)}/xp?delta=${delta}`,
         {
-        method: "POST",
+          method: "POST",
         }
       );
       if (!res.ok) return;
-      await fetchUserProfile(userId); // refresh xp
+      await fetchUserProfile(); // refresh xp
     } catch (e) {
       console.error("Failed to award XP", e);
     }
@@ -193,13 +206,14 @@ export function HomePage() {
 
   // Fetch user profile on mount
   useEffect(() => {
-    const userId = profile.mobile || routeFormData.mobile || "";
-    if (!userId) return;
-    if (fetchedUserRef.current === userId) return;
-    fetchedUserRef.current = userId;
+    const phoneNumber = localStorage.getItem("userPhone");
+    if (!phoneNumber) return;
+    if (fetchedUserRef.current === phoneNumber) return;
+    fetchedUserRef.current = phoneNumber;
 
-    fetchUserProfile(userId);
-  }, [profile.mobile, routeFormData.mobile]);
+    fetchUserProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Fetch daily habit stats on mount
   useEffect(() => {
@@ -263,12 +277,12 @@ export function HomePage() {
 
   // Award XP when goals are reached (once per goal per user)
   useEffect(() => {
-    const userId = profile.mobile || routeFormData.mobile || "";
-    if (!userId) return;
+    const phoneNumber = localStorage.getItem("userPhone");
+    if (!phoneNumber) return;
 
     // Reset goal state when user changes
-    if (goalStateRef.current.userId !== userId) {
-      goalStateRef.current = { userId, hits: new Set() };
+    if (goalStateRef.current.userId !== phoneNumber) {
+      goalStateRef.current = { userId: phoneNumber, hits: new Set() };
     }
 
     const goals = [
@@ -286,7 +300,7 @@ export function HomePage() {
 
     let delta = 0;
     goals.forEach(({ key, hit, xp }) => {
-      const marker = `${userId}:${key}`;
+      const marker = `${phoneNumber}:${key}`;
       const alreadyHit = goalStateRef.current.hits.has(marker);
 
       // If goal is already achieved before this render, only award when transitioning from not-hit -> hit
@@ -302,9 +316,10 @@ export function HomePage() {
     });
 
     if (delta > 0) {
-      awardXp(userId, delta);
+      awardXp(delta);
     }
-  }, [habitStats, profile.mobile, routeFormData.mobile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [habitStats]);
 
   // Determining "Persona" styles
   const isMale = gender === "male";
@@ -644,8 +659,8 @@ export function HomePage() {
     });
 
     socket.on("message", (data) => {
-        let text = "";
-        try {
+      let text = "";
+      try {
         if (typeof data === "string") {
           const parsed = JSON.parse(data);
           text = parsed.text ?? String(data);
@@ -654,16 +669,16 @@ export function HomePage() {
         } else {
           text = String(data);
         }
-        } catch {
+      } catch {
         text = String(data);
-        }
-        const coachMsg: Message = {
-          id: Date.now().toString(),
-          sender: "coach",
-          text,
-        };
-        setMessages((prev) => [...prev, coachMsg]);
-        setIsListening(false);
+      }
+      const coachMsg: Message = {
+        id: Date.now().toString(),
+        sender: "coach",
+        text,
+      };
+      setMessages((prev) => [...prev, coachMsg]);
+      setIsListening(false);
     });
 
     // Listen for 'response' event from server
@@ -1343,30 +1358,34 @@ export function HomePage() {
         </div>
 
         {/* Listening Overlay - shown when listening */}
-          {isListening && (
+        {isListening && (
           <div className="relative z-10 flex flex-col items-center justify-center py-8">
             <div
               className={`w-24 h-24 rounded-full flex items-center justify-center ${
                 isMale ? "bg-emerald-500" : "bg-purple-500"
               } animate-pulse shadow-[0_0_40px_rgba(0,0,0,0.2)]`}
             >
-                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
+              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
                 <div
                   className={`w-16 h-16 rounded-full flex items-center justify-center animate-ping ${
                     isMale ? "bg-emerald-100" : "bg-purple-100"
                   }`}
                 >
-                    <Zap className={`w-8 h-8 ${themeColor}`} />
-                  </div>
+                  <Zap className={`w-8 h-8 ${themeColor}`} />
                 </div>
               </div>
-            <p className="mt-6 text-gray-700 font-bold text-lg">Listening...</p>
             </div>
-          )}
+            <p className="mt-6 text-gray-700 font-bold text-lg">Listening...</p>
+          </div>
+        )}
 
         <div className="home-avatar-banner">
           <AvatarScene
-            textToSpeak={messages[messages.length - 1].sender === "coach" ? messages[messages.length - 1].text : ""}
+            textToSpeak={
+              messages[messages.length - 1].sender === "coach"
+                ? messages[messages.length - 1].text
+                : ""
+            }
             voiceType={gender as VoiceType}
             isFullScreen={false}
           />
@@ -1379,9 +1398,7 @@ export function HomePage() {
             <button
               onClick={() => setActiveTab("chat")}
               className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
-                activeTab === "chat"
-                  ? "text-emerald-600"
-                  : "text-gray-400"
+                activeTab === "chat" ? "text-emerald-600" : "text-gray-400"
               }`}
             >
               <MessageSquare className="w-4 h-4" /> Comms
@@ -1392,9 +1409,7 @@ export function HomePage() {
             <button
               onClick={() => setActiveTab("explore")}
               className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
-                activeTab === "explore"
-                  ? "text-emerald-600"
-                  : "text-gray-400"
+                activeTab === "explore" ? "text-emerald-600" : "text-gray-400"
               }`}
             >
               <Compass className="w-4 h-4" /> Explore
@@ -1446,7 +1461,8 @@ export function HomePage() {
                 <div className="mb-4">
                   <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
                     <p className="text-sm text-gray-700">
-                      Welcome back, {name.split(' ')[0]}. Ready to conquer today's mission?
+                      Welcome back, {name.split(" ")[0]}. Ready to conquer
+                      today's mission?
                     </p>
                   </div>
                 </div>
@@ -1466,16 +1482,16 @@ export function HomePage() {
                         habitStats.water >= 2000);
 
                     return (
-                    <div
-                      key={quest.id}
-                      className={`bg-white p-4 rounded-2xl border border-gray-200 flex items-center justify-between shadow-sm ${
+                      <div
+                        key={quest.id}
+                        className={`bg-white p-4 rounded-2xl border border-gray-200 flex items-center justify-between shadow-sm ${
                           quest.title === "Log Meal" ||
                           quest.title === "Walk 5,000 Steps" ||
                           quest.title === "Drink 2L Water"
-                          ? "cursor-pointer hover:shadow-md transition-shadow"
-                          : ""
+                            ? "cursor-pointer hover:shadow-md transition-shadow"
+                            : ""
                         } ${goalHit ? "border-emerald-200" : ""}`}
-                      onClick={() => {
+                        onClick={() => {
                           if (quest.title === "Log Meal") {
                             navigate("/log-meal", {
                               state: { formData: profile },
@@ -1484,18 +1500,21 @@ export function HomePage() {
                         }}
                       >
                         <div className="flex items-center gap-3 flex-1">
-                        <div
-                          className={`w-5 h-5 rounded-full flex items-center justify-center border-2 ${
+                          <div
+                            className={`w-5 h-5 rounded-full flex items-center justify-center border-2 ${
                               quest.completed || goalHit
                                 ? "bg-emerald-500 border-emerald-500"
                                 : "bg-white border-gray-300"
-                          }`}
-                        >
-                          {quest.completed || goalHit ? (
-                            <CheckCircle2 className="w-3 h-3 text-white fill-white" strokeWidth={3} />
-                          ) : null}
-                        </div>
-                        <div className="flex flex-col">
+                            }`}
+                          >
+                            {quest.completed || goalHit ? (
+                              <CheckCircle2
+                                className="w-3 h-3 text-white fill-white"
+                                strokeWidth={3}
+                              />
+                            ) : null}
+                          </div>
+                          <div className="flex flex-col">
                             <span
                               className={`text-sm font-medium ${
                                 quest.completed
@@ -1513,30 +1532,28 @@ export function HomePage() {
                               )}
                             {quest.title === "Walk 5,000 Steps" &&
                               habitStats.steps != null && (
-                            <span className="text-xs text-emerald-600">
-                              {habitStats.steps} steps today
+                                <span className="text-xs text-emerald-600">
+                                  {habitStats.steps} steps today
                                   {habitStats.steps >= 5000
                                     ? " · Goal hit!"
                                     : ""}
-                            </span>
-                          )}
+                                </span>
+                              )}
                             {quest.title === "Drink 2L Water" &&
                               habitStats.water != null && (
-                            <span className="text-xs text-emerald-600">
-                              {habitStats.water} ml today
+                                <span className="text-xs text-emerald-600">
+                                  {habitStats.water} ml today
                                   {habitStats.water >= 2000
                                     ? " · Goal hit!"
                                     : ""}
-                            </span>
-                          )}
+                                </span>
+                              )}
+                          </div>
                         </div>
-                      </div>
-                        <span
-                          className="text-xs font-bold px-3 py-1 rounded-full bg-yellow-100 text-yellow-700"
-                        >
+                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-yellow-100 text-yellow-700">
                           +{quest.xp} XP
                         </span>
-                    </div>
+                      </div>
                     );
                   })}
                 </div>
@@ -1564,13 +1581,14 @@ export function HomePage() {
                     size="icon"
                     onClick={handleVoiceInput}
                     className={`w-12 h-12 rounded-full shadow-md transition-all ${
-                      isListening ? "bg-red-500 animate-pulse" : "bg-emerald-600 hover:bg-emerald-700"
+                      isListening
+                        ? "bg-red-500 animate-pulse"
+                        : "bg-emerald-600 hover:bg-emerald-700"
                     }`}
                   >
                     <Zap className="w-5 h-5 fill-white text-white" />
                   </Button>
                 </div>
-
               </div>
             )}
 
@@ -1585,7 +1603,9 @@ export function HomePage() {
                     <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center text-orange-600">
                       <Utensils className="w-7 h-7" />
                     </div>
-                    <span className="font-semibold text-gray-700 text-sm">Recipes</span>
+                    <span className="font-semibold text-gray-700 text-sm">
+                      Recipes
+                    </span>
                   </div>
 
                   <div
@@ -1619,7 +1639,9 @@ export function HomePage() {
                     <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
                       <CheckCircle2 className="w-7 h-7" />
                     </div>
-                    <span className="font-semibold text-gray-700 text-sm">Habits</span>
+                    <span className="font-semibold text-gray-700 text-sm">
+                      Habits
+                    </span>
                   </div>
 
                   <div
@@ -1696,7 +1718,8 @@ export function HomePage() {
                     const size = position === 0 ? "w-20 h-20" : "w-16 h-16";
                     const innerSize = position === 0 ? "w-12 h-12" : "w-8 h-8";
                     const badgeSize = position === 0 ? "w-6 h-6" : "w-5 h-5";
-                    const badgeTextSize = position === 0 ? "text-xs" : "text-[10px]";
+                    const badgeTextSize =
+                      position === 0 ? "text-xs" : "text-[10px]";
 
                     return (
                       <div
@@ -1711,8 +1734,12 @@ export function HomePage() {
                         <div
                           className={`${size} ${badgeColor} rounded-full flex items-center justify-center mb-2 relative shadow-md`}
                         >
-                          <div className={`${innerSize} bg-white rounded-full flex items-center justify-center`}>
-                            <span className="text-white font-bold text-sm">W</span>
+                          <div
+                            className={`${innerSize} bg-white rounded-full flex items-center justify-center`}
+                          >
+                            <span className="text-white font-bold text-sm">
+                              W
+                            </span>
                           </div>
                           <div
                             className={`absolute -bottom-1 ${badgeColor} text-white ${badgeTextSize} ${badgeSize} rounded-full flex items-center justify-center font-bold shadow-sm`}

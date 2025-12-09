@@ -27,9 +27,14 @@ export function MultiStepForm() {
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const submitUserData = async () => {
+    // Get phone number from localStorage if available
+    const phoneFromStorage = localStorage.getItem("userPhone");
+    const mobile = phoneFromStorage || formData.mobile;
+
     const payload = {
       ...formData,
-      userId: formData.mobile,
+      userId: mobile,
+      mobile: mobile,
     };
 
     try {
