@@ -8,82 +8,96 @@ import SpeechController from './SpeechController';
 import type { VoiceType } from '../types/voice';
 import './AvatarScene.css';
 
-const REALISTIC_VISEME_MAP: Record<
-  string,
-  { morphs: Record<string, number> }
-> = {
+const SMOOTH_VISEME_MAP: Record<string, { morphs: Record<string, number> }> = {
   silence: {
-    morphs: {},
+    morphs: {
+      jawOpen: 0,
+      mouthFunnel: 0,
+      mouthPucker: 0,
+      mouthSmileLeft: 0,
+      mouthSmileRight: 0,
+      mouthRollUpper: 0,
+      mouthRollLower: 0,
+    },
   },
   A: {
     morphs: {
-      jawOpen: 0.35,
-      mouthFunnel: 0.15,
+      jawOpen: 0.2,
+      mouthSmileLeft: 0.08,
+      mouthSmileRight: 0.08,
+      mouthDimpleLeft: 0.1,
+      mouthDimpleRight: 0.1,
     },
   },
   E: {
     morphs: {
-      jawOpen: 0.2,
-      mouthSmileLeft: 0.3,
-      mouthSmileRight: 0.3,
-      mouthStretchLeft: 0.2,
-      mouthStretchRight: 0.2,
+      jawOpen: 0.08,
+      mouthSmileLeft: 0.18,
+      mouthSmileRight: 0.18,
+      mouthLowerDownLeft: 0.08,
+      mouthLowerDownRight: 0.08,
     },
   },
   I: {
     morphs: {
-      jawOpen: 0.2,
-      mouthSmileLeft: 0.1,
-      mouthSmileRight: 0.1,
+      jawOpen: 0.1,
+      mouthSmileLeft: 0.12,
+      mouthSmileRight: 0.12,
+      mouthShrugUpper: 0.05,
     },
   },
   O: {
     morphs: {
-      jawOpen: 0.35,
-      mouthFunnel: 0.7,
+      jawOpen: 0.22,
+      mouthFunnel: 0.5,
+      mouthPucker: 0.25,
     },
   },
   U: {
     morphs: {
-      jawOpen: 0.1,
-      mouthPucker: 0.9,
+      jawOpen: 0.05,
+      mouthPucker: 0.85,
       mouthFunnel: 0.1,
+      mouthRollLower: 0.2,
     },
   },
   M: {
     morphs: {
       jawOpen: 0.05,
-      mouthRollUpper: 0.2,
-      mouthRollLower: 0.2,
-      mouthShrugUpper: 0.2,
+      mouthRollUpper: 0.15,
+      mouthRollLower: 0.15,
+      mouthShrugUpper: 0.1,
+      mouthPucker: 0.1,
     },
   },
   F: {
     morphs: {
-      jawOpen: 0.15,
-      mouthRollLower: 0.4,
-      mouthLowerDownLeft: 0.2,
-      mouthLowerDownRight: 0.2,
+      jawOpen: 0.1,
+      mouthRollLower: 0.35,
+      mouthLowerDownLeft: 0.1,
+      mouthLowerDownRight: 0.1,
     },
   },
   TH: {
     morphs: {
-      jawOpen: 0.2,
-      mouthFunnel: 0.3,
+      jawOpen: 0.15,
+      mouthFunnel: 0.15,
+      mouthLowerDownLeft: 0.2,
+      mouthLowerDownRight: 0.2,
     },
   },
   default: {
     morphs: {
-      jawOpen: 0.05,
+      jawOpen: 0.02,
       mouthSmileLeft: 0.05,
       mouthSmileRight: 0.05,
     },
   },
 };
 
-REALISTIC_VISEME_MAP['B'] = REALISTIC_VISEME_MAP['M'];
-REALISTIC_VISEME_MAP['P'] = REALISTIC_VISEME_MAP['M'];
-REALISTIC_VISEME_MAP['V'] = REALISTIC_VISEME_MAP['F'];
+SMOOTH_VISEME_MAP['B'] = SMOOTH_VISEME_MAP['M'];
+SMOOTH_VISEME_MAP['P'] = SMOOTH_VISEME_MAP['M'];
+SMOOTH_VISEME_MAP['V'] = SMOOTH_VISEME_MAP['F'];
 
 interface AvatarSceneProps {
   textToSpeak?: string;
@@ -337,6 +351,8 @@ function AvatarWithVisemes({
     }
   }, [voiceType]); // Re-find head when voice type changes
 
+  const targetHistory = useRef<Record<string, number>>({});
+
   useFrame(() => {
     const head = headRef.current;
     if (!head || !head.morphTargetDictionary || !head.morphTargetInfluences) {
@@ -356,14 +372,22 @@ function AvatarWithVisemes({
 
     const charIndex = Math.floor(audioTime * 6.67);
     const phoneme = getPhonemeFromText(text, charIndex);
-    const targetData = REALISTIC_VISEME_MAP[phoneme] || REALISTIC_VISEME_MAP['default'];
+    const targetData = SMOOTH_VISEME_MAP[phoneme] || SMOOTH_VISEME_MAP['default'];
     const targetMorphs = targetData.morphs;
+    const blendedMorphs: Record<string, number> = {};
 
-      Object.keys(dict).forEach((name) => {
-        const idx = dict[name];
-        const targetValue = targetMorphs[name] ?? 0;
-        influences[idx] = THREE.MathUtils.lerp(influences[idx], targetValue, 0.35);
-      });
+    Object.keys(targetMorphs).forEach((key) => {
+      const previousValue = targetHistory.current[key] ?? 0;
+      const targetValue = Math.min(targetMorphs[key], 0.25);
+      blendedMorphs[key] = THREE.MathUtils.lerp(previousValue, targetValue, 0.45);
+      targetHistory.current[key] = blendedMorphs[key];
+    });
+
+    Object.keys(dict).forEach((name) => {
+      const idx = dict[name];
+      const targetValue = blendedMorphs[name] ?? 0;
+      influences[idx] = THREE.MathUtils.lerp(influences[idx], targetValue, 0.15);
+    });
   });
 
   return (
