@@ -75,7 +75,6 @@ function App() {
           <Route path="/profile" element={<UserLockerPage />} />
           <Route path="/devices" element={<DevicesPage />} />
           <Route path="/rewards" element={<RewardsPage />} />
-          <Route path="/rankings" element={<RankingsPage />} />
           <Route path="/log-meal" element={<LogLunchPage />} />
           <Route path="/log-steps" element={<LogStepsPage />} />
           <Route path="/log-water" element={<LogWaterPage />} />

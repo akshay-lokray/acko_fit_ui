@@ -2031,30 +2031,6 @@ export function HomePage() {
           <div className="flex-1 flex flex-col overflow-y-auto bg-white px-4 md:px-6 pt-4 pb-0 min-h-0">
             {activeTab === "goals" && (
               <div className="h-full space-y-6 max-w-2xl mx-auto px-4 pb-6">
-                {/* Goal Selector */}
-                {fitnessGoals.length > 1 && (
-                  <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm">
-                    <p className="text-sm font-semibold text-gray-700 mb-3">
-                      Select Goal:
-                    </p>
-                    <div className="flex flex-wrap gap-3">
-                      {fitnessGoals.map((goal) => (
-                        <button
-                          key={goal}
-                          onClick={() => setSelectedGoal(goal)}
-                          className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                            activeGoal === goal
-                              ? "bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-md shadow-purple-200"
-                              : "bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200"
-                          }`}
-                        >
-                          {goal}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {/* Progress Stats */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-3xl p-5 border border-emerald-200 shadow-sm">
