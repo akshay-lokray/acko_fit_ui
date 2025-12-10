@@ -880,16 +880,12 @@ export function HomePage() {
   const recognitionResultRef = useRef<string>("");
   const interimTranscriptRef = useRef<string>(""); // Store interim transcripts
   const wakeWordRecognitionRef = useRef<SpeechRecognition | null>(null);
-  const maxListeningTimeoutRef = useRef<number | null>(null);
-  const silenceTimeoutRef = useRef<number | null>(null);
-  const lastSpeechTimeRef = useRef<number>(0);
-  const silenceMonitorRef = useRef<number | null>(null);
   const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const handleSendMessageRef = useRef<((textOverride?: string) => void) | null>(
     null
   );
-  const SILENCE_TIMEOUT_MS = 3000;
+  const intentionallyStoppedRef = useRef<boolean>(false); // Track if recognition was intentionally stopped
 
   // Function to play audio feedback - start listening sound
   const playStartSound = useCallback(() => {
@@ -1167,31 +1163,12 @@ export function HomePage() {
     }
   };
 
-  // Helper function to stop listening and send the result
-  const clearSilenceMonitor = useCallback(() => {
-    if (silenceMonitorRef.current) {
-      window.clearInterval(silenceMonitorRef.current);
-      silenceMonitorRef.current = null;
-    }
-  }, []);
-
   const stopListeningAndSend = useCallback(() => {
     setIsListening(false);
-
-    clearSilenceMonitor();
+    intentionallyStoppedRef.current = true; // Mark as intentionally stopped
 
     // Play end sound to indicate listening has stopped
     playEndSound();
-
-    // Clear all timeouts
-    if (maxListeningTimeoutRef.current) {
-      window.clearTimeout(maxListeningTimeoutRef.current);
-      maxListeningTimeoutRef.current = null;
-    }
-    if (silenceTimeoutRef.current) {
-      window.clearTimeout(silenceTimeoutRef.current);
-      silenceTimeoutRef.current = null;
-    }
 
     if (recognitionRef.current) {
       const recognition = recognitionRef.current;
@@ -1238,7 +1215,7 @@ export function HomePage() {
       recognitionResultRef.current = "";
       interimTranscriptRef.current = "";
     }
-  }, [playEndSound, clearSilenceMonitor]);
+  }, [playEndSound]);
 
   // Voice input handler - wrapped in useCallback for use in wake word detection
   const handleVoiceInput = useCallback(() => {
@@ -1280,6 +1257,26 @@ export function HomePage() {
       return;
     }
 
+    // Stop wake word detection first to avoid conflicts
+    if (wakeWordRecognitionRef.current) {
+      try {
+        const wakeWordRecognition = wakeWordRecognitionRef.current;
+        wakeWordRecognitionRef.current = null;
+        wakeWordRecognition.onend = null;
+        wakeWordRecognition.onerror = null;
+        wakeWordRecognition.onresult = null;
+        wakeWordRecognition.stop();
+      } catch {
+        try {
+          if (wakeWordRecognitionRef.current) {
+            wakeWordRecognitionRef.current.abort();
+          }
+        } catch {
+          // Ignore errors
+        }
+      }
+    }
+
     // Ensure any previous recognition is fully cleaned up
     if (recognitionRef.current) {
       const oldRecognition = recognitionRef.current;
@@ -1289,6 +1286,7 @@ export function HomePage() {
       oldRecognition.onresult = null;
       // Clear ref before stopping
       recognitionRef.current = null;
+      intentionallyStoppedRef.current = true; // Mark as intentionally stopped
 
       try {
         // Use stop() for graceful stop
@@ -1303,7 +1301,7 @@ export function HomePage() {
       }
     }
 
-    // Small delay to ensure previous recognition is fully stopped
+    // Longer delay to ensure previous recognition is fully stopped and cleaned up
     setTimeout(() => {
       // Double-check we're still not listening (user might have clicked again)
       if (isListening) {
@@ -1314,6 +1312,7 @@ export function HomePage() {
       try {
         const recognition = new SpeechRecognition();
         recognitionRef.current = recognition;
+        intentionallyStoppedRef.current = false; // Reset flag when starting new recognition
 
         // Configure recognition
         recognition.continuous = true; // Keep listening until stopped
@@ -1401,9 +1400,8 @@ export function HomePage() {
           }
         };
 
-        // Track when recognition started to prevent immediate restarts
+        // Track when recognition started
         const recognitionStartTime = Date.now();
-        const MIN_RECOGNITION_DURATION = 500; // Minimum 500ms before allowing restart
 
         // Handle when recognition ends
         recognition.onend = () => {
@@ -1419,69 +1417,28 @@ export function HomePage() {
           const duration = Date.now() - recognitionStartTime;
           console.log(`🎤 Speech recognition ended (duration: ${duration}ms)`);
 
-          // If recognition ended very quickly (< 500ms), it might be an error
-          // Don't restart immediately in this case
-          if (duration < MIN_RECOGNITION_DURATION) {
-            console.warn(
-              "⚠️ Recognition ended too quickly, might be an error. Not restarting."
+          // Check if this was intentionally stopped
+          if (intentionallyStoppedRef.current) {
+            console.log(
+              "✅ Recognition ended (intentionally stopped by user). Waiting for user to manually start again."
             );
-            // Check if we're still supposed to be listening and ref matches
-            if (isListening && recognitionRef.current === recognition) {
-              // Wait a bit longer before trying to restart
-              setTimeout(() => {
-                // Double-check ref still matches (might have been cleared)
-                if (isListening && recognitionRef.current === recognition) {
-                  console.log(
-                    "🔄 Attempting to restart recognition after quick end..."
-                  );
-                  try {
-                    recognition.start();
-                  } catch (error) {
-                    console.error(
-                      "Failed to restart recognition after quick end:",
-                      error
-                    );
-                    stopListeningAndSend();
-                  }
-                }
-              }, 1000); // Wait 1 second before restarting
-            }
+            intentionallyStoppedRef.current = false; // Reset flag
             return;
           }
 
-          // Only restart if we're still supposed to be listening
-          // and the recognition wasn't intentionally stopped (ref still matches)
-          if (isListening && recognitionRef.current === recognition) {
-            console.log("🔄 Recognition ended normally, restarting...");
-            // Small delay before restarting to avoid conflicts
-            setTimeout(() => {
-              // Double-check ref still matches (might have been cleared)
-              if (isListening && recognitionRef.current === recognition) {
-                try {
-                  recognition.start();
-                } catch (error) {
-                  console.error("Failed to restart recognition:", error);
-                  // If restart fails, stop listening
-                  if (
-                    error instanceof Error &&
-                    error.message.includes("already started")
-                  ) {
-                    // Recognition might already be running, ignore
-                    return;
-                  }
-                  stopListeningAndSend();
-                }
-              } else {
-                console.log(
-                  "⚠️ Ref was cleared during restart delay, not restarting"
-                );
-              }
-            }, 100);
-          } else {
-            console.log(
-              "✅ Recognition ended and we're no longer listening (expected)"
-            );
-          }
+          // If recognition ended unexpectedly (not manually stopped)
+          console.warn(
+            `⚠️ Recognition ended unexpectedly after ${duration}ms. This might be due to a browser issue or conflict.`
+          );
+
+          // Clear the listening state and ref to allow restart
+          setIsListening(false);
+          recognitionRef.current = null;
+
+          // Don't restart automatically - user will click mic button again
+          console.log(
+            "✅ Recognition ended unexpectedly. User can click mic button to restart."
+          );
         };
 
         // Start recognition
@@ -1498,11 +1455,12 @@ export function HomePage() {
         console.error("Failed to start speech recognition:", error);
         setIsListening(false);
         recognitionRef.current = null; // Clear ref on error
+        intentionallyStoppedRef.current = false; // Reset flag on error
         alert(
           "Failed to start speech recognition. Please check your microphone permissions."
         );
       }
-    }, 100); // Small delay to ensure previous recognition is fully stopped
+    }, 500); // Longer delay to ensure previous recognition is fully stopped and cleaned up
   }, [isListening, stopListeningAndSend, playStartSound]);
 
   // Wake word listener - listens for "okay Dhoni" or "ok Sakshi"
