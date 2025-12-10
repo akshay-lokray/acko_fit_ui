@@ -329,19 +329,11 @@ export function UserLockerPage() {
                     </div>
                 </div>
                 <div className="md:hidden absolute inset-0 pointer-events-none">
-<<<<<<< Updated upstream
                     <div className="absolute left-3 top-56 text-[20px] font-semibold tracking-[0em] text-black/90">
                         Current
                     </div>
                     <div className="absolute right-0 top-56 text-[20px] font-semibold tracking-[0em] text-black/90 text-right">
                         Expected
-=======
-                    <div className="absolute left-6 top-24 text-[10px] font-semibold tracking-[0.3em] text-black/90">
-                        Current ({safeCurrent.toFixed(0)}%)
-                    </div>
-                    <div className="absolute right-6 top-24 text-[10px] font-semibold tracking-[0.3em] text-black/90 text-right">
-                        Expected ({expectedProgress.toFixed(0)}%)
->>>>>>> Stashed changes
                     </div>
                     <div className="absolute left-6 top-72 bottom-56 w-6 rounded-full bg-gradient-to-b from-emerald-500/90 to-emerald-200" />
                     <span className="absolute left-6 top-[42%] h-5 w-5 -translate-y-1/2 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)]" />

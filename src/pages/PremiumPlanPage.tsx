@@ -49,7 +49,7 @@ export function PremiumPlanPage() {
                                 ₹{BASE_PRICE}
                             </span>
                             <span className="text-2xl font-medium text-gray-400">
-                                per goal
+                                / year
                             </span>
                         </div>
                         <p className="text-sm text-gray-500 mt-2">Pay once, lifetime access</p>
