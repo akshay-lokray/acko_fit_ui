@@ -36,7 +36,7 @@ export function CoachSelectionPage() {
     },
     {
       id: "female",
-      name: "Disha",
+      name: "Sakshi",
       role: "Agility & Balance",
       description: "Master control and flexibility with precision flows.",
       themeColor: "text-purple-700",

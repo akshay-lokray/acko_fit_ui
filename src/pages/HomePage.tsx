@@ -247,10 +247,10 @@ export function HomePage() {
   // Safe access to formData with defaults
   const gender = profile.gender || routeFormData.gender || "female";
   const name = profile.name || routeFormData.name || "Traveller";
-  const coachName = gender === "male" ? "Dhoni" : "Disha";
+  const coachName = gender === "male" ? "Dhoni" : "Sakshi";
 
   // State
-  const [activeTab, setActiveTab] = useState<"goals" | "Your Plans" | "Talk to Dhoni">(
+  const [activeTab, setActiveTab] = useState<"goals" | "Your Plan" | "Talk to Dhoni">(
     "goals"
   );
   const [messages, setMessages] = useState<Message[]>([]);
@@ -1477,7 +1477,7 @@ export function HomePage() {
     }, 100); // Small delay to ensure previous recognition is fully stopped
   }, [isListening, stopListeningAndSend, playStartSound]);
 
-  // Wake word listener - listens for "okay Dhoni" or "ok Disha"
+  // Wake word listener - listens for "okay Dhoni" or "ok Sakshi"
   useEffect(() => {
     const SpeechRecognition =
       (
@@ -1516,7 +1516,7 @@ export function HomePage() {
         // Define wake words based on coach gender
         const wakeWords = isMale
           ? ["okay Dhoni", "ok Dhoni", "hey Dhoni", "Dhoni"]
-          : ["okay Disha", "ok Disha", "hey Disha", "Disha"];
+          : ["okay Sakshi", "ok Sakshi", "hey Sakshi", "Sakshi"];
 
         wakeWordRecognition.onresult = (event: SpeechRecognitionEvent) => {
           // Don't process if already listening
@@ -1799,13 +1799,13 @@ export function HomePage() {
               )}
             </button>
             <button
-              onClick={() => setActiveTab("Your Plans")}
+              onClick={() => setActiveTab("Your Plan")}
               className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
-                activeTab === "Your Plans" ? "text-emerald-600" : "text-gray-400"
+                activeTab === "Your Plan" ? "text-emerald-600" : "text-gray-400"
               }`}
             >
-              <Compass className="w-4 h-4" /> Your Plans
-              {activeTab === "Your Plans" && (
+              <Compass className="w-4 h-4" /> Your Plan
+              {activeTab === "Your Plan" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600" />
               )}
             </button>
@@ -1832,7 +1832,7 @@ export function HomePage() {
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
                       <p className="text-xs text-emerald-700 font-semibold uppercase tracking-wide">
-                        Current Progress
+                        Current
                       </p>
                     </div>
                     <p className="text-3xl font-bold text-emerald-600">
@@ -2129,7 +2129,7 @@ export function HomePage() {
             )}
 
             {/* Explore Tab replaced Map Tab */}
-            {activeTab === "Your Plans" && (
+            {activeTab === "Your Plan" && (
               <div className="flex-1 max-w-2xl mx-auto space-y-6 overflow-y-auto px-4 py-5">
                 <div className="grid grid-cols-2 gap-4 justify-center">
                   <div className="relative">

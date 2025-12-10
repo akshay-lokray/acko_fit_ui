@@ -463,9 +463,15 @@ export default function AvatarScene({
   }
 
   const isAnimatedMale = voiceType === 'male' && isFullScreen;
-  const cameraDistance = isAnimatedMale ? 5 : undefined;
-  const cameraHeight = isAnimatedMale ? 40.1 : undefined;
-  const targetHeight = isAnimatedMale ? 1.7 : undefined;
+  const isAnimatedFemale = voiceType === 'female' && isFullScreen;
+  const cameraDistance = isAnimatedMale
+    ? 5
+    : isAnimatedFemale
+      ? 4.5
+      : undefined;
+  const cameraHeight = isAnimatedMale ? 40.1 : isAnimatedFemale ? 1.9 : undefined;
+  const targetHeight = isAnimatedMale ? 1.7 : isAnimatedFemale ? 1.0 : undefined;
+  const groupOffsetY = isAnimatedFemale ? 0.8 : 0.6;
 
   return (
     <div className="avatar-scene-container">
@@ -512,7 +518,7 @@ export default function AvatarScene({
             </div>
           </Html>
         }>
-          <group position={isFullScreen ? [0, 0.6, 0] : [0, 0, 0]}>
+          <group position={isFullScreen ? [0, groupOffsetY, 0] : [0, 0, 0]}>
             <AvatarWithVisemes 
               key={avatarKey} // Force remount on transition
               isSpeaking={isSpeaking} 
