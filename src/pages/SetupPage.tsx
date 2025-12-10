@@ -101,7 +101,6 @@ export function SetupPage() {
     status?: string;
     keys?: Record<string, unknown>;
   } | null>(null); // Store context from server responses (new structure: {status, keys})
-  const [isJourneyCompleted, setIsJourneyCompleted] = useState(false); // Track if journey is completed
 
   // Socket from context
   const { socket: contextSocket } = useSocket();
@@ -223,73 +222,73 @@ export function SetupPage() {
       }
 
       return new Promise<void>((resolve) => {
-      try {
-        const utterance = new SpeechSynthesisUtterance(text);
-        speechSynthesisRef.current = utterance;
+        try {
+          const utterance = new SpeechSynthesisUtterance(text);
+          speechSynthesisRef.current = utterance;
 
-        utterance.lang = "en-US";
-        utterance.rate = 1.0;
-        utterance.pitch = isMale ? 0.8 : 1.2;
-        utterance.volume = 1.0;
+          utterance.lang = "en-US";
+          utterance.rate = 1.0;
+          utterance.pitch = isMale ? 0.8 : 1.2;
+          utterance.volume = 1.0;
 
-        const voices = window.speechSynthesis.getVoices();
-        if (voices.length > 0) {
-          const preferredVoices = voices.filter((voice) => {
-            const voiceName = voice.name.toLowerCase();
-            if (isMale) {
-              return (
-                voiceName.includes("male") ||
-                voiceName.includes("david") ||
-                voiceName.includes("daniel") ||
-                voiceName.includes("alex") ||
-                voice.lang.startsWith("en")
-              );
-            } else {
-              return (
-                voiceName.includes("female") ||
-                voiceName.includes("samantha") ||
-                voiceName.includes("susan") ||
-                voiceName.includes("karen") ||
-                voiceName.includes("victoria") ||
-                voice.lang.startsWith("en")
-              );
-            }
-          });
+          const voices = window.speechSynthesis.getVoices();
+          if (voices.length > 0) {
+            const preferredVoices = voices.filter((voice) => {
+              const voiceName = voice.name.toLowerCase();
+              if (isMale) {
+                return (
+                  voiceName.includes("male") ||
+                  voiceName.includes("david") ||
+                  voiceName.includes("daniel") ||
+                  voiceName.includes("alex") ||
+                  voice.lang.startsWith("en")
+                );
+              } else {
+                return (
+                  voiceName.includes("female") ||
+                  voiceName.includes("samantha") ||
+                  voiceName.includes("susan") ||
+                  voiceName.includes("karen") ||
+                  voiceName.includes("victoria") ||
+                  voice.lang.startsWith("en")
+                );
+              }
+            });
 
-          if (preferredVoices.length > 0) {
-            utterance.voice = preferredVoices[0];
-          } else if (voices.length > 0) {
+            if (preferredVoices.length > 0) {
+              utterance.voice = preferredVoices[0];
+            } else if (voices.length > 0) {
               const englishVoices = voices.filter((v) =>
                 v.lang.startsWith("en")
               );
-            if (englishVoices.length > 0) {
-              utterance.voice = englishVoices[0];
+              if (englishVoices.length > 0) {
+                utterance.voice = englishVoices[0];
+              }
             }
           }
-        }
 
-        utterance.onstart = () => {
-          console.log("🔊 Started speaking response");
-        };
+          utterance.onstart = () => {
+            console.log("🔊 Started speaking response");
+          };
 
-        utterance.onend = () => {
-          console.log("🔊 Finished speaking response");
-          speechSynthesisRef.current = null;
+          utterance.onend = () => {
+            console.log("🔊 Finished speaking response");
+            speechSynthesisRef.current = null;
             resolve();
-        };
+          };
 
-        utterance.onerror = (event) => {
-          console.error("❌ Speech synthesis error:", event.error);
-          speechSynthesisRef.current = null;
+          utterance.onerror = (event) => {
+            console.error("❌ Speech synthesis error:", event.error);
+            speechSynthesisRef.current = null;
             resolve();
-        };
+          };
 
-        window.speechSynthesis.speak(utterance);
-        console.log("🔊 Speaking response:", text.substring(0, 50) + "...");
-      } catch (error) {
-        console.error("Failed to speak text:", error);
+          window.speechSynthesis.speak(utterance);
+          console.log("🔊 Speaking response:", text.substring(0, 50) + "...");
+        } catch (error) {
+          console.error("Failed to speak text:", error);
           resolve();
-      }
+        }
       });
     },
     [isMale]
@@ -748,7 +747,6 @@ export function SetupPage() {
             console.log(
               "✅ Setup completed! Waiting for plan_creation_response..."
             );
-            setIsJourneyCompleted(true);
             // Don't redirect here - wait for plan_creation_response event
           }
         } else {
@@ -810,8 +808,8 @@ export function SetupPage() {
             (trimmedData.startsWith("{") && trimmedData.endsWith("}")) ||
             (trimmedData.startsWith("[") && trimmedData.endsWith("]"))
           ) {
-          try {
-            const parsed = JSON.parse(data);
+            try {
+              const parsed = JSON.parse(data);
               // Check if it's the new format with data.data
               if (parsed.data && typeof parsed.data === "object") {
                 responseText = String(parsed.data.text || "");
@@ -993,13 +991,13 @@ export function SetupPage() {
 
         processedMessageIdsRef.current.add(rawText);
 
-      const coachMsg: Message = {
+        const coachMsg: Message = {
           id: `${rawText.substring(0, 50)}-${Date.now()}`,
-        sender: "coach",
+          sender: "coach",
           text: rawText,
-      };
-      setMessages((prev) => [...prev, coachMsg]);
-      setShowTextInput(false);
+        };
+        setMessages((prev) => [...prev, coachMsg]);
+        setShowTextInput(false);
         setIsWaitingForResponse(false); // Hide loading indicator
         setIsWaitingForInitialResponse(false); // Hide initial loading indicator
 
@@ -1011,7 +1009,6 @@ export function SetupPage() {
           console.log(
             "✅ Setup completed! Waiting for plan_creation_response..."
           );
-          setIsJourneyCompleted(true);
           // Don't redirect here - wait for plan_creation_response event
         }
       } else {
@@ -1150,7 +1147,6 @@ export function SetupPage() {
             console.log(
               "✅ Setup completed! Waiting for plan_creation_response..."
             );
-            setIsJourneyCompleted(true);
             // Don't redirect here - wait for plan_creation_response event
           }
         } else {
@@ -1250,9 +1246,6 @@ export function SetupPage() {
         setIsWaitingForResponse(false);
         setIsWaitingForInitialResponse(false);
 
-        // Speak the plan text exactly as received
-        speakText(planText);
-
         // Extract and save phone number to localStorage if not already saved
         if (contextState?.keys && typeof contextState.keys === "object") {
           const phoneKey = contextState.keys.phone;
@@ -1316,8 +1309,30 @@ export function SetupPage() {
           }
         }
 
-        // Mark journey as completed to show Done button
-        setIsJourneyCompleted(true);
+        // Speak the plan text and wait for it to complete, then auto-redirect
+        speakText(planText).then(() => {
+          console.log(
+            "✅ Plan text finished speaking, redirecting to /premium"
+          );
+          // Small delay to ensure speech is fully complete
+          setTimeout(() => {
+            if (navigateRef.current) {
+              navigateRef.current("/premium", {
+                state: {
+                  gender: genderRef.current,
+                  formData: contextState?.keys || {},
+                },
+              });
+            } else {
+              navigate("/premium", {
+                state: {
+                  gender,
+                  formData: contextState?.keys || {},
+                },
+              });
+            }
+          }, 500);
+        });
       } catch (error) {
         console.error("❌ Error processing plan_creation_response:", error);
       }
@@ -1780,37 +1795,6 @@ export function SetupPage() {
     setSelectedOptions([]);
   };
 
-  // Handle Done button click - redirect to premium page
-  const handleDoneClick = () => {
-    // Stop any ongoing speech
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
-      if (speechSynthesisRef.current) {
-        speechSynthesisRef.current.onend = null;
-        speechSynthesisRef.current.onerror = null;
-        speechSynthesisRef.current.onstart = null;
-        speechSynthesisRef.current = null;
-      }
-    }
-
-    // Redirect to premium page
-    if (navigateRef.current) {
-      navigateRef.current("/premium", {
-        state: {
-          gender: genderRef.current,
-          formData: contextState?.keys || {},
-        },
-      });
-    } else {
-      navigate("/premium", {
-        state: {
-          gender,
-          formData: contextState?.keys || {},
-        },
-      });
-    }
-  };
-
   return (
     <div className="setup-page-root h-screen bg-white font-sans flex flex-col overflow-hidden">
       {/* Header */}
@@ -1829,25 +1813,25 @@ export function SetupPage() {
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto p-4 pb-24"
         >
-        <div className="max-w-2xl mx-auto space-y-4">
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${
-                msg.sender === "user" ? "justify-end" : "justify-start"
-              }`}
-            >
+          <div className="max-w-2xl mx-auto space-y-4">
+            {messages.map((msg) => (
               <div
-                className={`max-w-[80%] rounded-2xl p-4 text-sm ${
-                  msg.sender === "user"
-                    ? "bg-gray-900 text-white rounded-br-none"
-                    : "bg-white border border-gray-100 shadow-sm text-gray-800 rounded-bl-none"
+                key={msg.id}
+                className={`flex ${
+                  msg.sender === "user" ? "justify-end" : "justify-start"
                 }`}
               >
-                {msg.text}
+                <div
+                  className={`max-w-[80%] rounded-2xl p-4 text-sm ${
+                    msg.sender === "user"
+                      ? "bg-gray-900 text-white rounded-br-none"
+                      : "bg-white border border-gray-100 shadow-sm text-gray-800 rounded-bl-none"
+                  }`}
+                >
+                  {msg.text}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
 
             {/* Loading indicator when waiting for response (including initial) */}
             {(isWaitingForResponse || isWaitingForInitialResponse) && (
@@ -1874,25 +1858,25 @@ export function SetupPage() {
             )}
 
             {/* Listening Indicator - Explicit Listening */}
-          {isListening && (
-            <div className="flex justify-center py-4">
-              <div
-                className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                  isMale ? "bg-emerald-500" : "bg-purple-500"
-                } animate-pulse shadow-lg`}
-              >
-                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center animate-ping ${
-                      isMale ? "bg-emerald-100" : "bg-purple-100"
-                    }`}
-                  >
-                    <Zap className={`w-6 h-6 ${themeColor}`} />
+            {isListening && (
+              <div className="flex justify-center py-4">
+                <div
+                  className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                    isMale ? "bg-emerald-500" : "bg-purple-500"
+                  } animate-pulse shadow-lg`}
+                >
+                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center animate-ping ${
+                        isMale ? "bg-emerald-100" : "bg-purple-100"
+                      }`}
+                    >
+                      <Zap className={`w-6 h-6 ${themeColor}`} />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
             {/* Selection Options UI - Only show when keyboard input is active */}
             {selectionConfig && showTextInput && (
@@ -1958,7 +1942,7 @@ export function SetupPage() {
           </div>
         </div>
       </main>
-      
+
       {/* Avatar Zone - Fixed at bottom */}
       <div className="setup-page-avatar-zone flex-shrink-0">
         <div className="setup-avatar-panel">
@@ -1980,22 +1964,6 @@ export function SetupPage() {
       {/* Input Area - Fixed at bottom */}
       <div className="bg-white border-t border-gray-100 p-4 flex-shrink-0 z-50">
         <div className="max-w-2xl mx-auto">
-          {/* Done Button - Show when journey is completed */}
-          {isJourneyCompleted ? (
-            <div className="flex flex-col items-center gap-3">
-              <Button
-                size="lg"
-                onClick={handleDoneClick}
-                className={`w-full max-w-xs py-6 text-lg font-semibold rounded-full shadow-lg ${buttonBg}`}
-              >
-                Done
-              </Button>
-              <p className="text-center text-xs text-gray-500">
-                Click Done to continue to your premium plan
-              </p>
-            </div>
-          ) : (
-            <>
           {/* Text Input (shown when user clicks keyboard icon) */}
           {showTextInput && (
             <div className="mb-3 animate-in slide-in-from-bottom-2">
@@ -2076,8 +2044,6 @@ export function SetupPage() {
             <p className="text-center text-xs text-gray-500 mt-2 font-medium">
               🎤 Listening... Speak now or tap again to stop
             </p>
-              )}
-            </>
           )}
         </div>
       </div>
