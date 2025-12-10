@@ -73,6 +73,12 @@ export function SetupPage() {
     }
   }, []);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem("selectedCoachGender", gender);
+    }
+  }, [gender]);
+
   // State
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -217,73 +223,73 @@ export function SetupPage() {
       }
 
       return new Promise<void>((resolve) => {
-        try {
-          const utterance = new SpeechSynthesisUtterance(text);
-          speechSynthesisRef.current = utterance;
+      try {
+        const utterance = new SpeechSynthesisUtterance(text);
+        speechSynthesisRef.current = utterance;
 
-          utterance.lang = "en-US";
-          utterance.rate = 1.0;
-          utterance.pitch = isMale ? 0.8 : 1.2;
-          utterance.volume = 1.0;
+        utterance.lang = "en-US";
+        utterance.rate = 1.0;
+        utterance.pitch = isMale ? 0.8 : 1.2;
+        utterance.volume = 1.0;
 
-          const voices = window.speechSynthesis.getVoices();
-          if (voices.length > 0) {
-            const preferredVoices = voices.filter((voice) => {
-              const voiceName = voice.name.toLowerCase();
-              if (isMale) {
-                return (
-                  voiceName.includes("male") ||
-                  voiceName.includes("david") ||
-                  voiceName.includes("daniel") ||
-                  voiceName.includes("alex") ||
-                  voice.lang.startsWith("en")
-                );
-              } else {
-                return (
-                  voiceName.includes("female") ||
-                  voiceName.includes("samantha") ||
-                  voiceName.includes("susan") ||
-                  voiceName.includes("karen") ||
-                  voiceName.includes("victoria") ||
-                  voice.lang.startsWith("en")
-                );
-              }
-            });
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          const preferredVoices = voices.filter((voice) => {
+            const voiceName = voice.name.toLowerCase();
+            if (isMale) {
+              return (
+                voiceName.includes("male") ||
+                voiceName.includes("david") ||
+                voiceName.includes("daniel") ||
+                voiceName.includes("alex") ||
+                voice.lang.startsWith("en")
+              );
+            } else {
+              return (
+                voiceName.includes("female") ||
+                voiceName.includes("samantha") ||
+                voiceName.includes("susan") ||
+                voiceName.includes("karen") ||
+                voiceName.includes("victoria") ||
+                voice.lang.startsWith("en")
+              );
+            }
+          });
 
-            if (preferredVoices.length > 0) {
-              utterance.voice = preferredVoices[0];
-            } else if (voices.length > 0) {
+          if (preferredVoices.length > 0) {
+            utterance.voice = preferredVoices[0];
+          } else if (voices.length > 0) {
               const englishVoices = voices.filter((v) =>
                 v.lang.startsWith("en")
               );
-              if (englishVoices.length > 0) {
-                utterance.voice = englishVoices[0];
-              }
+            if (englishVoices.length > 0) {
+              utterance.voice = englishVoices[0];
             }
           }
-
-          utterance.onstart = () => {
-            console.log("🔊 Started speaking response");
-          };
-
-          utterance.onend = () => {
-            console.log("🔊 Finished speaking response");
-            speechSynthesisRef.current = null;
-            resolve();
-          };
-
-          utterance.onerror = (event) => {
-            console.error("❌ Speech synthesis error:", event.error);
-            speechSynthesisRef.current = null;
-            resolve();
-          };
-
-          window.speechSynthesis.speak(utterance);
-          console.log("🔊 Speaking response:", text.substring(0, 50) + "...");
-        } catch (error) {
-          console.error("Failed to speak text:", error);
-          resolve();
         }
+
+        utterance.onstart = () => {
+          console.log("🔊 Started speaking response");
+        };
+
+        utterance.onend = () => {
+          console.log("🔊 Finished speaking response");
+          speechSynthesisRef.current = null;
+            resolve();
+        };
+
+        utterance.onerror = (event) => {
+          console.error("❌ Speech synthesis error:", event.error);
+          speechSynthesisRef.current = null;
+            resolve();
+        };
+
+        window.speechSynthesis.speak(utterance);
+        console.log("🔊 Speaking response:", text.substring(0, 50) + "...");
+      } catch (error) {
+        console.error("Failed to speak text:", error);
+          resolve();
+      }
       });
     },
     [isMale]
@@ -804,8 +810,8 @@ export function SetupPage() {
             (trimmedData.startsWith("{") && trimmedData.endsWith("}")) ||
             (trimmedData.startsWith("[") && trimmedData.endsWith("]"))
           ) {
-            try {
-              const parsed = JSON.parse(data);
+          try {
+            const parsed = JSON.parse(data);
               // Check if it's the new format with data.data
               if (parsed.data && typeof parsed.data === "object") {
                 responseText = String(parsed.data.text || "");
@@ -987,13 +993,13 @@ export function SetupPage() {
 
         processedMessageIdsRef.current.add(rawText);
 
-        const coachMsg: Message = {
+      const coachMsg: Message = {
           id: `${rawText.substring(0, 50)}-${Date.now()}`,
-          sender: "coach",
+        sender: "coach",
           text: rawText,
-        };
-        setMessages((prev) => [...prev, coachMsg]);
-        setShowTextInput(false);
+      };
+      setMessages((prev) => [...prev, coachMsg]);
+      setShowTextInput(false);
         setIsWaitingForResponse(false); // Hide loading indicator
         setIsWaitingForInitialResponse(false); // Hide initial loading indicator
 
@@ -1823,25 +1829,25 @@ export function SetupPage() {
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto p-4 pb-24"
         >
-          <div className="max-w-2xl mx-auto space-y-4">
-            {messages.map((msg) => (
+        <div className="max-w-2xl mx-auto space-y-4">
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex ${
+                msg.sender === "user" ? "justify-end" : "justify-start"
+              }`}
+            >
               <div
-                key={msg.id}
-                className={`flex ${
-                  msg.sender === "user" ? "justify-end" : "justify-start"
+                className={`max-w-[80%] rounded-2xl p-4 text-sm ${
+                  msg.sender === "user"
+                    ? "bg-gray-900 text-white rounded-br-none"
+                    : "bg-white border border-gray-100 shadow-sm text-gray-800 rounded-bl-none"
                 }`}
               >
-                <div
-                  className={`max-w-[80%] rounded-2xl p-4 text-sm ${
-                    msg.sender === "user"
-                      ? "bg-gray-900 text-white rounded-br-none"
-                      : "bg-white border border-gray-100 shadow-sm text-gray-800 rounded-bl-none"
-                  }`}
-                >
-                  {msg.text}
-                </div>
+                {msg.text}
               </div>
-            ))}
+            </div>
+          ))}
 
             {/* Loading indicator when waiting for response (including initial) */}
             {(isWaitingForResponse || isWaitingForInitialResponse) && (
@@ -1868,25 +1874,25 @@ export function SetupPage() {
             )}
 
             {/* Listening Indicator - Explicit Listening */}
-            {isListening && (
-              <div className="flex justify-center py-4">
-                <div
-                  className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                    isMale ? "bg-emerald-500" : "bg-purple-500"
-                  } animate-pulse shadow-lg`}
-                >
-                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center animate-ping ${
-                        isMale ? "bg-emerald-100" : "bg-purple-100"
-                      }`}
-                    >
-                      <Zap className={`w-6 h-6 ${themeColor}`} />
-                    </div>
+          {isListening && (
+            <div className="flex justify-center py-4">
+              <div
+                className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                  isMale ? "bg-emerald-500" : "bg-purple-500"
+                } animate-pulse shadow-lg`}
+              >
+                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center animate-ping ${
+                      isMale ? "bg-emerald-100" : "bg-purple-100"
+                    }`}
+                  >
+                    <Zap className={`w-6 h-6 ${themeColor}`} />
                   </div>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
             {/* Selection Options UI - Only show when keyboard input is active */}
             {selectionConfig && showTextInput && (
@@ -1952,7 +1958,7 @@ export function SetupPage() {
           </div>
         </div>
       </main>
-
+      
       {/* Avatar Zone - Fixed at bottom */}
       <div className="setup-page-avatar-zone flex-shrink-0">
         <div className="setup-avatar-panel">
@@ -1990,86 +1996,86 @@ export function SetupPage() {
             </div>
           ) : (
             <>
-              {/* Text Input (shown when user clicks keyboard icon) */}
-              {showTextInput && (
-                <div className="mb-3 animate-in slide-in-from-bottom-2">
-                  <div className="relative flex items-center gap-2">
-                    <Input
-                      ref={inputRef}
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          handleSendMessage();
-                        } else if (e.key === "Escape") {
-                          setShowTextInput(false);
-                          setInputValue("");
-                        }
-                      }}
-                      placeholder="Type your answer here..."
-                      className="flex-1 py-4 rounded-full border-2 border-gray-300 shadow-sm focus-visible:ring-offset-0 focus-visible:ring-2 focus-visible:border-transparent pr-12"
-                      autoFocus
-                    />
-                    {inputValue && (
-                      <Button
-                        size="icon"
-                        onClick={() => handleSendMessage()}
-                        className={`absolute right-2 rounded-full w-9 h-9 ${buttonBg}`}
-                      >
-                        <Send className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1 ml-2">
-                    Press Enter to send, Esc to cancel
-                  </p>
-                </div>
-              )}
-
-              {/* Primary Input Controls */}
-              <div className="flex items-center justify-center gap-3">
-                {/* Voice Input Button (Primary) */}
-                <Button
-                  size="lg"
-                  onClick={handleVoiceInput}
-                  className={`w-16 h-16 rounded-full shadow-lg transition-all ${
-                    isListening
-                      ? "bg-red-500 hover:bg-red-600 animate-pulse scale-110"
-                      : buttonBg
-                  }`}
-                >
-                  {isListening ? (
-                    <Mic className="w-6 h-6 fill-white text-white" />
-                  ) : (
-                    <Mic className="w-6 h-6 fill-white text-white" />
-                  )}
-                </Button>
-
-                {/* Text Input Toggle Button (Fallback) */}
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={handleTextInputToggle}
-                  className={`w-16 h-16 rounded-full shadow-md border-2 ${
-                    showTextInput
-                      ? "border-gray-400 bg-gray-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <Keyboard className="w-6 h-6 text-gray-600" />
-                </Button>
+          {/* Text Input (shown when user clicks keyboard icon) */}
+          {showTextInput && (
+            <div className="mb-3 animate-in slide-in-from-bottom-2">
+              <div className="relative flex items-center gap-2">
+                <Input
+                  ref={inputRef}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleSendMessage();
+                    } else if (e.key === "Escape") {
+                      setShowTextInput(false);
+                      setInputValue("");
+                    }
+                  }}
+                  placeholder="Type your answer here..."
+                  className="flex-1 py-4 rounded-full border-2 border-gray-300 shadow-sm focus-visible:ring-offset-0 focus-visible:ring-2 focus-visible:border-transparent pr-12"
+                  autoFocus
+                />
+                {inputValue && (
+                  <Button
+                    size="icon"
+                    onClick={() => handleSendMessage()}
+                    className={`absolute right-2 rounded-full w-9 h-9 ${buttonBg}`}
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
+              <p className="text-xs text-gray-400 mt-1 ml-2">
+                Press Enter to send, Esc to cancel
+              </p>
+            </div>
+          )}
 
-              {/* Helper Text */}
-              {!showTextInput && !isListening && (
-                <p className="text-center text-xs text-gray-400 mt-2">
-                  Tap the microphone to speak, or tap the keyboard to type
-                </p>
+          {/* Primary Input Controls */}
+          <div className="flex items-center justify-center gap-3">
+            {/* Voice Input Button (Primary) */}
+            <Button
+              size="lg"
+              onClick={handleVoiceInput}
+              className={`w-16 h-16 rounded-full shadow-lg transition-all ${
+                isListening
+                  ? "bg-red-500 hover:bg-red-600 animate-pulse scale-110"
+                  : buttonBg
+              }`}
+            >
+              {isListening ? (
+                <Mic className="w-6 h-6 fill-white text-white" />
+              ) : (
+                <Mic className="w-6 h-6 fill-white text-white" />
               )}
-              {isListening && (
-                <p className="text-center text-xs text-gray-500 mt-2 font-medium">
-                  🎤 Listening... Speak now or tap again to stop
-                </p>
+            </Button>
+
+            {/* Text Input Toggle Button (Fallback) */}
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={handleTextInputToggle}
+              className={`w-16 h-16 rounded-full shadow-md border-2 ${
+                showTextInput
+                  ? "border-gray-400 bg-gray-50"
+                  : "border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              <Keyboard className="w-6 h-6 text-gray-600" />
+            </Button>
+          </div>
+
+          {/* Helper Text */}
+          {!showTextInput && !isListening && (
+            <p className="text-center text-xs text-gray-400 mt-2">
+              Tap the microphone to speak, or tap the keyboard to type
+            </p>
+          )}
+          {isListening && (
+            <p className="text-center text-xs text-gray-500 mt-2 font-medium">
+              🎤 Listening... Speak now or tap again to stop
+            </p>
               )}
             </>
           )}
