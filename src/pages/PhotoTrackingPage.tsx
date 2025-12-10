@@ -1,40 +1,72 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft,
-  ScanLine,
-  Coffee,
-  Utensils,
-  Moon,
-  Apple,
-  ChevronLeft,
-  Star,
-  Flame,
-  Camera,
+    ArrowLeft,
+    ScanLine,
+    Coffee,
+    Utensils,
+    Moon,
+    Apple,
+    ChevronLeft,
   Mic,
+    Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import AvatarScene from "@/components/AvatarScene";
 import { useUserProfileStore } from "@/store/userProfileStore";
 
 type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snack";
 
 interface FoodItem {
-  id: string;
-  name: string;
-  quantity: string;
-  calories: number;
+    id: string;
+    name: string;
+    quantity: string;
+    calories: number;
   note?: string;
 }
 
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  transcript: string;
+  confidence: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+type SpeechRecognitionResultList = SpeechRecognitionResult[];
+
+interface SpeechRecognitionEvent {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message: string;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+
 export function PhotoTrackingPage() {
-  const navigate = useNavigate();
-  const [step, setStep] = useState<"camera" | "review" | "success">("camera");
-  const [selectedType, setSelectedType] = useState<MealType>("Breakfast");
+    const navigate = useNavigate();
+    const [step, setStep] = useState<"camera" | "review" | "success">("camera");
+    const [selectedType, setSelectedType] = useState<MealType>("Breakfast");
   const [items, setItems] = useState<FoodItem[]>([]);
-  const [showConfetti, setShowConfetti] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -49,9 +81,10 @@ export function PhotoTrackingPage() {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [voiceTranscript, setVoiceTranscript] = useState("");
+  const intentSentRef = useRef(false);
   const { formData: profile } = useUserProfileStore();
-  const streak = profile.streak ?? 0;
   const transcriptRef = useRef("");
+  const [isAdjusting, setIsAdjusting] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -61,8 +94,8 @@ export function PhotoTrackingPage() {
     };
   }, []);
 
-  // Mock total calories
-  const totalCalories = items.reduce((acc, item) => acc + item.calories, 0);
+    // Mock total calories
+    const totalCalories = items.reduce((acc, item) => acc + item.calories, 0);
 
   const handleTakeShit = () => {
     cameraInputRef.current?.click();
@@ -141,7 +174,7 @@ export function PhotoTrackingPage() {
         URL.revokeObjectURL(prevImageRef.current);
       }
       prevImageRef.current = nextUrl;
-      setStep("review");
+            setStep("review");
     } catch (err) {
       console.error(err);
       setAnalysisError("Unable to analyze the photo right now.");
@@ -149,6 +182,8 @@ export function PhotoTrackingPage() {
       setIsAnalyzing(false);
     }
   };
+
+  const [successMessage, setSuccessMessage] = useState("");
 
   const handleConfirmLog = async () => {
     setLogError(null);
@@ -194,8 +229,8 @@ export function PhotoTrackingPage() {
       if (!mealRes.ok) {
         throw new Error("Failed to log meal details");
       }
-      setStep("success");
-      setShowConfetti(true);
+      setSuccessMessage("Meal logged! Redirecting you to the dashboard…");
+      setTimeout(() => navigate("/home"), 900);
     } catch (error) {
       console.error("Meal logging failed", error);
       setLogError("Unable to log the meal right now.");
@@ -206,7 +241,9 @@ export function PhotoTrackingPage() {
 
   const handleVoiceIntent = useCallback(
     async (text: string) => {
-      if (!text.trim()) return;
+      console.log("[voice] handleVoiceIntent transcript:", text);
+      if (!text.trim() || intentSentRef.current) return;
+      intentSentRef.current = true;
       setVoiceError(null);
       setVoiceTranscript(text);
       const instruction = encodeURIComponent(text);
@@ -240,6 +277,7 @@ export function PhotoTrackingPage() {
           healthNote: healthNote || "",
         };
       try {
+        setIsAdjusting(true);
         const response = await fetch(
           `/api/habits/food/adjust?instruction=${instruction}`,
           {
@@ -278,6 +316,9 @@ export function PhotoTrackingPage() {
       } catch (error) {
         console.error("Voice adjust failed", error);
         setVoiceError("Unable to adjust meal right now.");
+      } finally {
+        setIsAdjusting(false);
+        intentSentRef.current = false;
       }
     },
     [handleConfirmLog, healthNote, items, mealName, totalCalories]
@@ -312,10 +353,15 @@ export function PhotoTrackingPage() {
     recognition.maxAlternatives = 1;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = Array.from(event.results)
-        .map((result) => result[0].transcript)
-        .join(" ")
-        .trim();
+      const transcripts: string[] = [];
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        const alternative = result.item(0);
+        if (alternative) {
+          transcripts.push(alternative.transcript);
+        }
+      }
+      const transcript = transcripts.join(" ").trim();
       transcriptRef.current = transcript;
       setVoiceTranscript(transcript);
     };
@@ -329,6 +375,7 @@ export function PhotoTrackingPage() {
       setIsListening(false);
       recognitionRef.current = null;
       const finalTranscript = transcriptRef.current;
+      console.log("[voice] onend transcript:", finalTranscript);
       if (finalTranscript) {
         handleVoiceIntent(finalTranscript);
       }
@@ -349,7 +396,11 @@ export function PhotoTrackingPage() {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
-  }, []);
+    const pendingTranscript = transcriptRef.current || voiceTranscript;
+    if (pendingTranscript && !intentSentRef.current) {
+      setTimeout(() => handleVoiceIntent(pendingTranscript), 150);
+    }
+  }, [handleVoiceIntent, voiceTranscript]);
 
   useEffect(() => {
     return () => {
@@ -357,46 +408,46 @@ export function PhotoTrackingPage() {
     };
   }, []);
 
-  // --- Steps Renderers ---
+    // --- Steps Renderers ---
 
-  const renderCamera = () => (
-    <div className="flex flex-col h-full bg-white relative">
-      {/* Header */}
-      <div className="pt-6 px-4 flex items-center justify-center relative mb-4">
+    const renderCamera = () => (
+        <div className="flex flex-col h-full bg-white relative">
+            {/* Header */}
+            <div className="pt-6 px-4 flex items-center justify-center relative mb-4">
         <Button
           variant="ghost"
           size="icon"
           className="absolute left-4"
           onClick={() => navigate(-1)}
         >
-          <ArrowLeft className="w-6 h-6" />
-        </Button>
+                    <ArrowLeft className="w-6 h-6" />
+                </Button>
         <h1 className="text-lg font-bold">Snap Your Meal</h1>
-      </div>
+            </div>
 
-      {/* Viewfinder */}
-      <div className="mx-4 aspect-[4/5] bg-gray-900 rounded-3xl relative overflow-hidden mb-6 group">
-        {/* Mock Camera Feed UI */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-white/50 flex flex-col items-center gap-2">
-            <ScanLine className="w-16 h-16 animate-pulse" />
-            <p className="text-xs font-medium">Align food within frame</p>
-          </div>
-        </div>
+            {/* Viewfinder */}
+            <div className="mx-4 aspect-[4/5] bg-gray-900 rounded-3xl relative overflow-hidden mb-6 group">
+                {/* Mock Camera Feed UI */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-white/50 flex flex-col items-center gap-2">
+                        <ScanLine className="w-16 h-16 animate-pulse" />
+                        <p className="text-xs font-medium">Align food within frame</p>
+                    </div>
+                </div>
 
-        {/* Mock Image (Shows "what see") */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent pointer-events-none" />
-      </div>
+                {/* Mock Image (Shows "what see") */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent pointer-events-none" />
+            </div>
 
-      {/* Instruction Bubble */}
-      <div className="px-8 mb-8">
-        <div className="bg-gray-50 rounded-xl p-4 text-center">
-          <p className="text-sm text-gray-500">
+            {/* Instruction Bubble */}
+            <div className="px-8 mb-8">
+                <div className="bg-gray-50 rounded-xl p-4 text-center">
+                    <p className="text-sm text-gray-500">
             Take a clear, well lit photo. The better the photo, the more
             accurate the analysis.
-          </p>
-        </div>
-      </div>
+                    </p>
+                </div>
+            </div>
 
       {/* File picker */}
       <input
@@ -425,52 +476,53 @@ export function PhotoTrackingPage() {
         </Button>
       </div>
 
-      {/* Shutter Button area */}
-      <div className="mt-auto pb-8 flex flex-col items-center">
-        <button
-          onClick={handleTakeShit}
+            {/* Shutter Button area */}
+            <div className="mt-auto pb-8 flex flex-col items-center">
+                <button
+                    onClick={handleTakeShit}
           className="w-20 h-20 rounded-full border-4 border-gray-200 p-1 mb-6 transition-transform active:scale-95"
-        >
-          <div className="w-full h-full bg-emerald-500 rounded-full shadow-lg" />
-        </button>
+                >
+                    <div className="w-full h-full bg-emerald-500 rounded-full shadow-lg" />
+                </button>
 
-        {/* Meal Type Tabs */}
-        <div className="w-full px-6 flex justify-between">
-          {[
-            { id: "Breakfast", icon: Coffee },
-            { id: "Lunch", icon: Utensils },
-            { id: "Dinner", icon: Moon },
-            { id: "Snack", icon: Apple },
-          ].map((type) => (
-            <button
-              key={type.id}
-              onClick={() => setSelectedType(type.id as MealType)}
+                {/* Meal Type Tabs */}
+                <div className="w-full px-6 flex justify-between">
+                    {[
+                        { id: "Breakfast", icon: Coffee },
+                        { id: "Lunch", icon: Utensils },
+                        { id: "Dinner", icon: Moon },
+                        { id: "Snack", icon: Apple },
+                    ].map((type) => (
+                        <button
+                            key={type.id}
+                            onClick={() => setSelectedType(type.id as MealType)}
               className={`flex flex-col items-center gap-1 transition-colors ${
                 selectedType === type.id ? "text-emerald-600" : "text-gray-400"
               }`}
-            >
-              <type.icon className="w-6 h-6" />
-              <span className="text-xs font-medium">{type.id}</span>
-            </button>
-          ))}
+                        >
+                            <type.icon className="w-6 h-6" />
+                            <span className="text-xs font-medium">{type.id}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 
-  const renderReview = () => (
-    <div className="flex flex-col h-full bg-gray-50/50">
-      <div className="pt-6 px-4 flex items-center justify-between relative mb-4 bg-white pb-4 shadow-sm">
-        <Button variant="ghost" size="icon" onClick={() => setStep("camera")}>
-          <ChevronLeft className="w-6 h-6" />
-        </Button>
+    const renderReview = () => (
+        <div className="flex flex-col h-full bg-gray-50/50">
+            <div className="pt-6 px-4 flex items-center justify-between relative mb-4 bg-white pb-4 shadow-sm">
+                <Button variant="ghost" size="icon" onClick={() => setStep("camera")}>
+                    <ChevronLeft className="w-6 h-6" />
+                </Button>
         <h1 className="text-lg font-bold">Snap Your Meal</h1>
-        <div className="w-10" /> {/* Spacer */}
-      </div>
+                <div className="w-10" /> {/* Spacer */}
+            </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-24">
+            <div className="flex-1 overflow-y-auto px-4 pb-24">
         {isAnalyzing && (
-          <div className="mb-4 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-800">
+          <div className="mb-4 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-800 flex items-center justify-center gap-2">
+            <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
             Analyzing your meal… this might take a moment.
           </div>
         )}
@@ -479,9 +531,9 @@ export function PhotoTrackingPage() {
             {analysisError}
           </div>
         )}
-        {/* Captured Image Preview */}
-        <div className="relative mb-6">
-          <div className="w-full h-64 bg-gray-200 rounded-3xl overflow-hidden flex items-center justify-center text-6xl">
+                {/* Captured Image Preview */}
+                <div className="relative mb-6">
+                    <div className="w-full h-64 bg-gray-200 rounded-3xl overflow-hidden flex items-center justify-center text-6xl">
             {imagePreview ? (
               <img
                 src={imagePreview}
@@ -491,14 +543,14 @@ export function PhotoTrackingPage() {
             ) : (
               <span>🥘</span>
             )}
-          </div>
-          <button
-            onClick={() => setStep("camera")}
-            className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-md flex items-center gap-1"
-          >
-            <ArrowLeft className="w-3 h-3" /> Retake
-          </button>
-        </div>
+                    </div>
+                    <button
+                        onClick={() => setStep("camera")}
+                        className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-md flex items-center gap-1"
+                    >
+                        <ArrowLeft className="w-3 h-3" /> Retake
+                    </button>
+                </div>
 
         <div className="bg-white rounded-3xl p-6 shadow-sm mb-4 animate-fade-in-up space-y-4">
           <div className="flex items-center justify-between">
@@ -520,7 +572,7 @@ export function PhotoTrackingPage() {
             </div>
           </div>
           <div className="space-y-3">
-            {items.map((item, idx) => (
+            {items.map((item) => (
               <div
                 key={item.id}
                 className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm"
@@ -540,44 +592,58 @@ export function PhotoTrackingPage() {
                   {item.note && (
                     <div className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-600">
                       {item.note}
-                    </div>
+                                </div>
                   )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Totals */}
-        <div className="bg-white rounded-3xl p-6 shadow-sm mb-6 flex justify-between items-center">
-          <span className="font-bold text-gray-900">Est Total Calories:</span>
+                {/* Totals */}
+                <div className="bg-white rounded-3xl p-6 shadow-sm mb-6 flex justify-between items-center">
+                    <span className="font-bold text-gray-900">Est Total Calories:</span>
           <span className="font-bold text-xl text-emerald-600">
             {totalCalories} Kcal
           </span>
-        </div>
+                </div>
 
-        <div className="space-y-3">
+                <div className="space-y-3">
           {logError && (
-            <div className="rounded-xl bg-red-50 px-4 py-2 text-sm text-red-600 border border-red-100">
+            <div className="rounded-xl bg-red-50 px-4 py-2 text-sm text-red-600 border border-red-100 text-center">
               {logError}
             </div>
           )}
-          <div className="flex flex-col items-center gap-3">
-            <Button
-              size="sm"
-              onClick={() => {
-                if (isListening) {
-                  stopVoiceCapture();
-                } else {
-                  startVoiceCapture();
-                }
-              }}
-              className="w-12 h-12 rounded-full shadow-lg bg-emerald-600 hover:bg-emerald-700 transition-transform flex items-center justify-center"
-            >
-              <Mic className="w-5 h-5 text-white" />
-            </Button>
-            <p className="text-xs text-gray-500">
-              {isListening ? "Listening… tap again to stop" : "Tap to speak submission"}
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center justify-center gap-4">
+              <button
+                onClick={() => {
+                  if (isListening) {
+                    stopVoiceCapture();
+                  } else {
+                    startVoiceCapture();
+                  }
+                }}
+                className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-colors ${
+                  isListening
+                    ? "bg-red-500 text-white"
+                    : "bg-emerald-600 text-white"
+                }`}
+              >
+                <Mic className="w-6 h-6" />
+              </button>
+              <button
+                onClick={handleConfirmLog}
+                className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg bg-white border border-gray-200 text-emerald-600 hover:border-emerald-500"
+                disabled={loggingMeal}
+              >
+                <Check className="w-6 h-6" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 text-center">
+              {isListening
+                ? "Listening… tap again to stop"
+                : "Tap the mic to adjust calories"}
             </p>
             {voiceTranscript && (
               <p className="text-xs text-slate-500 text-center">
@@ -587,84 +653,46 @@ export function PhotoTrackingPage() {
             {voiceError && (
               <p className="text-xs text-red-500 text-center">{voiceError}</p>
             )}
-            <Button
-              onClick={handleConfirmLog}
-              className="w-32 h-12 text-sm bg-emerald-500 hover:bg-emerald-600 rounded-full shadow-lg shadow-emerald-200"
-              disabled={loggingMeal}
-            >
-              {loggingMeal ? "Saving..." : "Submit"}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+            {isAdjusting && (
+              <p className="text-xs text-cyan-600 text-center">Adjusting meal...</p>
+            )}
+            {successMessage && (
+              <p className="text-xs text-emerald-600 text-center">
+                {successMessage}
+              </p>
+            )}
+                </div>
+                    </div>
+                    </div>
+                </div>
   );
 
   const renderSuccess = () => (
-    <div className="flex flex-col h-full bg-gradient-to-b from-blue-400 to-blue-500 relative overflow-hidden">
-      {/* Header */}
-      <div className="pt-6 px-4 flex items-center justify-center relative z-20">
-        <h1 className="text-lg font-bold text-white">Rewards</h1>
-      </div>
-
-      {/* Confetti BG */}
-      {showConfetti && (
-        <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
-          <div className="text-6xl animate-bounce duration-1000">🎉 🎊</div>
+    <div className="flex flex-col h-full bg-white items-center justify-center p-6 space-y-4">
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl font-bold text-emerald-600">Meal Logged!</h1>
+        <p className="text-sm text-gray-500">
+          Your meal has been recorded. Keep the momentum going!
+        </p>
+                    </div>
+      <div className="text-xs text-slate-500 text-center">
+        You can close this screen or log another meal whenever you're ready.
+                </div>
+                <Button
+                    onClick={() => navigate("/home")}
+        variant="ghost"
+        className="px-6 py-3 rounded-full border border-emerald-200 text-emerald-600"
+                >
+                    Back to Dashboard
+                </Button>
         </div>
-      )}
+    );
 
-      {/* Avatar Celebration */}
-      <div className="flex-1 relative z-10">
-        <AvatarScene
-          textToSpeak="Awesome work! That looks delicious. I've added 50 points to your account."
-          voiceType="female" // Or match context
-        />
-      </div>
-
-      {/* Success Card */}
-      <div className="bg-white rounded-t-[3rem] p-8 pb-12 relative z-20 animate-slide-up-fade">
-        <div className="text-center space-y-2 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900">Meal Logged!</h2>
-          <p className="text-gray-500 font-medium">Awesome work.</p>
+    return (
+        <div className="min-h-screen bg-white font-sans">
+            {step === "camera" && renderCamera()}
+            {step === "review" && renderReview()}
+            {step === "success" && renderSuccess()}
         </div>
-
-        <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-4 mb-6">
-          <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
-            <Star className="w-6 h-6 fill-current" />
-          </div>
-          <div>
-            <p className="font-bold text-gray-900">+50 ACKO Points Earned!</p>
-            <p className="text-xs text-gray-500">Keep it up!</p>
-          </div>
-        </div>
-
-        <div className="space-y-2 mb-8">
-          <div className="flex justify-between items-center text-sm font-medium">
-            <span className="flex items-center gap-1 text-orange-500">
-              <Flame className="w-4 h-4 fill-current" />
-              {streak}-Day Snap Streak
-            </span>
-            <span className="text-gray-400">{streak}/7</span>
-          </div>
-          <Progress value={Math.min((streak / 7) * 100, 100)} className="h-2" />
-        </div>
-
-        <Button
-          onClick={() => navigate("/home")}
-          className="w-full h-14 text-lg bg-emerald-500 hover:bg-emerald-600 rounded-2xl shadow-xl"
-        >
-          Back to Dashboard
-        </Button>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen bg-white font-sans">
-      {step === "camera" && renderCamera()}
-      {step === "review" && renderReview()}
-      {step === "success" && renderSuccess()}
-    </div>
-  );
+    );
 }
