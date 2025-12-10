@@ -93,7 +93,7 @@ interface HabitLog {
     mealName?: string;
     healthNote?: string;
     items?: Array<{
-      name: string;
+  name: string;
       calories: number;
       quantity?: string;
       note?: string;
@@ -239,13 +239,24 @@ export function HomePage() {
   const navigate = useNavigate();
   const { formData: profile, updateFormData } = useUserProfileStore();
   const fetchedUserRef = useRef<string | null>(null);
+  const [sessionCoachGender, setSessionCoachGender] = useState<string | null>(null);
   const goalStateRef = useRef<{ userId: string | null; hits: Set<string> }>({
     userId: null,
     hits: new Set(),
   });
   const routeFormData = location.state?.formData || {};
   // Safe access to formData with defaults
-  const gender = profile.gender || routeFormData.gender || "female";
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSessionCoachGender(window.sessionStorage.getItem("selectedCoachGender"));
+    }
+  }, []);
+
+  const gender =
+    profile.gender ||
+    routeFormData.gender ||
+    sessionCoachGender ||
+    "female";
   const name = profile.name || routeFormData.name || "Traveller";
   const coachName = gender === "male" ? "Dhoni" : "Sakshi";
 
@@ -698,6 +709,13 @@ export function HomePage() {
     console.log("Calculated goal chart data:", result);
     return result;
   }, [activeGoal, goalHabitData]);
+
+  useEffect(() => {
+    const storedValue = goalChartData.currentProgress;
+    if (storedValue !== undefined && storedValue !== null) {
+      localStorage.setItem("homeCurrentProgress", String(storedValue));
+    }
+  }, [goalChartData.currentProgress]);
 
   // Fetch habit data from API and calculate daily goal progress
   useEffect(() => {
@@ -1692,12 +1710,12 @@ export function HomePage() {
     sendHabitAssistMessage(textToSend, userId)
       .then((reply) => {
         if (reply) {
-        const coachMsg: Message = {
+      const coachMsg: Message = {
             id: (Date.now() + 2).toString(),
-          sender: "coach",
+        sender: "coach",
             text: reply,
-        };
-        setMessages((prev) => [...prev, coachMsg]);
+      };
+      setMessages((prev) => [...prev, coachMsg]);
           speakText(reply);
         }
         // Refresh goal section after chat message
@@ -1781,7 +1799,7 @@ export function HomePage() {
           >
             <Camera className="w-6 h-6 text-white" />
           </button>
-        </div>
+              </div>
 
         {/* 2. Interface Tabs (Chat / Explore / Chat) - Fills remaining space and scrolls */}
         <div className="flex-1 bg-white rounded-t-[2rem] relative z-20 flex flex-col min-h-0 overflow-hidden">
@@ -2118,7 +2136,7 @@ export function HomePage() {
                       )}
                     </div>
                               ))}
-                            </div>
+                </div>
                           </div>
                         );
                       })}
@@ -2140,8 +2158,8 @@ export function HomePage() {
                     )}
                     <div
                       className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
-                      onClick={() => navigate("/recipes")}
-                    >
+                    onClick={() => navigate("/recipes")}
+                  >
                     <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center text-orange-600">
                       <Utensils className="w-7 h-7" />
                     </div>
@@ -2159,8 +2177,8 @@ export function HomePage() {
                     )}
                     <div
                       className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
-                      onClick={() => navigate("/workouts")}
-                    >
+                    onClick={() => navigate("/workouts")}
+                  >
                     <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
                       <Dumbbell className="w-7 h-7" />
                     </div>
@@ -2192,7 +2210,7 @@ export function HomePage() {
                     <span className="font-semibold text-gray-700 text-sm">
                       Habits
                     </span>
-                  </div>
+                    </div>
                 </div>
               </div>
             )}
@@ -2263,11 +2281,11 @@ export function HomePage() {
                             <Send className="w-4 h-4" />
                           </Button>
                         )}
-                      </div>
+                    </div>
                       <p className="text-xs text-gray-400 mt-1 ml-2">
                         Press Enter to send, Esc to cancel
                       </p>
-                    </div>
+                  </div>
                   )}
 
                   {/* Primary Input Controls */}
@@ -2302,7 +2320,7 @@ export function HomePage() {
                     >
                       <Keyboard className="w-6 h-6 text-gray-600" />
                     </Button>
-                    </div>
+                        </div>
                 </div>
               </div>
             )}

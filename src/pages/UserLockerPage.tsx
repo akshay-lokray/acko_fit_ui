@@ -111,7 +111,7 @@ function StageModel({ url }: { url: string }) {
         <primitive
             ref={stageGroup}
             object={scene}
-            scale={1.25}
+            scale={1.28}
             position={[0, -1.55, 0]}
             rotation={[0, 0, 0]}
         />
@@ -120,6 +120,16 @@ function StageModel({ url }: { url: string }) {
 
 export function UserLockerPage() {
     const navigate = useNavigate();
+    const [progress, setProgress] = useState(0);
+
+    useEffect(() => {
+        const stored = parseFloat(localStorage.getItem("homeCurrentProgress") ?? "0");
+        setProgress(Number.isFinite(stored) ? stored : 0);
+    }, []);
+
+    const safeCurrent = Number.isFinite(progress) ? Math.min(100, Math.max(0, progress)) : 0;
+    const expectedProgress = Math.min(100, safeCurrent + 10);
+    const extraExpectedWidth = Math.max(0, expectedProgress - safeCurrent);
 
     // --- State ---
     const [habitLog, setHabitLog] = useState<HabitRecord[]>([]);
@@ -127,7 +137,7 @@ export function UserLockerPage() {
     const [logError, setLogError] = useState<string | null>(null);
     const [selectedHabit, setSelectedHabit] = useState<string>("calories");
     const [recordsLimit, setRecordsLimit] = useState(5);
-    
+
 
     const habitIcons: Record<string, any> = {
         calories: Flame,
@@ -232,12 +242,12 @@ export function UserLockerPage() {
                         <ArrowLeft className="w-5 h-5" />
                         <span>Back</span>
                     </Button>
-                <h1 className="text-xl font-bold text-gray-900">Your Profile</h1>
-            </div>
-            <div className="flex items-center gap-2 bg-white shadow-sm rounded-full p-1">
-                <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-100 bg-white">
-                    <img src={ackoLogo} alt="ACKO logo" className="w-full h-full object-contain" />
+                    <h1 className="text-xl font-bold text-gray-900">Your Profile</h1>
                 </div>
+                <div className="flex items-center gap-2 bg-white shadow-sm rounded-full p-1">
+                    <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-100 bg-white">
+                        <img src={ackoLogo} alt="ACKO logo" className="w-full h-full object-contain" />
+                    </div>
                 </div>
             </div>
 
@@ -252,50 +262,82 @@ export function UserLockerPage() {
                         Evolution Timeline
                     </h2>
                 </div>
-                <div className="flex flex-col md:flex-row items-start md:items-stretch gap-4 w-full max-w-[960px] mx-auto pt-4">
-                    <div className="hidden md:flex flex-col items-center gap-2 w-32 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">
+                <div className="flex flex-col md:flex-row items-center md:items-stretch gap-4 w-full max-w-[960px] mx-auto pt-6">
+                    <div className="hidden md:flex flex-col items-center gap-2 w-32 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500 pt-4">
                         <span className="text-[10px] text-gray-400">Current</span>
                         <div className="relative flex h-full flex-col justify-center items-center py-6">
-                            <div className="absolute top-4 bottom-4 right-[13%] w-9 rounded-full bg-gradient-to-b from-emerald-500/90 to-emerald-200 border border-emerald-200" />
+                            <div className="absolute top-12 bottom-4 right-[13%] w-9 rounded-full bg-gradient-to-b from-emerald-500/90 to-emerald-200 border border-emerald-200" />
                             <span className="absolute right-[13%] top-[40%] h-5 w-5 -translate-y-1/2 rounded-full bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)]" />
                             <span className="absolute right-[13%] top-[60%] h-5 w-5 -translate-y-1/2 rounded-full bg-emerald-500/70 shadow-[0_0_12px_rgba(16,185,129,0.6)] border border-white" />
                         </div>
                     </div>
-                    <div className="flex-1 flex flex-col items-center gap-6 w-full pb-10">
+                    <div className="flex-1 flex flex-col items-center gap-4 w-full pb-12">
                         {TIMELINE_STAGES.map((stage) => (
-                            <div key={`stage-wrapper-${stage.id}`} className="flex flex-col items-center gap-3 w-full">
-                                <div className="timeline-card relative rounded-3xl border border-gray-100 bg-transparent shadow-[0_25px_60px_rgba(15,23,42,0.08)] backdrop-blur-md overflow-hidden flex justify-center items-center min-h-[260px] pt-4 max-w-[420px] mx-auto pb-4">
-                                    <div className="w-52 h-56 -translate-y-6">
-                                        <div className="w-full h-full flex items-center justify-center">
+                            <div key={`stage-wrapper-${stage.id}`} className="flex flex-col items-center gap-1 w-full">
+                                <div className="text-[11px] uppercase tracking-[0.6em] text-slate-500 mb-2">
+                                    {stage.label}
+                                </div>
+                                <div className="timeline-card relative rounded-3xl bg-transparent shadow-none overflow-hidden flex justify-center items-center min-h-[300px] pt-4 max-w-[440px] mx-auto">
+                                    <div className="w-60 h-64 -translate-y-4 border border-black/15 rounded-3xl overflow-hidden">
+                                        <div className="w-full h-full flex items-center justify-center bg-transparent">
                                             <StagePreview url={stage.url} />
                                         </div>
                                     </div>
                                 </div>
-                                <div className="text-[11px] uppercase tracking-[0.5em] text-slate-500">
-                                    {stage.label}
-                                </div>
                             </div>
                         ))}
                     </div>
-                    <div className="hidden md:flex flex-col items-center gap-2 w-32 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">
-                        <span className="text-[10px] text-gray-400">Expected</span>
+                    <div className="hidden md:flex flex-col items-center gap-2 w-32 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500 pt-4">
+                        <span className="text-[20px] text-gray-400">Expected</span>
                         <div className="relative flex h-full flex-col justify-center items-center py-6">
-                            <div className="absolute top-4 bottom-4 left-[13%] w-9 rounded-full bg-gradient-to-b from-sky-400/80 to-slate-200 border border-sky-200" />
+                            <div className="absolute top-56 bottom-4 left-[13%] w-9 rounded-full bg-gradient-to-b from-sky-400/80 to-slate-200 border border-sky-200" />
                             <span className="absolute left-[13%] top-[55%] h-5 w-5 -translate-y-1/2 rounded-full bg-sky-500 shadow-[0_0_15px_rgba(14,165,233,0.8)] border border-white" />
                             <span className="absolute left-[13%] top-[75%] h-5 w-5 -translate-y-1/2 rounded-full bg-sky-400/70 shadow-[0_0_12px_rgba(14,165,233,0.6)]" />
                         </div>
                     </div>
                 </div>
+                <div className="hidden md:block absolute left-[6rem] right-[6rem] top-[260px] pointer-events-none">
+                    <div className="relative h-2">
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-400/80 via-cyan-400 to-sky-500/80 opacity-80" />
+                        <div
+                            className="absolute top-0 h-2 rounded-full bg-emerald-600"
+                            style={{
+                                width: `${safeCurrent}%`,
+                            }}
+                        />
+                        {extraExpectedWidth > 0 && (
+                            <div
+                                className="absolute top-0 h-2 rounded-full bg-sky-500/80"
+                                style={{
+                                    left: `${safeCurrent}%`,
+                                    width: `${extraExpectedWidth}%`,
+                                }}
+                            />
+                        )}
+                        <div
+                            className="absolute -top-4 text-[10px] font-semibold tracking-[0.4em] text-slate-500"
+                            style={{ left: "0" }}
+                        >
+                            {safeCurrent.toFixed(0)}%
+                        </div>
+                        <div
+                            className="absolute -top-4 text-[10px] font-semibold tracking-[0.4em] text-slate-500"
+                            style={{ right: 0 }}
+                        >
+                            {expectedProgress.toFixed(0)}%
+                        </div>
+                    </div>
+                </div>
                 <div className="md:hidden absolute inset-0 pointer-events-none">
-                    <div className="absolute left-6 top-20 text-[10px] font-semibold tracking-[0.3em] text-black/90">
+                    <div className="absolute left-3 top-56 text-[20px] font-semibold tracking-[0em] text-black/90">
                         Current
                     </div>
-                    <div className="absolute right-6 top-20 text-[10px] font-semibold tracking-[0.3em] text-black/90 text-right">
+                    <div className="absolute right-0 top-56 text-[20px] font-semibold tracking-[0em] text-black/90 text-right">
                         Expected
                     </div>
-                    <div className="absolute left-6 top-20 bottom-24 w-6 rounded-full bg-gradient-to-b from-emerald-500/90 to-emerald-200" />
+                    <div className="absolute left-6 top-72 bottom-56 w-6 rounded-full bg-gradient-to-b from-emerald-500/90 to-emerald-200" />
                     <span className="absolute left-6 top-[42%] h-5 w-5 -translate-y-1/2 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)]" />
-                    <div className="absolute right-6 top-20 bottom-24 w-6 rounded-full bg-gradient-to-b from-sky-400/80 to-slate-200" />
+                    <div className="absolute right-6 top-72 bottom-56 w-6 rounded-full bg-gradient-to-b from-sky-400/80 to-slate-200" />
                     <span className="absolute right-6 top-[68%] h-5 w-5 -translate-y-1/2 rounded-full bg-sky-500 shadow-[0_0_12px_rgba(14,165,233,0.8)]" />
                 </div>
             </div>
@@ -343,33 +385,31 @@ export function UserLockerPage() {
                                                     <button
                                                         key={summary.habit}
                                                         onClick={() => setSelectedHabit(summary.habit)}
-                                                        className={`px-4 py-3 rounded-2xl border transition-shadow text-left flex flex-col gap-2 ${
-                                                            isSelected
-                                                                ? "bg-emerald-500 text-white shadow-lg border-emerald-500"
-                                                                : "bg-white border border-gray-200 text-gray-800 hover:shadow-sm"
-                                                        }`}
+                                                        className={`px-4 py-3 rounded-2xl border transition-shadow text-left flex flex-col gap-2 ${isSelected
+                                                            ? "bg-emerald-500 text-white shadow-lg border-emerald-500"
+                                                            : "bg-white border border-gray-200 text-gray-800 hover:shadow-sm"
+                                                            }`}
                                                     >
                                                         <div className="flex items-center justify-between">
                                                             <Icon className="w-5 h-5" />
                                                             <span className="text-xs uppercase tracking-[0.2em]">
                                                                 {habitLabels[summary.habit] || summary.habit}
                                                             </span>
-                                </div>
+                                                        </div>
                                                         <div className="text-2xl font-bold">
                                                             {summary.latest.value} {latestUnit}
-                        </div>
+                                                        </div>
                                                         <div className="text-xs">
                                                             {new Date(summary.latest.recordedAt).toLocaleDateString(
                                                                 "en-IN",
                                                                 { month: "short", day: "numeric" }
                                                             )}
-                                            </div>
+                                                        </div>
                                                         <div
-                                                            className={`text-sm font-semibold ${
-                                                                summary.change >= 0
-                                                                    ? "text-emerald-200"
-                                                                    : "text-rose-200"
-                                                            }`}
+                                                            className={`text-sm font-semibold ${summary.change >= 0
+                                                                ? "text-emerald-200"
+                                                                : "text-rose-200"
+                                                                }`}
                                                         >
                                                             {summary.change >= 0 ? "+" : ""}
                                                             {summary.change.toFixed(1)} {latestUnit}
@@ -404,11 +444,10 @@ export function UserLockerPage() {
                                                         </p>
                                                     </div>
                                                     <div
-                                                        className={`text-sm font-bold ${
-                                                            selectedSummary.change >= 0
-                                                                ? "text-emerald-600"
-                                                                : "text-red-500"
-                                                        }`}
+                                                        className={`text-sm font-bold ${selectedSummary.change >= 0
+                                                            ? "text-emerald-600"
+                                                            : "text-red-500"
+                                                            }`}
                                                     >
                                                         {selectedSummary.change >= 0 ? "+" : ""}
                                                         {selectedSummary.change.toFixed(1)}{" "}
@@ -468,7 +507,7 @@ export function UserLockerPage() {
                                 )}
                             </>
                         )}
-                        </div>
+                    </div>
                 </div>
             </div>
 
