@@ -710,6 +710,13 @@ export function HomePage() {
     return result;
   }, [activeGoal, goalHabitData]);
 
+  useEffect(() => {
+    const storedValue = goalChartData.currentProgress;
+    if (storedValue !== undefined && storedValue !== null) {
+      localStorage.setItem("homeCurrentProgress", String(storedValue));
+    }
+  }, [goalChartData.currentProgress]);
+
   // Fetch habit data from API and calculate daily goal progress
   useEffect(() => {
     const userId = HARD_CODED_USER_ID;
