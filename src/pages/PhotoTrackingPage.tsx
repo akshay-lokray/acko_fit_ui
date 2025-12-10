@@ -51,6 +51,7 @@ export function PhotoTrackingPage() {
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const { formData: profile } = useUserProfileStore();
   const streak = profile.streak ?? 0;
+  const transcriptRef = useRef("");
 
   useEffect(() => {
     return () => {
@@ -208,31 +209,78 @@ export function PhotoTrackingPage() {
       if (!text.trim()) return;
       setVoiceError(null);
       setVoiceTranscript(text);
-      const params = new URLSearchParams();
-      params.append("text", text);
+      const instruction = encodeURIComponent(text);
+        const parseQuantity = (quantity: string) => {
+          const numeric = parseFloat(quantity);
+          if (!Number.isFinite(numeric)) {
+            return {
+              amount: 0,
+              unit: quantity.replace(/^[\d\s\.]+/, "").trim(),
+            };
+          }
+          return {
+            amount: numeric,
+            unit: quantity.replace(/^[\d\s\.]+/, "").trim(),
+          };
+        };
+
+        const payload = {
+          mealName: mealName || "Meal",
+          totalCalories,
+          items: items.map((item) => {
+            const { amount, unit } = parseQuantity(item.quantity);
+            return {
+              name: item.name,
+              quantity: amount,
+              unit,
+              calories: item.calories,
+              note: item.note || "",
+            };
+          }),
+          healthNote: healthNote || "",
+        };
       try {
-        const response = await fetch("/api/users/intent/submit", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: params.toString(),
-        });
+        const response = await fetch(
+          `/api/habits/food/adjust?instruction=${instruction}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          }
+        );
         if (!response.ok) {
-          throw new Error("Intent check failed");
+          throw new Error("Meal adjust request failed");
         }
         const data = await response.json();
-        if (data?.submit) {
+        if (data.mealName) {
+          setMealName(data.mealName);
+        }
+        if (data.healthNote) {
+          setHealthNote(data.healthNote);
+        }
+        if (Array.isArray(data.items)) {
+          const normalized = data.items.map((item: any, idx: number) => ({
+            id: `${item.name || "item"}-${idx}-${Date.now()}`,
+            name: item.name || "",
+            quantity: item.unit
+              ? `${item.quantity ?? ""} ${item.unit}`.trim()
+              : String(item.quantity ?? ""),
+            calories: Number(item.calories ?? 0),
+            note: item.note || "",
+          }));
+          setItems(normalized);
+        }
+        if (data.submit) {
           await handleConfirmLog();
-        } else {
-          setLogError("AI assistant suggested not submitting right now.");
         }
       } catch (error) {
-        console.error("Intent API failed", error);
-        setVoiceError("Voice assistant couldn't determine intent.");
+        console.error("Voice adjust failed", error);
+        setVoiceError("Unable to adjust meal right now.");
       }
     },
-    [handleConfirmLog]
+    [handleConfirmLog, healthNote, items, mealName, totalCalories]
   );
 
   const startVoiceCapture = useCallback(() => {
@@ -268,8 +316,8 @@ export function PhotoTrackingPage() {
         .map((result) => result[0].transcript)
         .join(" ")
         .trim();
+      transcriptRef.current = transcript;
       setVoiceTranscript(transcript);
-      handleVoiceIntent(transcript);
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -280,6 +328,10 @@ export function PhotoTrackingPage() {
     recognition.onend = () => {
       setIsListening(false);
       recognitionRef.current = null;
+      const finalTranscript = transcriptRef.current;
+      if (finalTranscript) {
+        handleVoiceIntent(finalTranscript);
+      }
     };
 
     recognitionRef.current = recognition;
