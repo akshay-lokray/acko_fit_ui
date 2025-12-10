@@ -36,12 +36,12 @@ export function FemaleAvatarModel(props: any) {
         
         if (isFullScreen) {
           // Full screen: normal scale
-          const scale = 1.2 / maxDim;
+          const scale = 1.8 / maxDim;
           groupRef.current.position.sub(center);
           groupRef.current.scale.multiplyScalar(scale);
         } else {
           // Face-only (200x200): very large scale and high Y offset to show ONLY face
-          const scale = 8.9 / maxDim; // Very large scale for face-only focus
+          const scale = 8.5 / maxDim; // Very large scale for face-only focus
           groupRef.current.position.sub(center);
           groupRef.current.position.y += 1.2; // High offset to position face at camera targetY
           groupRef.current.scale.multiplyScalar(scale);
