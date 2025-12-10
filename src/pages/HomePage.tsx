@@ -93,7 +93,7 @@ interface HabitLog {
     mealName?: string;
     healthNote?: string;
     items?: Array<{
-  name: string;
+      name: string;
       calories: number;
       quantity?: string;
       note?: string;
@@ -239,7 +239,9 @@ export function HomePage() {
   const navigate = useNavigate();
   const { formData: profile, updateFormData } = useUserProfileStore();
   const fetchedUserRef = useRef<string | null>(null);
-  const [sessionCoachGender, setSessionCoachGender] = useState<string | null>(null);
+  const [sessionCoachGender, setSessionCoachGender] = useState<string | null>(
+    null
+  );
   const goalStateRef = useRef<{ userId: string | null; hits: Set<string> }>({
     userId: null,
     hits: new Set(),
@@ -248,22 +250,21 @@ export function HomePage() {
   // Safe access to formData with defaults
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setSessionCoachGender(window.sessionStorage.getItem("selectedCoachGender"));
+      setSessionCoachGender(
+        window.sessionStorage.getItem("selectedCoachGender")
+      );
     }
   }, []);
 
   const gender =
-    profile.gender ||
-    routeFormData.gender ||
-    sessionCoachGender ||
-    "female";
+    profile.gender || routeFormData.gender || sessionCoachGender || "female";
   const name = profile.name || routeFormData.name || "Traveller";
   const coachName = gender === "male" ? "Dhoni" : "Sakshi";
 
   // State
-  const [activeTab, setActiveTab] = useState<"goals" | "Your Plan" | "Talk to Dhoni">(
-    "goals"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "goals" | "Your Plan" | "Talk to Dhoni"
+  >("goals");
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isHabitApiLoading, setHabitApiLoading] = useState(false);
@@ -401,7 +402,7 @@ export function HomePage() {
       const res = await fetch(
         `/api/users/${encodeURIComponent(phoneNumber)}/xp?delta=${delta}`,
         {
-        method: "POST",
+          method: "POST",
         }
       );
       if (!res.ok) return;
@@ -877,6 +878,7 @@ export function HomePage() {
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const recognitionResultRef = useRef<string>("");
+  const interimTranscriptRef = useRef<string>(""); // Store interim transcripts
   const wakeWordRecognitionRef = useRef<SpeechRecognition | null>(null);
   const maxListeningTimeoutRef = useRef<number | null>(null);
   const silenceTimeoutRef = useRef<number | null>(null);
@@ -884,6 +886,9 @@ export function HomePage() {
   const silenceMonitorRef = useRef<number | null>(null);
   const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const handleSendMessageRef = useRef<((textOverride?: string) => void) | null>(
+    null
+  );
   const SILENCE_TIMEOUT_MS = 3000;
 
   // Function to play audio feedback - start listening sound
@@ -1162,8 +1167,6 @@ export function HomePage() {
     }
   };
 
- 
-
   // Helper function to stop listening and send the result
   const clearSilenceMonitor = useCallback(() => {
     if (silenceMonitorRef.current) {
@@ -1193,18 +1196,18 @@ export function HomePage() {
     if (recognitionRef.current) {
       const recognition = recognitionRef.current;
 
-      // Remove all event handlers first to prevent them from firing
+      // Remove all event handlers FIRST before stopping to prevent auto-restart
       recognition.onend = null;
       recognition.onerror = null;
       recognition.onresult = null;
 
-      // Clear ref to prevent handlers from restarting
+      // Clear ref BEFORE stopping to prevent handlers from restarting
       recognitionRef.current = null;
 
       try {
-        // Use stop() for graceful stop (abort() triggers error events)
+        // Use stop() for graceful stop
         recognition.stop();
-        } catch {
+      } catch {
         // If stop fails, try abort
         try {
           recognition.abort();
@@ -1215,18 +1218,27 @@ export function HomePage() {
     }
 
     // Send the transcribed text if available
-  }, [isMale, playEndSound, clearSilenceMonitor]);
+    // Use final transcript if available, otherwise fall back to interim transcript
+    const finalText = recognitionResultRef.current.trim();
+    const interimText = interimTranscriptRef.current.trim();
+    const textToSend = finalText || interimText;
 
-  const startSilenceMonitor = useCallback(() => {
-    clearSilenceMonitor();
-    silenceMonitorRef.current = window.setInterval(() => {
-      const idle = Date.now() - lastSpeechTimeRef.current;
-      if (idle >= SILENCE_TIMEOUT_MS) {
-        console.log("🔇 Silence monitor triggered, stopping recognition");
-        stopListeningAndSend();
+    if (textToSend) {
+      console.log("📤 Sending transcribed text:", textToSend);
+      if (interimText && !finalText) {
+        console.log(
+          "⚠️ Using interim transcript as final transcript was not available"
+        );
       }
-    }, 400);
-  }, [clearSilenceMonitor, stopListeningAndSend]);
+      // Send the message using handleSendMessageRef
+      if (handleSendMessageRef.current) {
+        handleSendMessageRef.current(textToSend);
+      }
+      // Clear the refs
+      recognitionResultRef.current = "";
+      interimTranscriptRef.current = "";
+    }
+  }, [playEndSound, clearSilenceMonitor]);
 
   // Voice input handler - wrapped in useCallback for use in wake word detection
   const handleVoiceInput = useCallback(() => {
@@ -1250,6 +1262,18 @@ export function HomePage() {
       return;
     }
 
+    // Stop any ongoing speech synthesis when user clicks mic (mic takes priority)
+    if (window.speechSynthesis.speaking) {
+      console.log("🔇 Stopping speech synthesis - microphone activated");
+      window.speechSynthesis.cancel();
+      if (speechSynthesisRef.current) {
+        speechSynthesisRef.current.onend = null;
+        speechSynthesisRef.current.onerror = null;
+        speechSynthesisRef.current.onstart = null;
+        speechSynthesisRef.current = null;
+      }
+    }
+
     // If already listening, stop recognition manually
     if (isListening) {
       stopListeningAndSend();
@@ -1258,17 +1282,25 @@ export function HomePage() {
 
     // Ensure any previous recognition is fully cleaned up
     if (recognitionRef.current) {
+      const oldRecognition = recognitionRef.current;
+      // Remove all event handlers FIRST to prevent auto-restart
+      oldRecognition.onend = null;
+      oldRecognition.onerror = null;
+      oldRecognition.onresult = null;
+      // Clear ref before stopping
+      recognitionRef.current = null;
+
       try {
-        const oldRecognition = recognitionRef.current;
-        // Remove all event handlers to prevent conflicts
-        oldRecognition.onend = null;
-        oldRecognition.onerror = null;
-        oldRecognition.onresult = null;
+        // Use stop() for graceful stop
         oldRecognition.stop();
       } catch {
-        // Ignore errors when cleaning up
+        // If stop fails, try abort
+        try {
+          oldRecognition.abort();
+        } catch {
+          // Ignore errors when stopping
+        }
       }
-      recognitionRef.current = null;
     }
 
     // Small delay to ensure previous recognition is fully stopped
@@ -1288,33 +1320,6 @@ export function HomePage() {
         recognition.interimResults = true; // Show interim results
         recognition.lang = "en-US"; // Set language (you can make this configurable)
 
-        // Constants for timeout management
-        const MAX_LISTENING_TIME = 35000; // 35 seconds maximum
-        const SILENCE_TIMEOUT = 3000; // 3 seconds of silence to auto-stop
-
-        // Set maximum listening time (35 seconds)
-        maxListeningTimeoutRef.current = window.setTimeout(() => {
-          console.log("⏱️ Maximum listening time reached (35s), stopping...");
-          stopListeningAndSend();
-        }, MAX_LISTENING_TIME);
-
-        // Track speech activity
-        lastSpeechTimeRef.current = Date.now();
-
-        // Function to reset silence timeout
-        const resetSilenceTimeout = () => {
-          if (silenceTimeoutRef.current) {
-            window.clearTimeout(silenceTimeoutRef.current);
-          }
-          silenceTimeoutRef.current = window.setTimeout(() => {
-            const timeSinceLastSpeech = Date.now() - lastSpeechTimeRef.current;
-            if (timeSinceLastSpeech >= SILENCE_TIMEOUT && isListening) {
-              console.log("🔇 Silence detected for 3s, stopping...");
-              stopListeningAndSend();
-            }
-          }, SILENCE_TIMEOUT);
-        };
-
         // Handle recognition results
         recognition.onresult = (event: SpeechRecognitionEvent) => {
           let interimTranscript = "";
@@ -1332,19 +1337,14 @@ export function HomePage() {
           // Update the result
           if (finalTranscript) {
             recognitionResultRef.current += finalTranscript;
+            interimTranscriptRef.current = ""; // Clear interim when we get final
             console.log("🎤 Final transcript:", finalTranscript);
-            // Update last speech time when we get final results
-            lastSpeechTimeRef.current = Date.now();
-            // Reset silence timeout since we detected speech
-            resetSilenceTimeout();
           }
 
           // Update last speech time for interim results too (user is still speaking)
           if (interimTranscript) {
+            interimTranscriptRef.current = interimTranscript; // Store interim transcript
             console.log("🎤 Interim transcript:", interimTranscript);
-            lastSpeechTimeRef.current = Date.now();
-            // Reset silence timeout since we detected speech
-            resetSilenceTimeout();
           }
         };
 
@@ -1361,8 +1361,8 @@ export function HomePage() {
 
           // Log other errors
           if (event.error === "no-speech") {
-            console.log("No speech detected, checking silence timeout...");
-            // Don't stop immediately, let silence timeout handle it
+            console.log("No speech detected, continuing to listen...");
+            // Don't stop - user will manually stop when ready
           } else if (event.error === "audio-capture") {
             console.error("❌ Audio capture error - no microphone found");
             alert("No microphone found. Please check your microphone.");
@@ -1407,6 +1407,15 @@ export function HomePage() {
 
         // Handle when recognition ends
         recognition.onend = () => {
+          // Check if this recognition instance is still the current one
+          // If not, it means we've intentionally stopped and created a new one
+          if (recognitionRef.current !== recognition) {
+            console.log(
+              "✅ Recognition ended but ref was cleared (intentionally stopped)"
+            );
+            return;
+          }
+
           const duration = Date.now() - recognitionStartTime;
           console.log(`🎤 Speech recognition ended (duration: ${duration}ms)`);
 
@@ -1416,10 +1425,11 @@ export function HomePage() {
             console.warn(
               "⚠️ Recognition ended too quickly, might be an error. Not restarting."
             );
-            // Check if we're still supposed to be listening
+            // Check if we're still supposed to be listening and ref matches
             if (isListening && recognitionRef.current === recognition) {
               // Wait a bit longer before trying to restart
               setTimeout(() => {
+                // Double-check ref still matches (might have been cleared)
                 if (isListening && recognitionRef.current === recognition) {
                   console.log(
                     "🔄 Attempting to restart recognition after quick end..."
@@ -1440,11 +1450,12 @@ export function HomePage() {
           }
 
           // Only restart if we're still supposed to be listening
-          // and the recognition wasn't intentionally stopped
+          // and the recognition wasn't intentionally stopped (ref still matches)
           if (isListening && recognitionRef.current === recognition) {
             console.log("🔄 Recognition ended normally, restarting...");
             // Small delay before restarting to avoid conflicts
             setTimeout(() => {
+              // Double-check ref still matches (might have been cleared)
               if (isListening && recognitionRef.current === recognition) {
                 try {
                   recognition.start();
@@ -1460,6 +1471,10 @@ export function HomePage() {
                   }
                   stopListeningAndSend();
                 }
+              } else {
+                console.log(
+                  "⚠️ Ref was cleared during restart delay, not restarting"
+                );
               }
             }, 100);
           } else {
@@ -1473,21 +1488,16 @@ export function HomePage() {
         recognition.start();
         setIsListening(true);
         recognitionResultRef.current = "";
-        lastSpeechTimeRef.current = Date.now();
-        startSilenceMonitor();
+        interimTranscriptRef.current = ""; // Clear interim transcript on start
 
         // Play start sound to indicate listening has started
         playStartSound();
 
-        // Start silence detection
-        resetSilenceTimeout();
-
-        console.log(
-          "🎤 Started speech recognition (max 35s, auto-stop after 3s silence)"
-        );
+        console.log("🎤 Started speech recognition (manual stop only)");
       } catch (error) {
         console.error("Failed to start speech recognition:", error);
         setIsListening(false);
+        recognitionRef.current = null; // Clear ref on error
         alert(
           "Failed to start speech recognition. Please check your microphone permissions."
         );
@@ -1710,12 +1720,12 @@ export function HomePage() {
     sendHabitAssistMessage(textToSend, userId)
       .then((reply) => {
         if (reply) {
-      const coachMsg: Message = {
+          const coachMsg: Message = {
             id: (Date.now() + 2).toString(),
-        sender: "coach",
+            sender: "coach",
             text: reply,
-      };
-      setMessages((prev) => [...prev, coachMsg]);
+          };
+          setMessages((prev) => [...prev, coachMsg]);
           speakText(reply);
         }
         // Refresh goal section after chat message
@@ -1723,6 +1733,11 @@ export function HomePage() {
       })
       .finally(() => setHabitApiLoading(false));
   };
+
+  // Update handleSendMessageRef when handleSendMessage is defined
+  useEffect(() => {
+    handleSendMessageRef.current = handleSendMessage;
+  }, [handleSendMessage]);
 
   // Handle text input toggle
   const handleTextInputToggle = () => {
@@ -1790,7 +1805,7 @@ export function HomePage() {
             voiceType={gender as VoiceType}
             isFullScreen={false}
           />
-          
+
           {/* Snap Your Meal Button - Top right corner of avatar */}
           <button
             onClick={() => navigate("/tracker")}
@@ -1799,7 +1814,7 @@ export function HomePage() {
           >
             <Camera className="w-6 h-6 text-white" />
           </button>
-              </div>
+        </div>
 
         {/* 2. Interface Tabs (Chat / Explore / Chat) - Fills remaining space and scrolls */}
         <div className="flex-1 bg-white rounded-t-[2rem] relative z-20 flex flex-col min-h-0 overflow-hidden">
@@ -1830,10 +1845,13 @@ export function HomePage() {
             <button
               onClick={() => setActiveTab("Talk to Dhoni")}
               className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors relative ${
-                activeTab === "Talk to Dhoni" ? "text-emerald-600" : "text-gray-400"
+                activeTab === "Talk to Dhoni"
+                  ? "text-emerald-600"
+                  : "text-gray-400"
               }`}
             >
-              <Mic className="w-5 h-5" />Talk to Dhoni
+              <Mic className="w-5 h-5" />
+              Talk to Dhoni
               {activeTab === "Talk to Dhoni" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600" />
               )}
@@ -1893,7 +1911,7 @@ export function HomePage() {
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-md">
                       <Utensils className="w-5 h-5 text-white" />
-                      </div>
+                    </div>
                     <div>
                       <h2 className="text-lg font-bold text-gray-900">
                         Today's Intake
@@ -1944,7 +1962,7 @@ export function HomePage() {
                           ).toFixed(1)}
                           % of daily target
                         </p>
-                </div>
+                      </div>
 
                       {/* Water */}
                       <div className="space-y-2">
@@ -2091,52 +2109,60 @@ export function HomePage() {
                                       <span className="text-xs font-medium text-red-600">
                                         {meal.calories} kcal
                                       </span>
-                          )}
-                        </div>
+                                    )}
+                                  </div>
                                   {meal.healthNote && (
                                     <p className="text-xs text-gray-600 mt-1">
                                       {meal.healthNote}
                                     </p>
                                   )}
                                   {/* Display food items from metadata */}
-                                  {meal.food && Array.isArray(meal.food) && meal.food.length > 0 && (
-                                    <div className="mt-2 pt-2 border-t border-red-200/50">
-                                      <p className="text-xs font-medium text-gray-700 mb-1">
-                                        Food Items:
-                                      </p>
-                                      <div className="flex flex-wrap gap-1">
-                                        {meal.food.map((foodItem, foodIdx) => (
-                                          <span
-                                            key={foodIdx}
-                                            className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full"
-                                          >
-                                            {foodItem}
-                            </span>
-                                        ))}
-                        </div>
-                      </div>
-                                  )}
-                                  {/* Fallback to items array if food is not available */}
-                                  {(!meal.food || (Array.isArray(meal.food) && meal.food.length === 0)) && meal.items && meal.items.length > 0 && (
-                                    <div className="mt-2 pt-2 border-t border-red-200/50">
-                                      <p className="text-xs font-medium text-gray-700 mb-1">
-                                        Items:
-                                      </p>
-                                      <div className="flex flex-wrap gap-1">
-                                        {meal.items.map((item, itemIdx) => (
-                        <span
-                                            key={itemIdx}
-                                            className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full"
-                        >
-                                            {item.name}
-                        </span>
-                                        ))}
+                                  {meal.food &&
+                                    Array.isArray(meal.food) &&
+                                    meal.food.length > 0 && (
+                                      <div className="mt-2 pt-2 border-t border-red-200/50">
+                                        <p className="text-xs font-medium text-gray-700 mb-1">
+                                          Food Items:
+                                        </p>
+                                        <div className="flex flex-wrap gap-1">
+                                          {meal.food.map(
+                                            (foodItem, foodIdx) => (
+                                              <span
+                                                key={foodIdx}
+                                                className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full"
+                                              >
+                                                {foodItem}
+                                              </span>
+                                            )
+                                          )}
+                                        </div>
                                       </div>
-                                    </div>
-                      )}
-                    </div>
+                                    )}
+                                  {/* Fallback to items array if food is not available */}
+                                  {(!meal.food ||
+                                    (Array.isArray(meal.food) &&
+                                      meal.food.length === 0)) &&
+                                    meal.items &&
+                                    meal.items.length > 0 && (
+                                      <div className="mt-2 pt-2 border-t border-red-200/50">
+                                        <p className="text-xs font-medium text-gray-700 mb-1">
+                                          Items:
+                                        </p>
+                                        <div className="flex flex-wrap gap-1">
+                                          {meal.items.map((item, itemIdx) => (
+                                            <span
+                                              key={itemIdx}
+                                              className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full"
+                                            >
+                                              {item.name}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                </div>
                               ))}
-                </div>
+                            </div>
                           </div>
                         );
                       })}
@@ -2158,15 +2184,15 @@ export function HomePage() {
                     )}
                     <div
                       className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
-                    onClick={() => navigate("/recipes")}
-                  >
-                    <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center text-orange-600">
-                      <Utensils className="w-7 h-7" />
+                      onClick={() => navigate("/recipes")}
+                    >
+                      <div className="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center text-orange-600">
+                        <Utensils className="w-7 h-7" />
+                      </div>
+                      <span className="font-semibold text-gray-700 text-sm">
+                        Curated Recipes
+                      </span>
                     </div>
-                    <span className="font-semibold text-gray-700 text-sm">
-                      Curated Recipes
-                    </span>
-                  </div>
                   </div>
 
                   <div className="relative">
@@ -2177,15 +2203,15 @@ export function HomePage() {
                     )}
                     <div
                       className="w-full max-w-[150px] p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer hover:shadow-md transition-shadow bg-white rounded-2xl border border-gray-200 shadow-sm"
-                    onClick={() => navigate("/workouts")}
-                  >
-                    <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
-                      <Dumbbell className="w-7 h-7" />
+                      onClick={() => navigate("/workouts")}
+                    >
+                      <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                        <Dumbbell className="w-7 h-7" />
+                      </div>
+                      <span className="font-semibold text-gray-700 text-sm">
+                        Personalized Workout Plans
+                      </span>
                     </div>
-                    <span className="font-semibold text-gray-700 text-sm">
-                      Personalized Workout Plans
-                    </span>
-                  </div>
                   </div>
 
                   <div
@@ -2210,7 +2236,7 @@ export function HomePage() {
                     <span className="font-semibold text-gray-700 text-sm">
                       Habits
                     </span>
-                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -2237,7 +2263,7 @@ export function HomePage() {
                         }`}
                       >
                         {msg.text}
-                </div>
+                      </div>
                     </div>
                   ))}
                   {isHabitApiLoading && (
@@ -2245,10 +2271,10 @@ export function HomePage() {
                       <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-500">
                         <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                         thinking...
-                  </div>
+                      </div>
                     </div>
                   )}
-                  </div>
+                </div>
 
                 {/* Input Area - Fixed at bottom */}
                 <div className="sticky bottom-0 bg-white border-t border-gray-100 pt-4 pb-4 -mx-4 md:-mx-6 px-4 md:px-6 z-10">
@@ -2281,11 +2307,11 @@ export function HomePage() {
                             <Send className="w-4 h-4" />
                           </Button>
                         )}
-                    </div>
+                      </div>
                       <p className="text-xs text-gray-400 mt-1 ml-2">
                         Press Enter to send, Esc to cancel
                       </p>
-                  </div>
+                    </div>
                   )}
 
                   {/* Primary Input Controls */}
@@ -2320,7 +2346,7 @@ export function HomePage() {
                     >
                       <Keyboard className="w-6 h-6 text-gray-600" />
                     </Button>
-                        </div>
+                  </div>
                 </div>
               </div>
             )}
